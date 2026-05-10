@@ -5,6 +5,7 @@ import {
   BarChart3,
   Check,
   Download,
+  FileJson,
   FileText,
   History as HistoryIcon,
   Link as LinkIcon,
@@ -338,6 +339,24 @@ export default function CSVBadgePrinterPage() {
     XLSX.writeFile(workbook, exportFileName);
   };
 
+  const viewJsonInNewTab = () => {
+    if (csvData.length === 0) return;
+
+    // Remove internal fields for a cleaner JSON export
+    const cleanData = csvData.map(row => {
+      const { __printed, __manual, ...rest } = row;
+      return rest;
+    });
+
+    const jsonString = JSON.stringify(cleanData, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const newTab = window.open(url, '_blank');
+    if (newTab) {
+      newTab.focus();
+    }
+  };
+
   const selectedNameColumn = form.watch('nameColumn');
   const staticLink = form.watch('link');
   const currentEventName = form.watch('eventName');
@@ -346,18 +365,23 @@ export default function CSVBadgePrinterPage() {
     if (!nameCol) return '';
     const firstName = String(row[nameCol] || '').trim();
     if (!firstName) return '';
-    
+
     let surname = '';
     const keys = Object.keys(row);
     const surnameKey = keys.find(k => {
       const lower = k.toLowerCase().trim();
-      return lower === 'sobrenome' || lower.includes('sobrenome') || lower === 'last name' || lower === 'surname';
+      return (
+        lower === 'sobrenome' ||
+        lower.includes('sobrenome') ||
+        lower === 'last name' ||
+        lower === 'surname'
+      );
     });
-    
+
     if (surnameKey && surnameKey !== nameCol) {
       surname = String(row[surnameKey] || '').trim();
     }
-    
+
     return surname ? `${firstName} ${surname}` : firstName;
   };
 
@@ -665,6 +689,15 @@ export default function CSVBadgePrinterPage() {
                           </Button>
                         )}
                       </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={viewJsonInNewTab}
+                        className="whitespace-nowrap"
+                      >
+                        <FileJson className="w-4 h-4 mr-2" />
+                        Ver JSON
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
