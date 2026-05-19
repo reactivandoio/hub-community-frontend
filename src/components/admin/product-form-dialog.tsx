@@ -21,19 +21,15 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import {
+  productSchema,
+  type ProductFormValues,
+} from '@/lib/schemas';
 import { Batch, Product } from '@/lib/types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Pencil, Plus, Trash } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import * as z from 'zod';
-
-const productSchema = z.object({
-  name: z.string().min(2, 'O nome do produto é obrigatório.'),
-  enabled: z.boolean().default(true),
-});
-
-type ProductFormValues = z.infer<typeof productSchema>;
 
 // Extended definitions to match user request locally
 interface ExtendedBatch extends Batch {

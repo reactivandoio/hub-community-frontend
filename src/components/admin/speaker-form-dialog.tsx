@@ -22,19 +22,15 @@ import { Input } from '@/components/ui/input';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { useToast } from '@/hooks/use-toast';
 import { CREATE_SPEAKER, GET_SPEAKERS } from '@/lib/queries';
+import {
+  speakerSchema,
+  type SpeakerFormValues,
+} from '@/lib/schemas';
 import { CreateSpeakerResponse, Speaker } from '@/lib/types';
 import { useMutation } from '@apollo/client';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import * as z from 'zod';
-
-const speakerSchema = z.object({
-  name: z.string().min(2, 'O nome deve ter pelo menos 2 caracteres.'),
-  biography: z.any().optional(), // Rich Text JSON
-});
-
-type SpeakerFormValues = z.infer<typeof speakerSchema>;
 
 interface SpeakerFormDialogProps {
   onSave: (speaker: Speaker) => void;

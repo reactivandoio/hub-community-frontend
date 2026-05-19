@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import { Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -30,23 +29,13 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GET_EVENTS } from '@/lib/queries';
+import {
+  votingSessionSchema,
+  type VotingSessionFormValues,
+} from '@/lib/schemas';
 import { VotingOption, VotingSessionInput } from '@/lib/types';
 import { VotingOptionFormDialog } from '@/components/admin/voting-option-form-dialog';
 import { useToast } from '@/hooks/use-toast';
-
-const votingSessionSchema = z.object({
-  title: z.string().min(2, {
-    message: 'O título deve ter pelo menos 2 caracteres.',
-  }),
-  description: z.string().optional(),
-  event_id: z.string().optional(),
-  status: z.enum(['open', 'closed', 'archived']),
-  max_votes_per_user: z.coerce.number().min(1, {
-    message: 'O número de votos por usuário deve ser pelo menos 1.',
-  }),
-});
-
-type VotingSessionFormValues = z.infer<typeof votingSessionSchema>;
 
 export interface VotingSessionFormProps {
   initialData?: VotingSessionFormValues & {

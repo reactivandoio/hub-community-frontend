@@ -105,13 +105,23 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  const [signInMutation] = useMutation<SignInResponse>(SIGN_IN);
-  const [signUpMutation] = useMutation<SignUpResponse>(SIGN_UP);
-  const [forwardPasswordMutation] =
-    useMutation<ForwardPasswordResponse>(FORWARD_PASSWORD);
-  const [resetPasswordMutation] =
-    useMutation<ResetPasswordResponse>(RESET_PASSWORD);
-  const [updateUserPhoneMutation] = useMutation(UPDATE_USER_PHONE);
+  const [signInMutation] = useMutation<SignInResponse>(SIGN_IN, {
+    errorPolicy: 'all',
+  });
+  const [signUpMutation] = useMutation<SignUpResponse>(SIGN_UP, {
+    errorPolicy: 'all',
+  });
+  const [forwardPasswordMutation] = useMutation<ForwardPasswordResponse>(
+    FORWARD_PASSWORD,
+    { errorPolicy: 'all' }
+  );
+  const [resetPasswordMutation] = useMutation<ResetPasswordResponse>(
+    RESET_PASSWORD,
+    { errorPolicy: 'all' }
+  );
+  const [updateUserPhoneMutation] = useMutation(UPDATE_USER_PHONE, {
+    errorPolicy: 'none',
+  });
 
   // Load auth data from localStorage on mount
   useEffect(() => {
@@ -206,28 +216,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (input: SignInInput) => {
     dispatch({ type: 'AUTH_START' });
     try {
-      const { data } = await signInMutation({ variables: input });
+      const result = await signInMutation({ variables: input });
 
-      if (data?.signIn?.token) {
-        // Use the actual user data returned by the BFF
+      if (result.errors && result.errors.length > 0) {
+        throw new Error(result.errors[0].message);
+      }
+
+      if (result.data?.signIn?.token) {
         const user: User = {
-          id: data.signIn.id || undefined,
-          email: data.signIn.email || input.identifier,
-          username: data.signIn.username || input.identifier.split('@')[0],
-          name: data.signIn.name || undefined,
-          phone: data.signIn.phone || undefined,
+          id: result.data.signIn.id || undefined,
+          email: result.data.signIn.email || input.identifier,
+          username: result.data.signIn.username || input.identifier.split('@')[0],
+          name: result.data.signIn.name || undefined,
+          phone: result.data.signIn.phone || undefined,
         };
 
-        saveToStorage(user, data.signIn.token);
+        saveToStorage(user, result.data.signIn.token);
         dispatch({
           type: 'AUTH_SUCCESS',
-          payload: { user, token: data.signIn.token },
+          payload: { user, token: result.data.signIn.token },
         });
       } else {
         throw new Error('Invalid response');
       }
     } catch (error) {
-      console.error('Sign in error:', error);
       dispatch({ type: 'AUTH_ERROR' });
       throw error;
     }
@@ -236,18 +248,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (input: SignUpInput) => {
     dispatch({ type: 'AUTH_START' });
     try {
-      const { data } = await signUpMutation({ variables: { input } });
+      const result = await signUpMutation({ variables: { input } });
 
-      if (data?.signUp) {
-        // After signup, user needs to sign in
+      if (result.errors && result.errors.length > 0) {
+        throw new Error(result.errors[0].message);
+      }
+
+      if (result.data?.signUp) {
         dispatch({ type: 'AUTH_ERROR' });
-        // You could automatically sign them in here if you want
-        // await signIn({ identifier: input.email, password: input.password });
       } else {
-        throw new Error('Invalid response');
+        throw new Error('Erro ao criar conta. Tente novamente.');
       }
     } catch (error) {
-      console.error('Sign up error:', error);
       dispatch({ type: 'AUTH_ERROR' });
       throw error;
     }
@@ -263,18 +275,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const forwardPassword = async (email: string) => {
     try {
-      await forwardPasswordMutation({ variables: { email } });
+      const result = await forwardPasswordMutation({ variables: { email } });
+      if (result.errors && result.errors.length > 0) {
+        throw new Error(result.errors[0].message);
+      }
     } catch (error) {
-      console.error('Forward password error:', error);
       throw error;
     }
   };
 
   const resetPassword = async (code: string, password: string, passwordConfirmation: string) => {
     try {
-      await resetPasswordMutation({ variables: { code, password, passwordConfirmation } });
+      const result = await resetPasswordMutation({ variables: { code, password, passwordConfirmation } });
+      if (result.errors && result.errors.length > 0) {
+        throw new Error(result.errors[0].message);
+      }
     } catch (error) {
-      console.error('Reset password error:', error);
       throw error;
     }
   };

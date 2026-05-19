@@ -1,4 +1,9 @@
-import { ApolloClient, InMemoryCache, createHttpLink, split } from '@apollo/client';
+import {
+  ApolloClient,
+  InMemoryCache,
+  createHttpLink,
+  ApolloLink,
+} from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
@@ -50,72 +55,21 @@ function createApolloClient() {
     };
   });
 
-  // Error handling link
   const errorLink = onError(({ graphQLErrors, networkError }) => {
-    if (graphQLErrors) {
-      graphQLErrors.forEach(({ message, locations, path }) => {
-        console.error(
-          `[GraphQL error]: Message: ${message}, Location: ${locations}, Path: ${path}`
-        );
-      });
-    }
-
-    if (networkError) {
-      console.error(`[Network error]: ${networkError}`);
+    if (process.env.NODE_ENV === 'development') {
+      if (graphQLErrors) {
+        graphQLErrors.forEach(({ message, path }) => {
+          console.error(`[GraphQL error]: ${message} (path: ${path})`);
+        });
+      }
+      if (networkError) {
+        console.error(`[Network error]: ${networkError}`);
+      }
     }
   });
 
-  // Build the HTTP chain
-  const httpChain = errorLink.concat(authLink.concat(httpLink));
-
-  // Build the final link — with WS split on the client
-  let link = httpChain;
-
-  if (typeof window !== 'undefined') {
-    // Convert HTTP URL to WS URL — BFF WS server listens on path '/'
-    const wsUrl = httpUrl
-      .replace(/^http/, 'ws')
-      .replace(/\/graphql$/, '');
-
-    // Lazy WS link — only creates connection when a subscription is used
-    const wsLink = new GraphQLWsLink(
-      createClient({
-        url: wsUrl,
-        connectionParams: () => {
-          const token = localStorage.getItem('auth_token');
-          return {
-            authorization: token ? `Bearer ${token}` : '',
-          };
-        },
-        // Retry reconnections with backoff, not infinite
-        retryAttempts: 5,
-        shouldRetry: () => true,
-        lazy: true,
-        on: {
-          error: () => {
-            // Silently handle WS errors — subscriptions will degrade gracefully
-          },
-        },
-      })
-    );
-
-    // Split: subscriptions go via WS, everything else via HTTP
-    link = split(
-      ({ query }) => {
-        const definition = getMainDefinition(query);
-        return (
-          definition.kind === 'OperationDefinition' &&
-          definition.operation === 'subscription'
-        );
-      },
-      wsLink,
-      httpChain
-    );
-  }
-
-  // Criação do cliente Apollo
   return new ApolloClient({
-    link,
+    link: ApolloLink.from([errorLink, authLink, httpLink]),
     cache: new InMemoryCache({
       typePolicies: {
         Query: {
@@ -136,11 +90,14 @@ function createApolloClient() {
     }),
     defaultOptions: {
       watchQuery: {
-        errorPolicy: 'ignore',
+        errorPolicy: 'all',
         notifyOnNetworkStatusChange: true,
       },
       query: {
-        errorPolicy: 'ignore',
+        errorPolicy: 'all',
+      },
+      mutate: {
+        errorPolicy: 'all',
       },
     },
   });

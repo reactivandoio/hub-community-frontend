@@ -26,6 +26,10 @@ import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { useToast } from '@/hooks/use-toast';
 import { CREATE_TALK, GET_SPEAKERS, UPDATE_TALK } from '@/lib/queries';
 import {
+  talkSchema,
+  type TalkFormValues,
+} from '@/lib/schemas';
+import {
   CreateTalkResponse,
   Speaker,
   SpeakersResponse,
@@ -37,18 +41,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, User, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import * as z from 'zod';
-
-const talkSchema = z.object({
-  title: z.string().min(2, 'O título é obrigatório.'),
-  subtitle: z.string().optional(),
-  description: z.any().optional(),
-  occur_date: z.string().min(1, 'A data é obrigatória.'),
-  room_description: z.string().optional(),
-  speakerIds: z.array(z.string()).default([]),
-});
-
-type TalkFormValues = z.infer<typeof talkSchema>;
 
 interface TalkInput extends Omit<Talk, 'speakers'> {
   speakerIds: string[];
