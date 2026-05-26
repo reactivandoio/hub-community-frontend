@@ -324,6 +324,7 @@ export const SIGN_IN = gql`
       username
       name
       phone
+      social_security_number
       id
     }
   }
@@ -366,6 +367,7 @@ export const UPDATE_PROFILE = gql`
       github
       website
       instagram
+      social_security_number
     }
   }
 `;

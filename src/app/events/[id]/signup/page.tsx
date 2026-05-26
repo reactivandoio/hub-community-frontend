@@ -241,18 +241,45 @@ export default function EventSignupPage() {
       }
     }
 
+    // CPF Requirement: If user has no CPF and didn't provide one, show error
+    if (!user.social_security_number && !cpfInput.trim()) {
+      setCpfError('Informe seu CPF para prosseguir com a inscrição.');
+      setStep('confirm');
+      return;
+    }
+
+    // Validate CPF format if provided
+    if (!user.social_security_number && cpfInput.trim()) {
+      if (!validateCPF(cpfInput)) {
+        setCpfError('CPF inválido. Verifique os números informados.');
+        setStep('confirm');
+        return;
+      }
+    }
+
     setStep('processing');
     setErrorMessage('');
     setPhoneError('');
+    setCpfError('');
 
     try {
-      // If user has no phone, update it first
+      // Build profile update payload
+      const profileUpdate: any = {};
+
       if (!user.phone && phoneInput.trim()) {
-        const cleaned = phoneInput.replace(/[^\d+\s()-]/g, '');
-        await updatePhone(cleaned);
+        profileUpdate.phone = phoneInput.replace(/[^\d+\s()-]/g, '');
       }
 
-      const phoneToSend = user.phone || phoneInput.replace(/[^\d+\s()-]/g, '');
+      if (!user.social_security_number && cpfInput.trim()) {
+        profileUpdate.social_security_number = cpfInput;
+      }
+
+      // Update profile if needed
+      if (Object.keys(profileUpdate).length > 0) {
+        await updateProfile(profileUpdate);
+      }
+
+      const phoneToSend = user.phone || profileUpdate.phone;
 
       const variables: any = {
         eventId: slugOrId,
@@ -812,6 +839,14 @@ export default function EventSignupPage() {
                     <span className="font-medium text-foreground">{user?.phone || phoneInput}</span>
                   </div>
                 )}
+                {(user?.social_security_number || cpfInput) && (
+                  <div className="flex justify-between py-2 border-b border-border/30">
+                    <span className="text-muted-foreground">CPF</span>
+                    <span className="font-medium text-foreground">
+                      {user?.social_security_number || cpfInput}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between py-2 text-lg font-bold">
                   <span>Total</span>
                   <span className="text-primary">
@@ -951,6 +986,27 @@ export default function EventSignupPage() {
                             maxLength={20}
                             disabled={inlineBusy}
                             {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={inlineForm.control}
+                    name="social_security_number"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>CPF</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="000.000.000-00"
+                            disabled={inlineBusy}
+                            {...field}
+                            onChange={(e) => {
+                              field.onChange(formatCPF(e.target.value));
+                            }}
                           />
                         </FormControl>
                         <FormMessage />
@@ -1169,6 +1225,37 @@ export default function EventSignupPage() {
                         variant="outline"
                         className="rounded-full gap-2"
                         size="lg"
+                      >
+                        <CreditCard className="h-4 w-4" />
+                        Pagar com Cartão
+                        <ExternalLink className="h-3 w-3" />
+                      </Button>
+                    </a>
+                  </div>
+                )}
+
+                <div className="text-sm text-muted-foreground bg-muted/30 rounded-xl p-4">
+                  <p>
+                    Após o pagamento, sua inscrição será confirmada automaticamente.
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-center">
+                <Link href={`/events/${event.slug || slugOrId}`}>
+                  <Button variant="ghost" className="rounded-full">
+                    Voltar para o evento
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </FadeIn>
+  );
+}
+size="lg"
                       >
                         <CreditCard className="h-4 w-4" />
                         Pagar com Cartão

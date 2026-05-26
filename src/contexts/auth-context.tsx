@@ -216,6 +216,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           username: data.signIn.username || input.identifier.split('@')[0],
           name: data.signIn.name || undefined,
           phone: data.signIn.phone || undefined,
+          social_security_number: data.signIn.social_security_number || undefined,
         };
 
         saveToStorage(user, data.signIn.token);
@@ -309,6 +310,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const updatedUser: User = { ...state.user, ...data };
     if (JSON.stringify(updatedUser) !== JSON.stringify(state.user)) {
       dispatch({ type: 'UPDATE_USER', payload: { user: updatedUser } });
+      if (state.token) {
+        saveToStorage(updatedUser, state.token);
+      }
+    }
+  };
+
+  const value: AuthContextType = {
+    ...state,
+    signIn,
+    signUp,
+    signOut,
+    forwardPassword,
+    resetPassword,
+    updatePhone,
+    updateProfile,
+    syncUser,
+    validateToken,
+    showLogoutAlert,
+    hideLogoutAlert,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
+
+tch({ type: 'UPDATE_USER', payload: { user: updatedUser } });
       if (state.token) {
         saveToStorage(updatedUser, state.token);
       }
