@@ -68,6 +68,8 @@ services:
     environment:
       NEXT_PUBLIC_GRAPHQL_URL: http://localhost:4001/graphql
       NODE_ENV: development
+      PORT: 4010
+      HOSTNAME: 0.0.0.0
     ports:
       - '4010:4010'
     volumes:
