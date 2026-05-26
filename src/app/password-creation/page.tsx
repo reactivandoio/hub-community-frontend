@@ -100,9 +100,9 @@ function PasswordCreationContent() {
               <div className="flex justify-center mb-4">
                 <CheckCircle className="h-12 w-12 text-emerald-500" />
               </div>
-              <CardTitle>Senha criada com sucesso!</CardTitle>
+              <CardTitle>Senha definida com sucesso!</CardTitle>
               <CardDescription>
-                Sua conta está ativa e sua senha foi definida. Bem-vindo à Hub Community!
+                Sua conta está ativa e sua senha foi atualizada. Bem-vindo à Hub Community!
               </CardDescription>
             </CardHeader>
             <CardContent>
