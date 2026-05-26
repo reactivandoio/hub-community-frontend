@@ -122,7 +122,7 @@ export default function EventSignupPage() {
   // Inline signup form (for unauthenticated users)
   const inlineForm = useForm<InlineSignupValues>({
     resolver: zodResolver(inlineSignupSchema),
-    defaultValues: { name: '', email: '', phone: '', password: '' },
+    defaultValues: { name: '', email: '', phone: '' },
   });
 
   // Queries & Mutations
@@ -1014,26 +1014,6 @@ export default function EventSignupPage() {
                     )}
                   />
 
-                  <FormField
-                    control={inlineForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Senha</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            placeholder="Mínimo 6 caracteres"
-                            autoComplete="new-password"
-                            disabled={inlineBusy}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
                   <div className="bg-muted/30 rounded-xl p-4 space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">
@@ -1260,6 +1240,33 @@ size="lg"
                         <CreditCard className="h-4 w-4" />
                         Pagar com Cartão
                         <ExternalLink className="h-3 w-3" />
+                      </Button>
+                    </a>
+                  </div>
+                )}
+
+                <div className="text-sm text-muted-foreground bg-muted/30 rounded-xl p-4">
+                  <p>
+                    Após o pagamento, sua inscrição será confirmada automaticamente.
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-center">
+                <Link href={`/events/${event.slug || slugOrId}`}>
+                  <Button variant="ghost" className="rounded-full">
+                    Voltar para o evento
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </FadeIn>
+  );
+}
+>
                       </Button>
                     </a>
                   </div>

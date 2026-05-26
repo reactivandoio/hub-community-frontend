@@ -87,7 +87,7 @@ export function AuthModal({ isOpen, onClose, redirectUrl }: AuthModalProps) {
     try {
       await signUp(signUpData);
       setShowEmailConfirmation(true);
-      setSuccess('Conta criada com sucesso!');
+      setSuccess('Conta criada! Verifique seu email para definir sua senha e acessar a plataforma.');
     } catch (error) {
       setError('Erro ao criar conta. Tente novamente.');
       console.error('Sign up error:', error);
