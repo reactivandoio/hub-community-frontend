@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  hub-db:
+    image: mysql:8.0
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: f1r3wall@123
+      MYSQL_DATABASE: hub-community-db
+    ports:
+      - '3306:3306'
+    volumes:
+      - hub-db-data:/var/lib/mysql
+
+  hub-backend:
+    build:
+      context: ./hub-community-backend
+      dockerfile: Dockerfile.dev
+    restart: always
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      PORT: 1340
+      APP_KEYS: 9/1YjJgS5PHj6P2lbC0HJQ==,iHrtIADhQmov24kA22W7QA==,RsAAi0obiekvVZr4d+8jcw==,P2nQXo/1otgr/PL5zrAKbA==
+      API_TOKEN_SALT: kyqXQxehAM8nvaC1K1AI0g==
+      ADMIN_JWT_SECRET: NR1cv94ApF/gs4s9p73Mjw==
+      TRANSFER_TOKEN_SALT: lJHscSleFPoJ08Z/erlKlg==
+      JWT_SECRET: Frm5zWNoFyQXUtsxjZi4Yw==
+      DATABASE_CLIENT: mysql
+      DATABASE_HOST: hub-db
+      DATABASE_PORT: 3306
+      DATABASE_NAME: hub-community-db
+      DATABASE_USERNAME: root
+      DATABASE_PASSWORD: f1r3wall@123
+    ports:
+      - '1340:1340'
+    volumes:
+      - ./hub-community-backend:/opt/app
+      - /opt/app/node_modules
+    depends_on:
+      - hub-db
+
+  hub-bff:
+    build:
+      context: ./hub-community-bff
+      dockerfile: Dockerfile.dev
+    restart: always
+    environment:
+      NODE_ENV: development
+      PORT: 4001
+      MANAGER_URL: http://hub-backend:1340
+      MANAGER_TOKEN_INTEGRATION: aaa91e68d2b3ac30571043087fa481c942b50c289d51dd938e27a5dedf693d9a95f50c02000f4ab49c269b791f9992ccc6002538ee558f3ac76bc829279f8d4e4b5651d103dcd269e081e63b83ff54ba74d5bc57fad3af9096a81be4cadc721aa83617f4bd4438807d74b4b4b2ad4f6ab228e6218049d661b3dddc946355dc13
+    ports:
+      - '4001:4001'
+    volumes:
+      - ./hub-community-bff:/opt/app
+      - /opt/app/node_modules
+    depends_on:
+      - hub-backend
+
+  hub-frontend:
+    build:
+      context: ./hub-community-frontend
+      dockerfile: Dockerfile.dev
+    restart: always
+    environment:
+      NEXT_PUBLIC_GRAPHQL_URL: http://localhost:4001/graphql
+      NODE_ENV: development
+    ports:
+      - '4010:4010'
+    volumes:
+      - ./hub-community-frontend:/opt/app
+      - /opt/app/node_modules
+      - /opt/app/.next
+    depends_on:
+      - hub-bff
+
+volumes:
+  hub-db-data:
