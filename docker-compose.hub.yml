@@ -15,7 +15,7 @@ services:
 
   hub-backend:
     build:
-      context: ./hub-community-backend
+      context: ../hub-community-backend
       dockerfile: Dockerfile.dev
     restart: always
     environment:
@@ -36,14 +36,14 @@ services:
     ports:
       - '1340:1340'
     volumes:
-      - ./hub-community-backend:/opt/app
+      - ../hub-community-backend:/opt/app
       - /opt/app/node_modules
     depends_on:
       - hub-db
 
   hub-bff:
     build:
-      context: ./hub-community-bff
+      context: ../hub-community-bff
       dockerfile: Dockerfile.dev
     restart: always
     environment:
@@ -54,14 +54,14 @@ services:
     ports:
       - '4001:4001'
     volumes:
-      - ./hub-community-bff:/opt/app
+      - ../hub-community-bff:/opt/app
       - /opt/app/node_modules
     depends_on:
       - hub-backend
 
   hub-frontend:
     build:
-      context: ./hub-community-frontend
+      context: .
       dockerfile: Dockerfile.dev
     restart: always
     environment:
@@ -70,7 +70,7 @@ services:
     ports:
       - '4010:4010'
     volumes:
-      - ./hub-community-frontend:/opt/app
+      - .:/opt/app
       - /opt/app/node_modules
       - /opt/app/.next
     depends_on:
