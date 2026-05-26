@@ -22,6 +22,7 @@ services:
       NODE_ENV: development
       HOST: 0.0.0.0
       PORT: 1340
+      PUBLIC_URL: http://localhost:1340
       APP_KEYS: 9/1YjJgS5PHj6P2lbC0HJQ==,iHrtIADhQmov24kA22W7QA==,RsAAi0obiekvVZr4d+8jcw==,P2nQXo/1otgr/PL5zrAKbA==
       API_TOKEN_SALT: kyqXQxehAM8nvaC1K1AI0g==
       ADMIN_JWT_SECRET: NR1cv94ApF/gs4s9p73Mjw==
