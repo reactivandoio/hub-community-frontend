@@ -6,8 +6,8 @@ services:
     command: --default-authentication-plugin=mysql_native_password
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: f1r3wall@123
-      MYSQL_DATABASE: hub-community-db
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
     ports:
       - '3307:3306'
     volumes:
@@ -19,21 +19,21 @@ services:
       dockerfile: Dockerfile.dev
     restart: always
     environment:
-      NODE_ENV: development
+      NODE_ENV: ${NODE_ENV}
       HOST: 0.0.0.0
       PORT: 1340
       PUBLIC_URL: http://localhost:1340
-      APP_KEYS: 9/1YjJgS5PHj6P2lbC0HJQ==,iHrtIADhQmov24kA22W7QA==,RsAAi0obiekvVZr4d+8jcw==,P2nQXo/1otgr/PL5zrAKbA==
-      API_TOKEN_SALT: kyqXQxehAM8nvaC1K1AI0g==
-      ADMIN_JWT_SECRET: NR1cv94ApF/gs4s9p73Mjw==
-      TRANSFER_TOKEN_SALT: lJHscSleFPoJ08Z/erlKlg==
-      JWT_SECRET: Frm5zWNoFyQXUtsxjZi4Yw==
+      APP_KEYS: ${APP_KEYS}
+      API_TOKEN_SALT: ${API_TOKEN_SALT}
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET}
+      TRANSFER_TOKEN_SALT: ${TRANSFER_TOKEN_SALT}
+      JWT_SECRET: ${JWT_SECRET}
       DATABASE_CLIENT: mysql
-      DATABASE_HOST: hub-db
-      DATABASE_PORT: 3306
-      DATABASE_NAME: hub-community-db
-      DATABASE_USERNAME: root
-      DATABASE_PASSWORD: f1r3wall@123
+      DATABASE_HOST: ${DATABASE_HOST}
+      DATABASE_PORT: ${DATABASE_PORT}
+      DATABASE_NAME: ${MYSQL_DATABASE}
+      DATABASE_USERNAME: ${MYSQL_USER}
+      DATABASE_PASSWORD: ${MYSQL_PASSWORD}
     ports:
       - '1340:1340'
     volumes:
@@ -48,10 +48,10 @@ services:
       dockerfile: Dockerfile.dev
     restart: always
     environment:
-      NODE_ENV: development
+      NODE_ENV: ${NODE_ENV}
       PORT: 4001
       MANAGER_URL: http://hub-backend:1340
-      MANAGER_TOKEN_INTEGRATION: aaa91e68d2b3ac30571043087fa481c942b50c289d51dd938e27a5dedf693d9a95f50c02000f4ab49c269b791f9992ccc6002538ee558f3ac76bc829279f8d4e4b5651d103dcd269e081e63b83ff54ba74d5bc57fad3af9096a81be4cadc721aa83617f4bd4438807d74b4b4b2ad4f6ab228e6218049d661b3dddc946355dc13
+      MANAGER_TOKEN_INTEGRATION: ${MANAGER_TOKEN_INTEGRATION}
     ports:
       - '4001:4001'
     volumes:
@@ -66,8 +66,8 @@ services:
       dockerfile: Dockerfile.dev
     restart: always
     environment:
-      NEXT_PUBLIC_GRAPHQL_URL: http://localhost:4001/graphql
-      NODE_ENV: development
+      NEXT_PUBLIC_GRAPHQL_URL: ${NEXT_PUBLIC_GRAPHQL_URL}
+      NODE_ENV: ${NODE_ENV}
       PORT: 4010
       HOSTNAME: 0.0.0.0
     ports:
