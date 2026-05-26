@@ -173,6 +173,7 @@ export interface User {
   name?: string;
   avatar?: string;
   phone?: string;
+  social_security_number?: string;
 }
 
 export interface SignUpInput {
@@ -181,6 +182,7 @@ export interface SignUpInput {
   password: string;
   username: string;
   phone?: string;
+  social_security_number?: string;
 }
 
 export interface SignInInput {

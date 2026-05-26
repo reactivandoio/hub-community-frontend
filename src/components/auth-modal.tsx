@@ -17,7 +17,9 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/auth-context';
 import type { SignInInput, SignUpInput } from '@/lib/types';
-import { Eye, EyeOff, Loader2, Lock, Mail, Phone, User } from 'lucide-react';
+import { formatCPF, validateCPF } from '@/utils/cpf';
+import { CreditCard, Eye, EyeOff, Loader2, Lock, Mail, Phone, User } from 'lucide-react';
+
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -172,6 +174,7 @@ export function AuthModal({ isOpen, onClose, redirectUrl }: AuthModalProps) {
                           password: '',
                           username: '',
                           phone: '',
+                          social_security_number: '',
                         });
                       }}
                       variant="outline"
@@ -306,6 +309,27 @@ export function AuthModal({ isOpen, onClose, redirectUrl }: AuthModalProps) {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="signup-cpf">CPF</Label>
+                <div className="relative">
+                  <CreditCard className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="signup-cpf"
+                    type="text"
+                    placeholder="000.000.000-00"
+                    value={signUpData.social_security_number || ''}
+                    onChange={e =>
+                      setSignUpData({
+                        ...signUpData,
+                        social_security_number: formatCPF(e.target.value),
+                      })
+                    }
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="signup-phone">Telefone WhatsApp</Label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -409,6 +433,44 @@ export function AuthModal({ isOpen, onClose, redirectUrl }: AuthModalProps) {
         {success && (
           <Alert>
             <AlertDescription>{success}</AlertDescription>
+          </Alert>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+Loading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Enviando...
+                  </>
+                ) : (
+                  'Enviar Email de Recuperação'
+                )}
+              </Button>
+            </form>
+          </TabsContent>
+        </Tabs>
+
+        {/* Error Alert */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Success Alert */}
+        {success && (
+          <Alert>
+            <AlertDescription>{success}</AlertDescription>
+          </Alert>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+ertDescription>{success}</AlertDescription>
           </Alert>
         )}
       </DialogContent>
