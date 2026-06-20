@@ -134,7 +134,7 @@ export default function EventsAdminPage() {
                           <BarChart3 className="h-4 w-4" />
                         </Button>
                       </Link>
-                      <Link href={`/admin/events/${event.documentId}/presenca`}>
+                      <Link href={`/admin/events/${event.documentId}/attendance`}>
                         <Button variant="ghost" size="icon" title="Lista de Presença">
                           <ClipboardList className="h-4 w-4" />
                         </Button>

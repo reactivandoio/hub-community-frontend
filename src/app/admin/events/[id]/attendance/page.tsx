@@ -30,14 +30,14 @@ import {
 import { GET_EVENT_BY_SLUG_OR_ID, GET_EVENT_ATTENDANCES } from '@/lib/queries';
 import { EventAttendancesResponse, Attendance } from '@/lib/types';
 import { useQuery } from '@apollo/client';
-import { ArrowLeft, Loader2, Download, Copy, Check, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Loader2, Download, FileSpreadsheet, Copy, Check, ExternalLink } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 
-const ITEMS_PER_PAGE = 25;
+const ITEMS_PER_PAGE = 100;
 
-export default function PresencaAdminPage() {
+export default function AttendanceAdminPage() {
   const router = useRouter();
   const params = useParams();
   const id = params?.id as string;
@@ -153,10 +153,8 @@ export default function PresencaAdminPage() {
     }
   };
 
-  const handleDownloadXLSX = () => {
-    if (attendances.length === 0) return;
-
-    const wsData = attendances.map((a) => ({
+  const getExportData = () =>
+    attendances.map((a) => ({
       'Nome Completo': a.user?.name || '-',
       'CPF': a.user?.cpf ? formatCpf(a.user.cpf) : '-',
       'E-mail': a.user?.email || '-',
@@ -165,6 +163,9 @@ export default function PresencaAdminPage() {
       'Data do Registro': formatDateTime(a.createdAt),
     }));
 
+  const handleDownloadXLSX = () => {
+    if (attendances.length === 0) return;
+    const wsData = getExportData();
     const ws = XLSX.utils.json_to_sheet(wsData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Presença');
@@ -173,6 +174,32 @@ export default function PresencaAdminPage() {
       `presenca-${eventData?.eventBySlugOrId?.slug || 'evento'}.xlsx`,
       { bookType: 'xlsx' }
     );
+  };
+
+  const handleDownloadCSV = () => {
+    if (attendances.length === 0) return;
+    const wsData = getExportData();
+    const headers = Object.keys(wsData[0]);
+    const csvRows = [
+      headers.join(','),
+      ...wsData.map((row) =>
+        headers.map((h) => {
+          const val = String(row[h as keyof typeof row] || '');
+          // Escape values with commas or quotes
+          return val.includes(',') || val.includes('"')
+            ? `"${val.replace(/"/g, '""')}"`
+            : val;
+        }).join(',')
+      ),
+    ];
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `presenca-${eventData?.eventBySlugOrId?.slug || 'evento'}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleCopyFormLink = () => {
@@ -263,10 +290,16 @@ export default function PresencaAdminPage() {
                 </CardDescription>
               </div>
               {attendances.length > 0 && (
-                <Button onClick={handleDownloadXLSX} variant="outline">
-                  <Download className="w-4 h-4 mr-2" />
-                  Exportar XLSX
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button onClick={handleDownloadCSV} variant="outline">
+                    <Download className="w-4 h-4 mr-2" />
+                    CSV
+                  </Button>
+                  <Button onClick={handleDownloadXLSX} variant="outline">
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    XLSX
+                  </Button>
+                </div>
               )}
             </div>
           </CardHeader>
