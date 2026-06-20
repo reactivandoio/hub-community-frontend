@@ -23,6 +23,7 @@ import {
 import { useAuth } from '@/contexts/auth-context';
 import { CREATE_ATTENDANCE, GET_EVENT_BY_SLUG_OR_ID } from '@/lib/queries';
 import { CreateAttendanceResponse } from '@/lib/types';
+import { AuthModal } from '@/components/auth-modal';
 import Link from 'next/link';
 
 // CPF mask: 999.999.999-99
@@ -215,10 +216,14 @@ export default function AttendanceFormPage() {
     );
   }
 
-  // Not authenticated
+  // Not authenticated — show login modal on top of the page
   if (!isAuthenticated) {
     return (
       <div className="container max-w-2xl mx-auto py-20 px-4 min-h-[80vh] flex items-center justify-center">
+        <AuthModal
+          isOpen={true}
+          onClose={() => {}}
+        />
         <Card className="w-full text-center shadow-lg border-primary/10">
           <CardContent className="pt-10 pb-8 flex flex-col items-center">
             <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6">
@@ -233,12 +238,6 @@ export default function AttendanceFormPage() {
               </span>
               .
             </p>
-            <Link href={`/events/${slug}`}>
-              <Button size="lg" className="rounded-full">
-                <LogIn className="w-4 h-4 mr-2" />
-                Ir para o evento e fazer login
-              </Button>
-            </Link>
           </CardContent>
         </Card>
       </div>
