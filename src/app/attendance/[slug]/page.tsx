@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery } from '@apollo/client';
 import { Button } from '@/components/ui/button';
@@ -94,15 +94,30 @@ export default function AttendanceFormPage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
+  // Track which fields came pre-filled from user profile (these become readOnly)
+  const [lockedFields, setLockedFields] = useState<Record<string, boolean>>({});
+
   // Pre-fill from logged-in user
   useEffect(() => {
     if (user) {
-      setFormData((prev) => ({
-        ...prev,
-        name: user.name || prev.name,
-        email: user.email || prev.email,
-        phone: user.phone ? maskPhone(user.phone) : prev.phone,
-      }));
+      const locked: Record<string, boolean> = {};
+      const updates: Partial<typeof formData> = {};
+
+      if (user.name) {
+        updates.name = user.name;
+        locked.name = true;
+      }
+      if (user.email) {
+        updates.email = user.email;
+        locked.email = true;
+      }
+      if (user.phone) {
+        updates.phone = maskPhone(user.phone);
+        locked.phone = true;
+      }
+
+      setFormData((prev) => ({ ...prev, ...updates }));
+      setLockedFields(locked);
     }
   }, [user]);
 
@@ -118,9 +133,14 @@ export default function AttendanceFormPage() {
     }
   };
 
+  const hasSubmitted = useRef(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Prevent duplicate submissions
+    if (hasSubmitted.current || submitting) return;
 
     // Validations
     if (!formData.name.trim()) {
@@ -161,6 +181,8 @@ export default function AttendanceFormPage() {
     }
 
     try {
+      hasSubmitted.current = true;
+
       const { data } = await createAttendance({
         variables: {
           eventDocumentId: eventDocId,
@@ -179,6 +201,7 @@ export default function AttendanceFormPage() {
         );
       }
     } catch (err: any) {
+      hasSubmitted.current = false;
       setError(
         err.message || 'Ocorreu um erro inesperado. Tente novamente.'
       );
@@ -307,8 +330,9 @@ export default function AttendanceFormPage() {
                   required
                   value={formData.name}
                   onChange={handleChange}
+                  readOnly={lockedFields.name}
                   disabled={submitting}
-                  className="h-12"
+                  className={`h-12 ${lockedFields.name ? 'opacity-60 cursor-not-allowed' : ''}`}
                 />
               </div>
 
@@ -340,8 +364,9 @@ export default function AttendanceFormPage() {
                   required
                   value={formData.email}
                   onChange={handleChange}
+                  readOnly={lockedFields.email}
                   disabled={submitting}
-                  className="h-12"
+                  className={`h-12 ${lockedFields.email ? 'opacity-60 cursor-not-allowed' : ''}`}
                 />
               </div>
 
@@ -356,8 +381,9 @@ export default function AttendanceFormPage() {
                   required
                   value={formData.phone}
                   onChange={handleChange}
+                  readOnly={lockedFields.phone}
                   disabled={submitting}
-                  className="h-12"
+                  className={`h-12 ${lockedFields.phone ? 'opacity-60 cursor-not-allowed' : ''}`}
                   maxLength={15}
                   inputMode="tel"
                 />
