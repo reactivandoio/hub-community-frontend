@@ -27,30 +27,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { GET_EVENT_BY_SLUG_OR_ID } from '@/lib/queries';
+import { GET_EVENT_BY_SLUG_OR_ID, GET_EVENT_ATTENDANCES } from '@/lib/queries';
+import { EventAttendancesResponse, Attendance } from '@/lib/types';
 import { useQuery } from '@apollo/client';
 import { ArrowLeft, Loader2, Download, Copy, Check, ExternalLink } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 
-interface AttendanceRecord {
-  id: number;
-  documentId: string;
-  createdAt: string;
-  users_permissions_user?: {
-    id: number;
-    documentId: string;
-    name: string;
-    email: string;
-    phone: string;
-    cpf: string;
-    date_of_birth: string;
-  };
-}
-
 const ITEMS_PER_PAGE = 25;
-const STRAPI_PAGE_SIZE = 100;
 
 export default function PresencaAdminPage() {
   const router = useRouter();
@@ -65,57 +50,21 @@ export default function PresencaAdminPage() {
     }
   );
 
-  const [attendances, setAttendances] = useState<AttendanceRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const eventDocId = eventData?.eventBySlugOrId?.documentId;
+
+  const { data: attendancesData, loading: attendancesLoading, error: attendancesError } =
+    useQuery<EventAttendancesResponse>(GET_EVENT_ATTENDANCES, {
+      variables: { eventDocumentId: eventDocId },
+      skip: !eventDocId,
+      fetchPolicy: 'network-only',
+    });
+
+  const attendances: Attendance[] = attendancesData?.eventAttendances || [];
+  const loading = eventLoading || attendancesLoading;
+  const error = attendancesError?.message || '';
+
   const [currentPage, setCurrentPage] = useState(1);
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    if (!eventData?.eventBySlugOrId?.documentId) {
-      if (!eventLoading) setLoading(false);
-      return;
-    }
-
-    const fetchAllAttendances = async () => {
-      try {
-        const eventDocId = eventData.eventBySlugOrId.documentId;
-        let allData: AttendanceRecord[] = [];
-        let page = 1;
-        let hasMore = true;
-
-        while (hasMore) {
-          const res = await fetch(
-            `https://manager.hubcommunity.io/api/attendances?populate=*&filters[event][documentId][$eq]=${eventDocId}&sort=createdAt:desc&pagination[page]=${page}&pagination[pageSize]=${STRAPI_PAGE_SIZE}`
-          );
-          if (!res.ok) throw new Error('Falha ao buscar a lista de presença');
-
-          const json = await res.json();
-          const data = json.data || [];
-          allData = [...allData, ...data];
-
-          const pagination = json.meta?.pagination;
-          if (pagination && page < pagination.pageCount) {
-            page++;
-          } else {
-            hasMore = false;
-          }
-        }
-
-        setAttendances(allData);
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : 'Erro desconhecido ao carregar os dados.'
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAllAttendances();
-  }, [eventData, eventLoading]);
 
   const totalPages = Math.ceil(attendances.length / ITEMS_PER_PAGE);
 
@@ -207,17 +156,14 @@ export default function PresencaAdminPage() {
   const handleDownloadXLSX = () => {
     if (attendances.length === 0) return;
 
-    const wsData = attendances.map((a) => {
-      const user = a.users_permissions_user;
-      return {
-        'Nome Completo': user?.name || '-',
-        'CPF': user?.cpf ? formatCpf(user.cpf) : '-',
-        'E-mail': user?.email || '-',
-        'Telefone': user?.phone ? formatPhone(user.phone) : '-',
-        'Data de Nascimento': user?.date_of_birth ? formatDate(user.date_of_birth) : '-',
-        'Data do Registro': formatDateTime(a.createdAt),
-      };
-    });
+    const wsData = attendances.map((a) => ({
+      'Nome Completo': a.user?.name || '-',
+      'CPF': a.user?.cpf ? formatCpf(a.user.cpf) : '-',
+      'E-mail': a.user?.email || '-',
+      'Telefone': a.user?.phone ? formatPhone(a.user.phone) : '-',
+      'Data de Nascimento': a.user?.date_of_birth ? formatDate(a.user.date_of_birth) : '-',
+      'Data do Registro': formatDateTime(a.createdAt),
+    }));
 
     const ws = XLSX.utils.json_to_sheet(wsData);
     const wb = XLSX.utils.book_new();
@@ -348,32 +294,28 @@ export default function PresencaAdminPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {paginatedAttendances.map((a) => {
-                        const user = a.users_permissions_user;
-
-                        return (
-                          <TableRow key={a.documentId || a.id}>
+                      {paginatedAttendances.map((a) => (
+                          <TableRow key={a.id}>
                             <TableCell className="font-medium whitespace-nowrap">
-                              {user?.name || '-'}
+                              {a.user?.name || '-'}
                             </TableCell>
                             <TableCell className="whitespace-nowrap">
-                              {user?.cpf ? formatCpf(user.cpf) : '-'}
+                              {a.user?.cpf ? formatCpf(a.user.cpf) : '-'}
                             </TableCell>
-                            <TableCell>{user?.email || '-'}</TableCell>
+                            <TableCell>{a.user?.email || '-'}</TableCell>
                             <TableCell className="whitespace-nowrap">
-                              {user?.phone ? formatPhone(user.phone) : '-'}
+                              {a.user?.phone ? formatPhone(a.user.phone) : '-'}
                             </TableCell>
                             <TableCell className="whitespace-nowrap">
-                              {user?.date_of_birth
-                                ? formatDate(user.date_of_birth)
+                              {a.user?.date_of_birth
+                                ? formatDate(a.user.date_of_birth)
                                 : '-'}
                             </TableCell>
                             <TableCell className="whitespace-nowrap">
                               {formatDateTime(a.createdAt)}
                             </TableCell>
                           </TableRow>
-                        );
-                      })}
+                        ))}
                     </TableBody>
                   </Table>
                 </div>
