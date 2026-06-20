@@ -3,7 +3,7 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Pencil, Plus, Trash2, Award, BarChart3 } from 'lucide-react';
+import { Pencil, Plus, Trash2, Award, BarChart3, ClipboardList } from 'lucide-react';
 import Link from 'next/link';
 
 import { EventsTableSkeleton } from '@/components/admin/events-table-skeleton';
@@ -132,6 +132,11 @@ export default function EventsAdminPage() {
                       <Link href={`/admin/events/${event.documentId}/analytics`}>
                         <Button variant="ghost" size="icon" title="Analytics">
                           <BarChart3 className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <Link href={`/admin/events/${event.documentId}/presenca`}>
+                        <Button variant="ghost" size="icon" title="Lista de Presença">
+                          <ClipboardList className="h-4 w-4" />
                         </Button>
                       </Link>
                       <Link href={`/admin/events/${event.documentId}/certificados`}>

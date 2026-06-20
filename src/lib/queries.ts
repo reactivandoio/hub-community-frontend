@@ -830,3 +830,42 @@ export const MANUAL_SIGNUP = gql`
     }
   }
 `;
+
+// Attendance (Lista de Presença)
+export const GET_EVENT_ATTENDANCES = gql`
+  query GetEventAttendances($eventDocumentId: String!) {
+    eventAttendances(eventDocumentId: $eventDocumentId) {
+      id
+      user {
+        id
+        name
+        email
+        phone
+        cpf
+        date_of_birth
+      }
+      createdAt
+    }
+  }
+`;
+
+export const CREATE_ATTENDANCE = gql`
+  mutation CreateAttendance(
+    $eventDocumentId: String!
+    $cpf: String!
+    $date_of_birth: String!
+    $phone: String!
+    $name: String!
+  ) {
+    createAttendance(
+      eventDocumentId: $eventDocumentId
+      cpf: $cpf
+      date_of_birth: $date_of_birth
+      phone: $phone
+      name: $name
+    ) {
+      success
+      message
+    }
+  }
+`;

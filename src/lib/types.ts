@@ -596,3 +596,30 @@ export interface ManualSignupResponse {
     account_created: boolean;
   };
 }
+
+// Attendance (Lista de Presença) types
+export interface AttendanceUser {
+  id: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  cpf?: string;
+  date_of_birth?: string;
+}
+
+export interface Attendance {
+  id: string;
+  user?: AttendanceUser;
+  createdAt?: string;
+}
+
+export interface EventAttendancesResponse {
+  eventAttendances: Attendance[];
+}
+
+export interface CreateAttendanceResponse {
+  createAttendance: {
+    success: boolean;
+    message?: string;
+  };
+}
