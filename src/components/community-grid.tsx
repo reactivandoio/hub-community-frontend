@@ -62,10 +62,6 @@ export function CommunityGrid({
     );
   }
 
-  const nextFutureEvents = getNextFutureEvents(
-    communities.flatMap(community => community.events || [])
-  );
-
   if (communities.length === 0) {
     return (
       <div className="text-center py-16">
@@ -90,6 +86,7 @@ export function CommunityGrid({
     <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
       {communities?.map((community: Community) => {
         const imageSrc = community.images?.[0] || '/placeholder.svg';
+        const communityNextEvents = getNextFutureEvents(community.events || []);
 
         return (
           <StaggerItem key={community.id}>
@@ -155,13 +152,13 @@ export function CommunityGrid({
 
                   {/* Footer with next event + arrow */}
                   <div className="mt-auto flex items-center justify-between pt-3 border-t border-border/40">
-                    {!!nextFutureEvents?.length ? (
+                    {!!communityNextEvents?.length ? (
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <Calendar className="h-3.5 w-3.5 text-primary" />
                         <span>
                           Próximo:{' '}
                           {adjustToBrazilTimezone(
-                            new Date(nextFutureEvents[0].start_date)
+                            new Date(communityNextEvents[0].start_date)
                           ).toLocaleDateString('pt-BR', {
                             day: '2-digit',
                             month: 'short',
