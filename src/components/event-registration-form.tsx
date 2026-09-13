@@ -3,7 +3,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import * as z from 'zod';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -22,28 +21,16 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-
-// International phone: at least 8 digits
-const phoneRegex = /^\+?[\d\s()-]{8,20}$/;
-
-const formSchema = z.object({
-  fullName: z.string().min(3, {
-    message: 'Nome completo deve ter no mínimo 3 caracteres.',
-  }),
-  email: z.string().email({
-    message: 'Email inválido.',
-  }),
-  phone: z.string().regex(phoneRegex, {
-    message: 'Informe um número válido com código do país (ex: +55 11 98765-4321).',
-  }),
-});
-
-type FormValues = z.infer<typeof formSchema>;
+import { useToast } from '@/hooks/use-toast';
+import {
+  eventRegistrationSchema,
+  type EventRegistrationFormValues,
+} from '@/lib/schemas';
 
 interface EventRegistrationFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: FormValues) => void | Promise<void>;
+  onSubmit: (data: EventRegistrationFormValues) => void | Promise<void>;
   eventTitle?: string;
 }
 
@@ -54,9 +41,10 @@ export function EventRegistrationForm({
   eventTitle = 'este evento',
 }: EventRegistrationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<EventRegistrationFormValues>({
+    resolver: zodResolver(eventRegistrationSchema),
     defaultValues: {
       fullName: '',
       email: '',
@@ -64,14 +52,23 @@ export function EventRegistrationForm({
     },
   });
 
-  const handleSubmit = async (data: FormValues) => {
+  const handleSubmit = async (data: EventRegistrationFormValues) => {
     setIsSubmitting(true);
     try {
       await onSubmit(data);
       form.reset();
       onClose();
+      toast({
+        title: 'Inscrição realizada!',
+        description: 'Você foi inscrito com sucesso no evento.',
+      });
     } catch (error) {
       console.error('Error submitting form:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro na inscrição',
+        description: error instanceof Error ? error.message : 'Não foi possível realizar a inscrição. Tente novamente.',
+      });
     } finally {
       setIsSubmitting(false);
     }

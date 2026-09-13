@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import type React from 'react';
+import { Toaster as SonnerToaster } from 'sonner';
 
 import { PageTransitionProvider } from '@/components/animations';
 import { ApolloProviderWrapper } from '@/components/apollo-provider';
 import { CookieConsentBanner } from '@/components/cookie-consent-banner';
+import { RouteErrorBoundary } from '@/components/error-boundary';
 import { FirebaseProvider } from '@/components/firebase-provider';
 import { Footer } from '@/components/footer';
 import { CompleteProfileModal } from '@/components/complete-profile-modal';
@@ -63,10 +65,13 @@ export default function RootLayout({
                     disableTransitionOnChange
                   >
                     <Navigation />
-                    <PageTransitionProvider>
-                      {children}
-                    </PageTransitionProvider>
+                    <RouteErrorBoundary>
+                      <PageTransitionProvider>
+                        {children}
+                      </PageTransitionProvider>
+                    </RouteErrorBoundary>
                     <Toaster />
+                    <SonnerToaster richColors position="top-right" />
                     <Footer />
                     <CookieConsentBanner />
                   </ThemeProvider>

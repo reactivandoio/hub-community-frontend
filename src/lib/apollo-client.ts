@@ -52,16 +52,15 @@ function createApolloClient() {
 
   // Error handling link
   const errorLink = onError(({ graphQLErrors, networkError }) => {
-    if (graphQLErrors) {
-      graphQLErrors.forEach(({ message, locations, path }) => {
-        console.error(
-          `[GraphQL error]: Message: ${message}, Location: ${locations}, Path: ${path}`
-        );
-      });
-    }
-
-    if (networkError) {
-      console.error(`[Network error]: ${networkError}`);
+    if (process.env.NODE_ENV === 'development') {
+      if (graphQLErrors) {
+        graphQLErrors.forEach(({ message, path }) => {
+          console.error(`[GraphQL error]: ${message} (path: ${path})`);
+        });
+      }
+      if (networkError) {
+        console.error(`[Network error]: ${networkError}`);
+      }
     }
   });
 

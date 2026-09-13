@@ -20,27 +20,15 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import {
+  batchSchema,
+  type BatchFormValues,
+} from '@/lib/schemas';
 import { Batch } from '@/lib/types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import * as z from 'zod';
-
-const batchSchema = z.object({
-  batch_number: z.coerce.number().min(1, 'Número do lote obrigatório.'),
-  value: z.coerce.number().min(0, 'Valor deve ser positivo.'),
-  max_quantity: z.coerce
-    .number()
-    .min(1, 'Quantidade deve ser informada.')
-    .optional(),
-  valid_from: z.string().min(1, 'Data de início obrigatória.'),
-  valid_until: z.string().min(1, 'Data de fim obrigatória.'),
-  enabled: z.boolean().default(true),
-  half_price_eligible: z.boolean().default(false),
-});
-
-type BatchFormValues = z.infer<typeof batchSchema>;
 
 // Extending Batch type to match user request locally if needed, or assuming updated types
 interface ExtendedBatch extends Batch {

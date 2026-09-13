@@ -22,23 +22,19 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { CREATE_COMMUNITY, GET_COMMUNITIES } from '@/lib/queries';
+import {
+  createCommunitySchema,
+  generateSlugFromTitle,
+  type CreateCommunityFormValues,
+} from '@/lib/schemas';
 import { CreateCommunityResponse } from '@/lib/types';
 import { useMutation } from '@apollo/client';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import * as z from 'zod';
-
-const communitySchema = z.object({
-  title: z.string().min(2, 'O título deve ter pelo menos 2 caracteres.'),
-  slug: z.string().min(2, 'O slug é obrigatório.'),
-  short_description: z.string().optional(),
-});
-
-type CommunityFormValues = z.infer<typeof communitySchema>;
 
 interface CommunityFormDialogProps {
-  onSave: (community: any) => void;
+  onSave: (community: CreateCommunityResponse['createCommunity']) => void;
   trigger?: React.ReactNode;
 }
 
@@ -56,8 +52,8 @@ export function CommunityFormDialog({
     }
   );
 
-  const form = useForm<CommunityFormValues>({
-    resolver: zodResolver(communitySchema),
+  const form = useForm<CreateCommunityFormValues>({
+    resolver: zodResolver(createCommunitySchema),
     defaultValues: {
       title: '',
       slug: '',
@@ -67,16 +63,10 @@ export function CommunityFormDialog({
 
   const generateSlug = () => {
     const title = form.getValues('title');
-    const slug = title
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)+/g, '');
-    form.setValue('slug', slug);
+    form.setValue('slug', generateSlugFromTitle(title));
   };
 
-  const onSubmit = async (data: CommunityFormValues) => {
+  const onSubmit = async (data: CreateCommunityFormValues) => {
     try {
       const { data: responseData } = await createCommunity({
         variables: {

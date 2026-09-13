@@ -27,6 +27,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  locationSchema,
+  type LocationFormValues,
+} from '@/lib/schemas';
 import { CREATE_LOCATION, GET_LOCATIONS } from '@/lib/queries';
 import { EventLocation } from '@/lib/types';
 import regionAndCities from '@/utils/regionAndCities.json';
@@ -34,19 +38,6 @@ import { useMutation } from '@apollo/client';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import * as z from 'zod';
-
-const locationSchema = z.object({
-  title: z.string().min(2, 'O título deve ter pelo menos 2 caracteres.'),
-  region: z.string().min(2, 'A região é obrigatória.'),
-  latitude: z.coerce.number().optional(),
-  longitude: z.coerce.number().optional(),
-  google_maps_url: z.string().url('URL inválida').optional().or(z.literal('')),
-  full_address: z.string().min(5, 'O endereço deve ser completo.'),
-  city: z.string().min(2, 'A cidade é obrigatória.'),
-});
-
-type LocationFormValues = z.infer<typeof locationSchema>;
 
 interface LocationFormDialogProps {
   onSave: (location: EventLocation) => void;

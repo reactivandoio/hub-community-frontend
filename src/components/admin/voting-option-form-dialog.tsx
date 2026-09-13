@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -26,15 +25,11 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import {
+  votingOptionSchema,
+  type VotingOptionFormValues,
+} from '@/lib/schemas';
 import { VotingOption } from '@/lib/types';
-
-const optionSchema = z.object({
-  name: z.string().min(2, 'O nome é obrigatório.'),
-  description: z.string().optional(),
-  pitch_order: z.coerce.number().min(1, 'A ordem é obrigatória.'),
-});
-
-type OptionFormValues = z.infer<typeof optionSchema>;
 
 interface VotingOptionFormDialogProps {
   onSave: (option: any) => void;
@@ -55,8 +50,8 @@ export function VotingOptionFormDialog({
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
-  const form = useForm<OptionFormValues>({
-    resolver: zodResolver(optionSchema),
+  const form = useForm<VotingOptionFormValues>({
+    resolver: zodResolver(votingOptionSchema),
     defaultValues: {
       name: initialData?.name || '',
       description: initialData?.description || '',
@@ -64,7 +59,7 @@ export function VotingOptionFormDialog({
     },
   });
 
-  const onSubmit = async (data: OptionFormValues) => {
+  const onSubmit = async (data: VotingOptionFormValues) => {
     try {
       setSaving(true);
       let currentSessionId = sessionId;
