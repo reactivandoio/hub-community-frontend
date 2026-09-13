@@ -81,6 +81,11 @@ export function Footer() {
                     </Link>
                   </li>
                   <li>
+                    <Link href="/cookies" className="hover:text-white transition-colors">
+                      Cookies
+                    </Link>
+                  </li>
+                  <li>
                     <Link href="/terms" className="hover:text-white transition-colors">
                       Termos
                     </Link>

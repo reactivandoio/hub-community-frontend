@@ -4,8 +4,10 @@ import type React from 'react';
 
 import { PageTransitionProvider } from '@/components/animations';
 import { ApolloProviderWrapper } from '@/components/apollo-provider';
+import { CookieConsentBanner } from '@/components/cookie-consent-banner';
 import { FirebaseProvider } from '@/components/firebase-provider';
 import { Footer } from '@/components/footer';
+import { CompleteProfileModal } from '@/components/complete-profile-modal';
 import { LogoutModalWrapper } from '@/components/logout-modal-wrapper';
 import { Navigation } from '@/components/navigation';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -51,6 +53,7 @@ export default function RootLayout({
           <ApolloProviderWrapper>
             <AuthProvider>
               <LogoutModalWrapper />
+              <CompleteProfileModal />
               <AgendaProvider>
                 <FilterProvider>
                   <ThemeProvider
@@ -65,6 +68,7 @@ export default function RootLayout({
                     </PageTransitionProvider>
                     <Toaster />
                     <Footer />
+                    <CookieConsentBanner />
                   </ThemeProvider>
                 </FilterProvider>
               </AgendaProvider>

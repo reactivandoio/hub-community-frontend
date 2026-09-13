@@ -324,7 +324,24 @@ export const SIGN_IN = gql`
       username
       name
       phone
+      cpf
+      date_of_birth
       id
+    }
+  }
+`;
+
+// The authenticated user's own profile, read fresh from the server.
+export const ME = gql`
+  query Me {
+    me {
+      id
+      username
+      email
+      name
+      phone
+      cpf
+      date_of_birth
     }
   }
 `;
@@ -827,6 +844,294 @@ export const MANUAL_SIGNUP = gql`
       success
       message
       account_created
+      signup {
+        id
+        name
+        email
+        phone_number
+        checked_in
+        checked_in_at
+        product_name
+      }
+    }
+  }
+`;
+
+// Just what the badge printer needs to register a walk-in: the event's batches.
+export const EVENT_BATCHES = gql`
+  query EventBatches($slugOrId: String!) {
+    eventBySlugOrId(slugOrId: $slugOrId) {
+      id
+      title
+      products {
+        id
+        name
+        enabled
+        batches {
+          id
+          batch_number
+          value
+          enabled
+        }
+      }
+    }
+  }
+`;
+
+// Attendance (Lista de Presença)
+export const GET_EVENT_ATTENDANCES = gql`
+  query GetEventAttendances($eventDocumentId: String!) {
+    eventAttendances(eventDocumentId: $eventDocumentId) {
+      id
+      user {
+        id
+        name
+        email
+        phone
+        cpf
+        date_of_birth
+      }
+      createdAt
+    }
+  }
+`;
+
+export const CREATE_ATTENDANCE = gql`
+  mutation CreateAttendance(
+    $eventDocumentId: String!
+    $cpf: String!
+    $date_of_birth: String!
+    $phone: String!
+    $name: String!
+  ) {
+    createAttendance(
+      eventDocumentId: $eventDocumentId
+      cpf: $cpf
+      date_of_birth: $date_of_birth
+      phone: $phone
+      name: $name
+    ) {
+      success
+      message
+    }
+  }
+`;
+
+// Certificates (certificado de participação)
+export const CERTIFICATE_FIELDS = gql`
+  fragment CertificateFields on Certificate {
+    id
+    code
+    name
+    identifier
+    email
+    source
+    issued_at
+    sent_at
+    revoked_at
+    event {
+      id
+      documentId
+      slug
+      title
+      start_date
+      end_date
+      is_online
+      location {
+        title
+        city
+      }
+      communities {
+        title
+      }
+    }
+  }
+`;
+
+// Subset of CERTIFICATE_FIELDS without `identifier`/`email`: used by public pages
+// (GET_CERTIFICATE_BY_CODE) that must never fetch CPF/e-mail.
+export const CERTIFICATE_PUBLIC_FIELDS = gql`
+  fragment CertificatePublicFields on Certificate {
+    id
+    code
+    name
+    source
+    issued_at
+    sent_at
+    revoked_at
+    event {
+      id
+      documentId
+      slug
+      title
+      start_date
+      end_date
+      is_online
+      location {
+        title
+        city
+      }
+      communities {
+        title
+      }
+    }
+  }
+`;
+
+export const CERTIFICATE_CONFIG_FIELDS = gql`
+  fragment CertificateConfigFields on CertificateConfig {
+    id
+    enabled
+    allow_self_request
+    title
+    body_template
+    workload_hours
+    issuer_name
+    primary_color
+    logo
+    logo_id
+    background
+    background_id
+    sponsors {
+      name
+      logo
+      logo_id
+      url
+    }
+    signatures {
+      name
+      role
+      image
+      image_id
+      text
+      font
+    }
+  }
+`;
+
+export const GET_CERTIFICATE_CONFIG = gql`
+  ${CERTIFICATE_CONFIG_FIELDS}
+  query GetCertificateConfig($eventId: String!) {
+    certificateConfig(eventId: $eventId) {
+      ...CertificateConfigFields
+    }
+  }
+`;
+
+export const GET_CERTIFICATE_BY_CODE = gql`
+  ${CERTIFICATE_PUBLIC_FIELDS}
+  query GetCertificateByCode($code: String!) {
+    certificateByCode(code: $code) {
+      ...CertificatePublicFields
+    }
+  }
+`;
+
+export const LOOKUP_CERTIFICATE = gql`
+  ${CERTIFICATE_FIELDS}
+  query LookupCertificate($eventId: String!, $identifier: String!) {
+    lookupCertificate(eventId: $eventId, identifier: $identifier) {
+      certificate {
+        ...CertificateFields
+      }
+      eligible_by_attendance
+      self_request_allowed
+      event_ended
+      revoked
+    }
+  }
+`;
+
+export const UPSERT_CERTIFICATE_CONFIG = gql`
+  ${CERTIFICATE_CONFIG_FIELDS}
+  mutation UpsertCertificateConfig($eventId: String!, $data: CertificateConfigInput!) {
+    upsertCertificateConfig(eventId: $eventId, data: $data) {
+      ...CertificateConfigFields
+    }
+  }
+`;
+
+// Every event that has a certificate model — the source list for copying one.
+export const CERTIFICATE_CONFIGS = gql`
+  ${CERTIFICATE_CONFIG_FIELDS}
+  query CertificateConfigs {
+    certificateConfigs {
+      event {
+        id
+        slug
+        title
+        start_date
+      }
+      config {
+        ...CertificateConfigFields
+      }
+    }
+  }
+`;
+
+export const COPY_CERTIFICATE_CONFIG = gql`
+  ${CERTIFICATE_CONFIG_FIELDS}
+  mutation CopyCertificateConfig($fromEventId: String!, $toEventId: String!) {
+    copyCertificateConfig(fromEventId: $fromEventId, toEventId: $toEventId) {
+      ...CertificateConfigFields
+    }
+  }
+`;
+
+export const REQUEST_CERTIFICATE = gql`
+  ${CERTIFICATE_FIELDS}
+  mutation RequestCertificate(
+    $eventId: String!
+    $name: String!
+    $identifier: String!
+    $email: String!
+    $phone: String
+  ) {
+    requestCertificate(
+      eventId: $eventId
+      name: $name
+      identifier: $identifier
+      email: $email
+      phone: $phone
+    ) {
+      ...CertificateFields
+    }
+  }
+`;
+
+export const GET_CERTIFICATE_CANDIDATES = gql`
+  query GetCertificateCandidates($eventId: String!) {
+    certificateCandidates(eventId: $eventId) {
+      key
+      name
+      email
+      identifier
+      phone
+      sources
+      checked_in
+      certificate {
+        id
+        code
+        name
+        source
+        issued_at
+        sent_at
+      }
+    }
+  }
+`;
+
+export const ISSUE_CERTIFICATES = gql`
+  mutation IssueCertificates($eventId: String!, $entries: [IssueEntryInput!]!, $actions: IssueActionsInput!) {
+    issueCertificates(eventId: $eventId, entries: $entries, actions: $actions) {
+      issued
+      emailed
+      errors
+      certificates {
+        code
+        identifier
+        sent_at
+      }
     }
   }
 `;

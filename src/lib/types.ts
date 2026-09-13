@@ -1,4 +1,5 @@
 import { BlocksContent } from '@strapi/blocks-react-renderer';
+import type { SignatureFont } from '@/lib/certificate-fonts-meta';
 
 export interface Community {
   id: string;
@@ -173,6 +174,10 @@ export interface User {
   name?: string;
   avatar?: string;
   phone?: string;
+  /** digits only */
+  cpf?: string;
+  /** ISO yyyy-mm-dd */
+  date_of_birth?: string;
 }
 
 export interface SignUpInput {
@@ -195,6 +200,8 @@ export interface SignInResponse {
     username: string;
     name: string;
     phone: string;
+    cpf?: string | null;
+    date_of_birth?: string | null;
     id: string;
   };
 }
@@ -594,5 +601,178 @@ export interface ManualSignupResponse {
     success: boolean;
     message?: string;
     account_created: boolean;
+    /** created, or pre-existing when the person was already registered */
+    signup?: EventSignup | null;
   };
 }
+
+export interface EventBatchesResponse {
+  eventBySlugOrId: {
+    id: string;
+    title: string;
+    products: {
+      id: string;
+      name: string;
+      enabled: boolean;
+      batches: { id: string; batch_number: number; value: number; enabled: boolean }[];
+    }[];
+  } | null;
+}
+
+// Attendance (Lista de Presença) types
+export interface AttendanceUser {
+  id: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  cpf?: string;
+  date_of_birth?: string;
+}
+
+export interface Attendance {
+  id: string;
+  user?: AttendanceUser;
+  createdAt?: string;
+}
+
+export interface EventAttendancesResponse {
+  eventAttendances: Attendance[];
+}
+
+export interface CreateAttendanceResponse {
+  createAttendance: {
+    success: boolean;
+    message?: string;
+  };
+}
+
+// Certificates (certificado de participação)
+export interface CertificateSponsor {
+  name: string;
+  logo?: string | null;
+  logo_id?: string | null;
+  url?: string | null;
+}
+
+export interface CertificateSignature {
+  name: string;
+  role?: string | null;
+  image?: string | null;
+  image_id?: string | null;
+  /** Typed cursive signature, used when there is no image. */
+  text?: string | null;
+  font?: SignatureFont | null;
+}
+
+export interface CertificateConfig {
+  id?: string;
+  enabled: boolean;
+  allow_self_request: boolean;
+  title?: string | null;
+  body_template?: string | null;
+  workload_hours?: number | null;
+  issuer_name?: string | null;
+  primary_color?: string | null;
+  logo?: string | null;
+  logo_id?: string | null;
+  background?: string | null;
+  background_id?: string | null;
+  sponsors: CertificateSponsor[];
+  signatures: CertificateSignature[];
+}
+
+export interface CertificateConfigInput {
+  enabled?: boolean;
+  allow_self_request?: boolean;
+  title?: string;
+  body_template?: string;
+  workload_hours?: number | null;
+  issuer_name?: string;
+  primary_color?: string;
+  logo?: string | null; // Strapi media id
+  background?: string | null;
+  sponsors?: { name: string; logo: string; url?: string }[];
+  signatures?: { name: string; role?: string; image?: string | null; text?: string | null; font?: SignatureFont }[];
+}
+
+export type CertificateSource = 'ATTENDANCE' | 'SELF_REQUEST' | 'ADMIN';
+
+export interface CertificateEvent {
+  id: string;
+  documentId?: string;
+  slug?: string;
+  title: string;
+  start_date: string;
+  end_date: string;
+  is_online?: boolean;
+  location?: EventLocation | null;
+  communities?: { title: string }[];
+}
+
+export interface Certificate {
+  id?: string;
+  code: string;
+  name: string;
+  identifier?: string | null; // masked (null) on the public certificateByCode query
+  email?: string | null; // masked (null) on the public certificateByCode query
+  source: CertificateSource;
+  issued_at?: string | null;
+  sent_at?: string | null;
+  revoked_at?: string | null;
+  event?: CertificateEvent | null;
+}
+
+export interface LookupResult {
+  certificate?: Certificate | null;
+  eligible_by_attendance: boolean;
+  self_request_allowed: boolean;
+  event_ended: boolean;
+  revoked: boolean;
+}
+
+/** Certificate shape returned to public pages: never carries CPF/e-mail (see CERTIFICATE_PUBLIC_FIELDS). */
+export type PublicCertificate = Omit<Certificate, 'identifier' | 'email'>;
+
+export interface CertificateConfigResponse { certificateConfig: CertificateConfig | null }
+export interface CertificateByCodeResponse { certificateByCode?: PublicCertificate | null }
+export interface LookupCertificateResponse { lookupCertificate: LookupResult }
+export interface UpsertCertificateConfigResponse { upsertCertificateConfig: CertificateConfig }
+export interface CopyCertificateConfigResponse { copyCertificateConfig: CertificateConfig }
+export interface CertificateConfigSummary {
+  event: { id: string; slug?: string | null; title: string; start_date?: string | null };
+  config: CertificateConfig;
+}
+export interface CertificateConfigsResponse { certificateConfigs: CertificateConfigSummary[] }
+export interface RequestCertificateResponse { requestCertificate: Certificate }
+
+export type CandidateSource = 'SIGNUP' | 'ATTENDANCE' | 'REQUEST';
+
+export type CandidateCertificate = Pick<Certificate, 'id' | 'code' | 'name' | 'source' | 'issued_at' | 'sent_at'>;
+
+export interface CertificateCandidate {
+  key: string;
+  name: string;
+  email?: string | null;
+  identifier?: string | null;
+  phone?: string | null;
+  sources: CandidateSource[];
+  checked_in?: boolean | null;
+  certificate?: CandidateCertificate | null;
+}
+
+export interface CertificateCandidatesResponse { certificateCandidates: CertificateCandidate[] }
+
+/** `identifier` (CPF) is optional: without a valid CPF the BFF keys the certificate by the e-mail. */
+export interface IssueEntryInput { name: string; identifier?: string; email: string }
+export interface IssueActionsInput { register: boolean; email: boolean }
+
+export type IssuedCertificate = Pick<Certificate, 'code' | 'identifier' | 'sent_at'>;
+
+export interface IssueResult {
+  issued: number;
+  emailed: number;
+  certificates: IssuedCertificate[];
+  errors: string[];
+}
+
+export interface IssueCertificatesResponse { issueCertificates: IssueResult }

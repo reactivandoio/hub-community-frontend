@@ -65,6 +65,39 @@
   }
 }
 
+/* Cursive fonts for typed certificate signatures (SIL OFL 1.1, see /public/fonts/OFL.txt).
+   Keep in sync with src/lib/certificate-fonts-meta.ts. */
+@font-face {
+  font-family: 'GreatVibes';
+  src: url('/fonts/GreatVibes-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Allura';
+  src: url('/fonts/Allura-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'DancingScript';
+  src: url('/fonts/DancingScript-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+.font-signature-great-vibes {
+  font-family: 'GreatVibes', cursive;
+}
+.font-signature-allura {
+  font-family: 'Allura', cursive;
+}
+.font-signature-dancing-script {
+  font-family: 'DancingScript', cursive;
+}
+
 @layer base {
   * {
     @apply border-border;

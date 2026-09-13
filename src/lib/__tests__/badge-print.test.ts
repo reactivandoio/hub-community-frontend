@@ -18,32 +18,33 @@ describe('buildBadgeHtml', () => {
     expect(html).not.toContain('class="link-text"');
   });
 
-  it('emits @page size 50mm 100mm portrait (kiosk-mode workaround)', () => {
+  it('emits @page size 4in 2in matching the PPD-configured w4h2 page size', () => {
     const html = buildBadgeHtml(baseData);
-    expect(html).toContain('@page { size: 50mm 100mm; margin: 0; }');
+    expect(html).toContain('@page { size: 4in 2in; margin: 0; }');
   });
 
-  it('sets body to portrait dimensions matching @page', () => {
+  it('sets body to 4in x 2in dimensions matching @page', () => {
     const html = buildBadgeHtml(baseData);
-    expect(html).toContain('width: 50mm !important');
-    expect(html).toContain('height: 100mm !important');
+    expect(html).toContain('width: 4in !important');
+    expect(html).toContain('height: 2in !important');
   });
 
-  it('rotates badge container -90deg to compensate for printer rotation', () => {
+  it('does not rotate or absolutely position the badge container (PPD now handles orientation)', () => {
     const html = buildBadgeHtml(baseData);
-    expect(html).toContain('transform: translate(0, 100mm) rotate(-90deg)');
-    expect(html).toContain('transform-origin: top left');
+    expect(html).not.toContain('rotate(');
+    expect(html).not.toContain('transform-origin:');
+    expect(html).not.toContain('position: absolute');
   });
 
-  it('keeps badge container at intrinsic 100mm x 50mm landscape dimensions', () => {
+  it('sizes the badge container to fill the 4in x 2in page directly', () => {
     const html = buildBadgeHtml(baseData);
-    expect(html).toMatch(/\.badge-container\s*\{[^}]*width:\s*100mm[^}]*height:\s*50mm/);
+    expect(html).toMatch(/\.badge-container\s*\{[^}]*width:\s*4in;[^}]*height:\s*2in;/);
   });
 
-  it('emits page-break-inside: avoid on the badge container', () => {
+  it('no longer needs page-break-inside: avoid since the container matches the page exactly', () => {
     const html = buildBadgeHtml(baseData);
-    expect(html).toContain('page-break-inside: avoid');
-    expect(html).toContain('break-inside: avoid');
+    expect(html).not.toContain('page-break-inside');
+    expect(html).not.toContain('break-inside');
   });
 
   it('clamps long names to 2 lines via -webkit-line-clamp', () => {

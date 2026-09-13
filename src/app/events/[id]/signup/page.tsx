@@ -47,6 +47,7 @@ import {
   VALIDATE_COUPON,
   IS_USER_SIGNED_UP,
 } from '@/lib/queries';
+import { signupName } from '@/lib/signup-name';
 import { adjustToBrazilTimezone } from '@/utils/event';
 
 const phoneRegex = /^\+?[\d\s()-]{8,20}$/;
@@ -256,7 +257,7 @@ export default function EventSignupPage() {
 
       const variables: any = {
         eventId: slugOrId,
-        name: user.username || user.email.split('@')[0],
+        name: signupName(user),
         email: user.email,
         batch_id: selectedBatch.id,
         phone_number: phoneToSend || undefined,

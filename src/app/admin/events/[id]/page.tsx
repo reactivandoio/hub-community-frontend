@@ -220,7 +220,7 @@ export default function EditEventPage() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => window.open(`/badge-printer/live/${eventSlug}`, '_blank')}
+            onClick={() => window.open(`/badge-printer/event/${eventSlug}`, '_blank')}
           >
             <Printer className="w-4 h-4 mr-2" />
             Crachá

@@ -7,33 +7,26 @@ exports[`buildBadgeHtml > matches snapshot for a normal badge 1`] = `
     <meta charset="UTF-8">
     <title>Crachá - João Silva</title>
     <style>
-      @page { size: 50mm 100mm; margin: 0; }
+      @page { size: 4in 2in; margin: 0; }
       html, body {
         margin: 0 !important;
         padding: 0 !important;
-        width: 50mm !important;
-        height: 100mm !important;
+        width: 4in !important;
+        height: 2in !important;
         overflow: hidden !important;
         background: white;
         font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       }
       .badge-container {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100mm;
-        height: 50mm;
-        padding: 4mm 5mm;
-        transform: translate(0, 100mm) rotate(-90deg);
-        transform-origin: top left;
+        width: 4in;
+        height: 2in;
+        padding: 3mm 4mm;
         display: flex;
         flex-direction: row;
         align-items: center;
         justify-content: space-between;
         box-sizing: border-box;
         overflow: hidden;
-        page-break-inside: avoid;
-        break-inside: avoid;
       }
       .info-section {
         display: flex;
