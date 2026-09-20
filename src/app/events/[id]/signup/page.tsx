@@ -28,6 +28,7 @@ import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 
 import { AddToCalendarButton } from '@/components/add-to-calendar-button';
+import { SignupTicketQr } from '@/components/signup-ticket-qr';
 import { FadeIn } from '@/components/animations';
 import { Button } from '@/components/ui/button';
 import {
@@ -143,6 +144,7 @@ export default function EventSignupPage() {
   const event = data?.eventBySlugOrId;
   const isAlreadySignedUp = signupCheckData?.isUserSignedUp?.is_signed_up;
   const callLink = signupCheckData?.isUserSignedUp?.call_link;
+  const existingSignupId: string | null = signupCheckData?.isUserSignedUp?.signup_id ?? null;
 
   // Raw products with enabled batches (exclude hidden products like import-only batches)
   const allAvailableProducts: Product[] = useMemo(
@@ -451,6 +453,8 @@ export default function EventSignupPage() {
                   Sua inscrição no evento <strong>{event.title}</strong> já foi confirmada.
                 </p>
               </div>
+
+              {existingSignupId && <SignupTicketQr eventSlug={event.slug || slugOrId} signupId={existingSignupId} />}
 
               {event.is_online && callLink && (
                 <div className="bg-primary/5 border border-primary/20 rounded-xl p-6">
@@ -1056,6 +1060,10 @@ export default function EventSignupPage() {
                   Sua inscrição no evento <strong>{event.title}</strong> foi realizada com sucesso.
                 </p>
               </div>
+
+              {signupResult?.signup_id && (
+                <SignupTicketQr eventSlug={event.slug || slugOrId} signupId={signupResult.signup_id} />
+              )}
 
               {isNewAccount && (
                 <div className="bg-primary/5 border border-primary/20 rounded-xl p-6 text-left">

@@ -281,6 +281,7 @@ export const SIGNUP_TO_EVENT = gql`
       message
       payment
       is_free
+      signup_id
     }
   }
 `;
@@ -290,6 +291,7 @@ export const IS_USER_SIGNED_UP = gql`
     isUserSignedUp(eventId: $eventId, email: $email) {
       is_signed_up
       call_link
+      signup_id
     }
   }
 `;
