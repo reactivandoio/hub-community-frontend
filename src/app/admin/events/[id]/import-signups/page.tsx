@@ -20,6 +20,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 
+import { detectColumn, tableFromMatrix } from '@/lib/import-sheet';
+
 import { FadeIn } from '@/components/animations';
 import { Button } from '@/components/ui/button';
 import {
@@ -80,21 +82,7 @@ const DOITY_EMAIL_COLUMNS = ['E-mail', 'Email', 'email', 'E-mail do participante
 const DOITY_PHONE_COLUMNS = ['Telefone', 'Celular', 'phone', 'WhatsApp', 'Telefone/Celular'];
 const DOITY_CPF_COLUMNS = ['CPF', 'cpf', 'Cpf', 'Documento', 'CPF do participante'];
 
-function autoDetectColumn(headers: string[], candidates: string[]): string {
-  for (const candidate of candidates) {
-    const found = headers.find(
-      (h) => h.toLowerCase().trim() === candidate.toLowerCase().trim()
-    );
-    if (found) return found;
-  }
-  for (const candidate of candidates) {
-    const found = headers.find((h) =>
-      h.toLowerCase().trim().includes(candidate.toLowerCase().trim())
-    );
-    if (found) return found;
-  }
-  return '';
-}
+const autoDetectColumn = detectColumn;
 
 // ── CPF mask ──
 function maskCPF(value: string): string {
@@ -198,25 +186,19 @@ export default function ImportSignupsPage() {
         let rows: CSVRow[] = [];
         let headerRow: string[] = [];
 
-        if (file.name.endsWith('.csv')) {
-          const text = data as string;
-          const workbook = XLSX.read(text, { type: 'string' });
-          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
-          if (json.length > 0) {
-            headerRow = json[0].map((h) => String(h || '').trim());
-            rows = XLSX.utils.sheet_to_json(worksheet, { defval: '' }) as CSVRow[];
-          }
-        } else {
-          const arrayBuffer = data as ArrayBuffer;
-          const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
-          if (json.length > 0) {
-            headerRow = json[0].map((h) => String(h || '').trim());
-            rows = XLSX.utils.sheet_to_json(worksheet, { defval: '' }) as CSVRow[];
-          }
-        }
+        const workbook = file.name.endsWith('.csv')
+          ? XLSX.read(data as string, { type: 'string' })
+          : XLSX.read(data as ArrayBuffer, { type: 'array' });
+
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const matrix = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as any[][];
+
+        // Headers and rows come from the same place on purpose — see
+        // `tableFromMatrix`: reading them through two paths is what made a
+        // Google Forms export import nobody at all.
+        const table = tableFromMatrix(matrix);
+        headerRow = table.headers;
+        rows = table.rows as CSVRow[];
 
         setHeaders(headerRow);
         setCsvData(rows);
