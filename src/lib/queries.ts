@@ -115,8 +115,8 @@ export const GET_COMMUNITY_BY_SLUG_OR_ID = gql`
 `;
 
 export const GET_EVENTS = gql`
-  query GetEvents($filters: EventFilter, $sort: [EventSort]) {
-    events(filters: $filters, sort: $sort) {
+  query GetEvents($filters: EventFilter, $sort: [EventSort], $include_unlisted: Boolean) {
+    events(filters: $filters, sort: $sort, include_unlisted: $include_unlisted) {
       data {
         id
         documentId
@@ -126,6 +126,7 @@ export const GET_EVENTS = gql`
         start_date
         end_date
         images
+        unlisted
         communities {
           id
           slug
@@ -208,6 +209,7 @@ export const GET_EVENT_BY_SLUG_OR_ID = gql`
       subscription_link
       is_online
       call_link
+      unlisted
       communities {
         id
         slug

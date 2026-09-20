@@ -39,6 +39,7 @@ import { useQuery } from '@apollo/client';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Calendar,
+  EyeOff,
   ImagePlus,
   Link as LinkIcon,
   Loader2,
@@ -214,6 +215,7 @@ export function EventForm({
       pixai_token_integration: '',
       is_online: false,
       call_link: '',
+      unlisted: false,
       description: [],
       location: undefined,
       communityId: undefined,
@@ -367,7 +369,7 @@ export function EventForm({
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleFormSubmit, (errors) => {
           // Auto-navigate to the tab that contains the first error
-          const generalFields = ['title', 'slug', 'start_date', 'end_date', 'max_slots', 'description', 'location', 'communityId', 'pixai_token_integration', 'is_online', 'call_link', 'images'];
+          const generalFields = ['title', 'slug', 'start_date', 'end_date', 'max_slots', 'description', 'location', 'communityId', 'pixai_token_integration', 'is_online', 'call_link', 'unlisted', 'images'];
           const scheduleFields = ['talks'];
           const productFields = ['products'];
           const errorKeys = Object.keys(errors);
@@ -565,6 +567,36 @@ export function EventForm({
                   )}
                 />
               )}
+            </div>
+
+            {/* Listing Visibility Section */}
+            <div className="space-y-4 rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base font-semibold flex items-center gap-2">
+                    <EyeOff className="h-4 w-4" />
+                    Evento não listado
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Não aparece na home, na busca nem na página da comunidade.
+                    Continua acessível para quem tiver o link direto.
+                  </p>
+                </div>
+                <FormField
+                  control={form.control}
+                  name="unlisted"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Switch
+                          checked={field.value ?? false}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
             {/* Cover Image Upload Section */}
