@@ -51,6 +51,7 @@ export default function EditEventPage() {
         max_slots: event.max_slots || 0,
         is_online: event.is_online || false,
         call_link: event.call_link || '',
+        unlisted: event.unlisted || false,
         description: event.description,
         communityId: event.communities?.[0]?.id, // Get the first community ID if available
         location: event.location,
@@ -73,6 +74,7 @@ export default function EditEventPage() {
         pixai_token_integration: formData.pixai_token_integration,
         is_online: formData.is_online || false,
         call_link: formData.call_link || '',
+        unlisted: formData.unlisted || false,
         description: formData.description,
         images: formData.images,
         location: formData.location?.id || formData.location, // Send ID string

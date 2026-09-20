@@ -102,6 +102,8 @@ export interface Event {
   pixai_token_integration?: string;
   is_online?: boolean;
   call_link?: string;
+  /** Hidden from the public listings; still reachable by its direct link. */
+  unlisted?: boolean;
   communities: {
     id: string;
     title: string;
@@ -344,6 +346,7 @@ export interface EventInput {
   pixai_token_integration?: string;
   is_online?: boolean;
   call_link?: string;
+  unlisted?: boolean;
   products?: string[]; // IDs of products
   communities?: string[]; // IDs of communities
   location?: string; // ID of location

@@ -22,6 +22,7 @@ export const createEventSchema = z.object({
   pixai_token_integration: z.string().optional(),
   is_online: z.boolean().optional(),
   call_link: z.string().optional(),
+  unlisted: z.boolean().optional(),
   description: z.any().optional(),
   location: z.any().optional(),
   images: z.array(z.any()).optional(),

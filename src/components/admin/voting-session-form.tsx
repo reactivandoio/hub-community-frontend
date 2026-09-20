@@ -61,7 +61,8 @@ export function VotingSessionForm({
   // Events State for Combobox
   const [events, setEvents] = useState<{ label: string; value: string }[]>([]);
   const { data: eventsData } = useQuery(GET_EVENTS, {
-    variables: { sort: [{ start_date: 'DESC' }] },
+    // An admin picker: an unlisted event can hold a voting session like any other.
+    variables: { sort: [{ start_date: 'DESC' }], include_unlisted: true },
   });
 
   const form = useForm<VotingSessionFormValues>({

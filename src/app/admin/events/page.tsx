@@ -3,11 +3,12 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Pencil, Plus, Trash2, Award, BarChart3, ClipboardList } from 'lucide-react';
+import { Pencil, Plus, Trash2, Award, BarChart3, ClipboardList, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 
 import { EventsTableSkeleton } from '@/components/admin/events-table-skeleton';
 import { FadeIn } from '@/components/animations';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -26,7 +27,7 @@ export default function EventsAdminPage() {
   const { data, loading, error, refetch } = useQuery<EventsResponse>(
     GET_EVENTS,
     {
-      variables: { sort: [{ start_date: 'DESC' }] },
+      variables: { sort: [{ start_date: 'DESC' }], include_unlisted: true },
     }
   );
   const [deleteEvent] = useMutation<DeleteEventResponse>(DELETE_EVENT);
@@ -107,7 +108,15 @@ export default function EventsAdminPage() {
                 <TableRow key={event.documentId || event.id}>
                   <TableCell className="font-medium">
                     <div className="flex flex-col">
-                      <span>{event.title}</span>
+                      <div className="flex items-center gap-2">
+                        <span>{event.title}</span>
+                        {event.unlisted && (
+                          <Badge variant="secondary" className="gap-1 font-normal">
+                            <EyeOff className="h-3 w-3" />
+                            Não listado
+                          </Badge>
+                        )}
+                      </div>
                       <span className="text-xs text-muted-foreground">
                         /{event.slug}
                       </span>
