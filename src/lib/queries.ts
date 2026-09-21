@@ -1114,6 +1114,7 @@ export const GET_CERTIFICATE_CANDIDATES = gql`
       email
       identifier
       phone
+      date_of_birth
       sources
       checked_in
       certificate {
@@ -1219,6 +1220,7 @@ export const SUBMIT_CERTIFICATE_REQUEST = gql`
     $identifier: String!
     $email: String!
     $phone: String!
+    $date_of_birth: String
   ) {
     submitCertificateRequest(
       slug: $slug
@@ -1226,6 +1228,7 @@ export const SUBMIT_CERTIFICATE_REQUEST = gql`
       identifier: $identifier
       email: $email
       phone: $phone
+      date_of_birth: $date_of_birth
     ) {
       ok
       category

@@ -763,6 +763,8 @@ export interface CertificateCandidate {
   email?: string | null;
   identifier?: string | null;
   phone?: string | null;
+  /** "YYYY-MM-DD". Só quem preencheu um formulário de solicitação informa. */
+  date_of_birth?: string | null;
   sources: CandidateSource[];
   checked_in?: boolean | null;
   certificate?: CandidateCertificate | null;

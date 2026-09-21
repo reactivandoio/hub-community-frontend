@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
-import { DEFAULT_CATEGORY, categoryKey, formatCpf, formatDate, isDefaultCategory, isValidCpf, normalizeIdentifier } from '@/lib/certificate';
+import { DEFAULT_CATEGORY, categoryKey, formatBirthDate, formatCpf, formatDate, isDefaultCategory, isValidCpf, normalizeIdentifier } from '@/lib/certificate';
 import { GET_CERTIFICATE_CANDIDATES, GET_CERTIFICATE_REQUEST_FORMS, ISSUE_CERTIFICATES } from '@/lib/queries';
 import type { CandidateSource, CertificateCandidate, CertificateCandidatesResponse, CertificateRequestFormsResponse, IssueCertificatesResponse, IssueEntryInput } from '@/lib/types';
 
@@ -256,6 +256,7 @@ export function CertificateIssueTable({ eventId, eventSlug }: Props) {
       CPF: formatCpf(effective(c).identifier),
       'E-mail': c.email || '',
       WhatsApp: c.phone || '',
+      Nascimento: formatBirthDate(c.date_of_birth),
       Origem: c.sources.map((s) => SOURCE_LABEL[s]).join(', '),
       'Check-in': c.checked_in ? 'Sim' : 'Não',
       Código: c.certificate?.code || '',
