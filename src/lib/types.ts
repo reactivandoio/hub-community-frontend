@@ -719,6 +719,8 @@ export interface Certificate {
   identifier?: string | null; // masked (null) on the public certificateByCode query
   email?: string | null; // masked (null) on the public certificateByCode query
   source: CertificateSource;
+  /** "Participante" (padrão), "Organizador", "Mentor"... — a lista de onde o certificado saiu. */
+  category?: string | null;
   issued_at?: string | null;
   sent_at?: string | null;
   revoked_at?: string | null;
@@ -750,7 +752,10 @@ export interface RequestCertificateResponse { requestCertificate: Certificate }
 
 export type CandidateSource = 'SIGNUP' | 'ATTENDANCE' | 'REQUEST';
 
-export type CandidateCertificate = Pick<Certificate, 'id' | 'code' | 'name' | 'source' | 'issued_at' | 'sent_at'>;
+export type CandidateCertificate = Pick<
+  Certificate,
+  'id' | 'code' | 'name' | 'source' | 'category' | 'issued_at' | 'sent_at'
+>;
 
 export interface CertificateCandidate {
   key: string;
@@ -764,6 +769,50 @@ export interface CertificateCandidate {
 }
 
 export interface CertificateCandidatesResponse { certificateCandidates: CertificateCandidate[] }
+
+/** Formulário público de solicitação de certificado de uma categoria do evento. */
+export interface CertificateRequestForm {
+  id: string;
+  title: string;
+  category: string;
+  slug: string;
+  description?: string | null;
+  enabled: boolean;
+  submissions: number;
+}
+
+export interface CertificateRequestFormInput {
+  title: string;
+  category: string;
+  description?: string | null;
+  enabled?: boolean;
+}
+
+/** O que a página pública do formulário recebe — nunca quem já solicitou. */
+export interface CertificateRequestFormPage {
+  title: string;
+  category: string;
+  description?: string | null;
+  enabled: boolean;
+  event: { id: string; slug?: string | null; title: string; start_date?: string | null };
+}
+
+export interface CertificateRequestFormsResponse {
+  certificateRequestForms: CertificateRequestForm[];
+}
+export interface CertificateRequestFormResponse {
+  certificateRequestForm: CertificateRequestFormPage | null;
+}
+export interface CreateCertificateRequestFormResponse {
+  createCertificateRequestForm: CertificateRequestForm;
+}
+export interface UpdateCertificateRequestFormResponse {
+  updateCertificateRequestForm: CertificateRequestForm;
+}
+export interface DeleteCertificateRequestFormResponse { deleteCertificateRequestForm: boolean }
+export interface SubmitCertificateRequestResponse {
+  submitCertificateRequest: { ok: boolean; category: string; event_title: string };
+}
 
 /** `identifier` (CPF) is optional: without a valid CPF the BFF keys the certificate by the e-mail. */
 export interface IssueEntryInput { name: string; identifier?: string; email: string }

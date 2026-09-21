@@ -43,6 +43,14 @@ src/
 - Brand colors: Emerald Green (#10B981) primary, Purple (#8B5CF6) secondary
 - CSS variables defined in `src/app/globals.css` for both light and dark themes
 - **Certificates (`src/lib/certificate*.ts`, `src/components/certificate/`)** — PDFs are built with `@react-pdf/renderer`. Only `certificate-document.tsx`, `certificate-preview.tsx`, `lib/certificate-fonts.ts` and `lib/certificate-server.ts` may import it; everything else (types, forms) imports the pure `lib/certificate.ts` / `lib/certificate-fonts-meta.ts`. `CertificatePreview` (react-pdf + pdf.js canvas) must be loaded with `next/dynamic({ ssr:false })`. Server rendering lives in `/api/certificates/[code]/pdf` and `/api/certificates/zip` (they talk to the BFF via `GRAPHQL_URL`, falling back to `NEXT_PUBLIC_GRAPHQL_URL`). Cursive signature fonts are self-hosted in `public/fonts` (SIL OFL, see `OFL.txt`) and declared in both `globals.css` and `certificate-fonts-meta.ts` — keep them in sync. Docker: `make dev-front-build` / `dev-front-prod` (frontend container against the production BFF) / `dev-front-local`.
+- **Certificate categories** — every certificate, request and request form carries a category
+  ("Participante" by default, plus "Organizador", "Mentor"… as the event needs). `lib/certificate.ts`
+  owns the comparison rule (`normalizeCategory` / `categoryKey` / `isDefaultCategory`), matching the
+  BFF and the backend. The admin creates one public form per category under
+  `/admin/events/[id]/certificados` → aba **Solicitações**; each form has its own link
+  (`/certificado/solicitar/[slug]`), and whoever fills it lands in that category's list on the
+  **Emissão** tab, picked by the "Lista" select. The default list is the only one fed by inscritos and
+  presenças. `{{categoria}}` is a body-template placeholder, so one model serves every list.
 - **Unlisted events** — `Event.unlisted` hides an event from the public listings (home, `/events`,
   search, community page). The BFF filters it out of the `events` query by default, so a public
   caller needs no change; an admin surface that must see them passes `include_unlisted: true`
