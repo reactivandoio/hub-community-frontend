@@ -15,9 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
-import { formatCpf, formatDate, isValidCpf, normalizeIdentifier } from '@/lib/certificate';
-import { GET_CERTIFICATE_CANDIDATES, ISSUE_CERTIFICATES } from '@/lib/queries';
-import type { CandidateSource, CertificateCandidate, CertificateCandidatesResponse, IssueCertificatesResponse, IssueEntryInput } from '@/lib/types';
+import { DEFAULT_CATEGORY, categoryKey, formatCpf, formatDate, isDefaultCategory, isValidCpf, normalizeIdentifier } from '@/lib/certificate';
+import { GET_CERTIFICATE_CANDIDATES, GET_CERTIFICATE_REQUEST_FORMS, ISSUE_CERTIFICATES } from '@/lib/queries';
+import type { CandidateSource, CertificateCandidate, CertificateCandidatesResponse, CertificateRequestFormsResponse, IssueCertificatesResponse, IssueEntryInput } from '@/lib/types';
 
 const SOURCE_LABEL: Record<CandidateSource, string> = { SIGNUP: 'Inscrito', ATTENDANCE: 'Presença', REQUEST: 'Solicitação' };
 type StatusFilter = 'all' | 'pending' | 'issued' | 'sent';
@@ -44,8 +44,15 @@ interface Props {
 
 export function CertificateIssueTable({ eventId, eventSlug }: Props) {
   const { toast } = useToast();
-  const { data, loading, error, refetch } = useQuery<CertificateCandidatesResponse>(GET_CERTIFICATE_CANDIDATES, {
+  // The list being issued. Participantes is the default one (inscritos + presenças +
+  // solicitações sem categoria); the others come from the event's request forms.
+  const [category, setCategory] = useState(DEFAULT_CATEGORY);
+  const { data: formsData } = useQuery<CertificateRequestFormsResponse>(GET_CERTIFICATE_REQUEST_FORMS, {
     variables: { eventId },
+    fetchPolicy: 'network-only',
+  });
+  const { data, loading, error, refetch } = useQuery<CertificateCandidatesResponse>(GET_CERTIFICATE_CANDIDATES, {
+    variables: { eventId, category },
     fetchPolicy: 'network-only',
   });
   const [issue, { loading: issuing }] = useMutation<IssueCertificatesResponse>(ISSUE_CERTIFICATES);
@@ -62,6 +69,17 @@ export function CertificateIssueTable({ eventId, eventSlug }: Props) {
   const [zipping, setZipping] = useState(false);
 
   const candidates = data?.certificateCandidates ?? [];
+
+  // Dedup by the same rule the BFF uses (case- and accent-insensitive), keeping the label
+  // the organizer typed on the form.
+  const categories = useMemo(() => {
+    const byKey = new Map<string, string>([[categoryKey(DEFAULT_CATEGORY), DEFAULT_CATEGORY]]);
+    (formsData?.certificateRequestForms ?? []).forEach((f) => {
+      const key = categoryKey(f.category);
+      if (!byKey.has(key)) byKey.set(key, f.category);
+    });
+    return [...byKey.values()];
+  }, [formsData]);
 
   const effective = (c: CertificateCandidate) => ({
     name: edits[c.key]?.name ?? c.name,
@@ -110,6 +128,14 @@ export function CertificateIssueTable({ eventId, eventSlug }: Props) {
   };
   const setEdit = (key: string, patch: RowEdit) => setEdits({ ...edits, [key]: { ...edits[key], ...patch } });
 
+  // Rows are keyed within one list, so a selection or a pending edit must not survive a switch.
+  const changeCategory = (next: string) => {
+    setCategory(next);
+    setSelected(new Set());
+    setEdits({});
+    setRowErrors({});
+  };
+
   const downloadZip = async (codes: string[]) => {
     if (codes.length === 0) {
       toast({ variant: 'destructive', title: 'ZIP falhou', description: 'Nenhum dos selecionados tem certificado emitido.' });
@@ -128,7 +154,8 @@ export function CertificateIssueTable({ eventId, eventSlug }: Props) {
         const url = URL.createObjectURL(await res.blob());
         const a = document.createElement('a');
         a.href = url;
-        a.download = codes.length > ZIP_BATCH ? `certificados-${eventSlug}-${i / ZIP_BATCH + 1}.zip` : `certificados-${eventSlug}.zip`;
+        const base = `certificados-${eventSlug}-${categoryKey(category)}`;
+        a.download = codes.length > ZIP_BATCH ? `${base}-${i / ZIP_BATCH + 1}.zip` : `${base}.zip`;
         a.click();
         URL.revokeObjectURL(url);
       }
@@ -145,7 +172,7 @@ export function CertificateIssueTable({ eventId, eventSlug }: Props) {
       return { name, identifier: isValidCpf(cpf) ? normalizeIdentifier(cpf) : undefined, email };
     });
     try {
-      const { data: res } = await issue({ variables: { eventId, entries, actions: { register: opts.register, email: opts.email } } });
+      const { data: res } = await issue({ variables: { eventId, entries, category, actions: { register: opts.register, email: opts.email } } });
       const result = res?.issueCertificates;
       if (!result) return;
 
@@ -238,7 +265,7 @@ export function CertificateIssueTable({ eventId, eventSlug }: Props) {
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Certificados');
-    XLSX.writeFile(wb, `certificados-${eventSlug}.xlsx`);
+    XLSX.writeFile(wb, `certificados-${eventSlug}-${categoryKey(category)}.xlsx`);
   };
 
   if (loading) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
@@ -252,8 +279,12 @@ export function CertificateIssueTable({ eventId, eventSlug }: Props) {
         <CardHeader>
           <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
             <div>
-              <CardTitle>Participantes ({candidates.length})</CardTitle>
-              <CardDescription>Inscritos, presenças e solicitações, sem duplicar. Selecione e emita.</CardDescription>
+              <CardTitle>{category} ({candidates.length})</CardTitle>
+              <CardDescription>
+                {isDefaultCategory(category)
+                  ? 'Inscritos, presenças e solicitações, sem duplicar. Selecione e emita.'
+                  : `Quem solicitou pelo formulário de ${category}. Selecione e emita.`}
+              </CardDescription>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => refetch()}><RefreshCw className="w-4 h-4 mr-2" />Atualizar</Button>
@@ -261,8 +292,14 @@ export function CertificateIssueTable({ eventId, eventSlug }: Props) {
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 pt-4">
+            <Select value={category} onValueChange={changeCategory}>
+              <SelectTrigger className="sm:w-52" aria-label="Lista"><SelectValue placeholder="Lista" /></SelectTrigger>
+              <SelectContent>
+                {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
             <Input placeholder="Buscar por nome ou e-mail" value={search} onChange={(e) => setSearch(e.target.value)} className="sm:max-w-xs" />
-            <Select value={sourceFilter} onValueChange={(v) => setSourceFilter(v as 'all' | CandidateSource)}>
+            <Select value={sourceFilter} onValueChange={(v) => setSourceFilter(v as 'all' | CandidateSource)} disabled={!isDefaultCategory(category)}>
               <SelectTrigger className="sm:w-44"><SelectValue placeholder="Origem" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas as origens</SelectItem>

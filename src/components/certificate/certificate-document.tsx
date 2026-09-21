@@ -13,7 +13,7 @@ import { cursiveFontSize, registerSignatureFonts, signatureFontFamily } from '@/
 export interface CertificateDocumentProps {
   config: CertificateConfigLike;
   event: CertificateEventInfo;
-  certificate: { code: string; name: string };
+  certificate: { code: string; name: string; category?: string | null };
   verifyUrl: string;
   qrDataUrl: string;
   /** true when rendering in a route handler (images fetched directly, no proxy) */
@@ -87,7 +87,7 @@ export function CertificateDocument({
   registerSignatureFonts({ server });
   const primary = config.primary_color || DEFAULT_PRIMARY_COLOR;
   const title = config.title?.trim() || DEFAULT_TITLE;
-  const body = resolveBody(config, event, certificate.name);
+  const body = resolveBody(config, event, certificate.name, certificate.category);
   const src = (url?: string | null) => imageSrc(url, { server });
   const sponsors = (config.sponsors || []).filter((s) => s.logo);
   const signatures = (config.signatures || []).slice(0, 4);

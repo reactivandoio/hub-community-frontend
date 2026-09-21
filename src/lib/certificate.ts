@@ -8,10 +8,13 @@ export const PLACEHOLDERS = [
   'data_fim',
   'local',
   'comunidade',
+  'categoria',
 ] as const;
 export type Placeholder = (typeof PLACEHOLDERS)[number];
 
 export const DEFAULT_TITLE = 'Certificado de Participação';
+/** A categoria de quem não veio de um formulário de solicitação por categoria. */
+export const DEFAULT_CATEGORY = 'Participante';
 export const DEFAULT_PRIMARY_COLOR = '#10B981';
 export const DEFAULT_BODY_TEMPLATE =
   'Certificamos que {{nome}} participou do evento {{evento}}, realizado em {{local}} de {{data_inicio}} a {{data_fim}}, com carga horária de {{carga_horaria}} horas.';
@@ -85,12 +88,29 @@ export function eventLocationLabel(event: CertificateEventInfo): string {
   return parts.join(', ');
 }
 
+export function normalizeCategory(value?: string | null): string {
+  return (value || '').trim() || DEFAULT_CATEGORY;
+}
+
+/**
+ * Comparison key for a category, accent- and case-insensitive — the same rule the BFF and the
+ * backend apply, so "Voluntário", "voluntario" and "VOLUNTÁRIO" never split one list in two.
+ */
+export function categoryKey(value?: string | null): string {
+  return slugify(normalizeCategory(value));
+}
+
+export function isDefaultCategory(value?: string | null): boolean {
+  return categoryKey(value) === categoryKey(DEFAULT_CATEGORY);
+}
+
 export function buildTemplateVars(input: {
   config: CertificateConfigLike;
   event: CertificateEventInfo;
   name: string;
+  category?: string | null;
 }): Record<Placeholder, string> {
-  const { config, event, name } = input;
+  const { config, event, name, category } = input;
   return {
     nome: name,
     evento: event.title,
@@ -99,6 +119,7 @@ export function buildTemplateVars(input: {
     data_fim: formatDate(event.end_date),
     local: eventLocationLabel(event),
     comunidade: (event.communities || []).map((c) => c.title).join(', '),
+    categoria: normalizeCategory(category),
   };
 }
 
@@ -106,8 +127,9 @@ export function resolveBody(
   config: CertificateConfigLike,
   event: CertificateEventInfo,
   name: string,
+  category?: string | null,
 ): string {
-  const vars = buildTemplateVars({ config, event, name });
+  const vars = buildTemplateVars({ config, event, name, category });
   const template = config.body_template?.trim() || defaultBodyTemplate(Boolean(vars.local));
   return resolveTemplate(template, vars);
 }

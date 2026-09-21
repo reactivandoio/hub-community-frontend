@@ -6,6 +6,8 @@ import {
   formatDate,
   eventLocationLabel,
   buildTemplateVars,
+  categoryKey,
+  isDefaultCategory,
   resolveBody,
   certificateFileName,
   normalizeIdentifier,
@@ -78,7 +80,16 @@ describe('buildTemplateVars / resolveBody', () => {
       data_fim: '01/08/2026',
       local: 'Sebrae, Goiânia',
       comunidade: 'Reactivando',
+      categoria: 'Participante',
     });
+  });
+  it('falls back to the default category when the certificate has none', () => {
+    expect(buildTemplateVars({ config: {}, event, name: 'Ana', category: null }).categoria)
+      .toBe('Participante');
+  });
+  it('carries the category the certificate was issued with', () => {
+    expect(buildTemplateVars({ config: {}, event, name: 'Ana', category: 'Mentor' }).categoria)
+      .toBe('Mentor');
   });
   it('uses the default template with location', () => {
     expect(resolveBody({}, event, 'Ana')).toBe(
@@ -94,6 +105,26 @@ describe('buildTemplateVars / resolveBody', () => {
   });
   it('uses the custom template when present', () => {
     expect(resolveBody({ body_template: 'X {{nome}}' }, event, 'Ana')).toBe('X Ana');
+  });
+  it('resolves {{categoria}} so one model serves every list', () => {
+    const template = 'Certificamos que {{nome}} participou como {{categoria}}.';
+    expect(resolveBody({ body_template: template }, event, 'Ana', 'Mentor'))
+      .toBe('Certificamos que Ana participou como Mentor.');
+    expect(resolveBody({ body_template: template }, event, 'Ana'))
+      .toBe('Certificamos que Ana participou como Participante.');
+  });
+});
+
+describe('categoryKey / isDefaultCategory', () => {
+  it('ignores case and accents', () => {
+    expect(categoryKey('Voluntário')).toBe('voluntario');
+    expect(categoryKey('EQUIPE DE APOIO')).toBe('equipe-de-apoio');
+  });
+  it('treats an empty category as Participante', () => {
+    expect(categoryKey(null)).toBe('participante');
+    expect(isDefaultCategory('')).toBe(true);
+    expect(isDefaultCategory('participante')).toBe(true);
+    expect(isDefaultCategory('Mentor')).toBe(false);
   });
 });
 

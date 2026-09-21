@@ -930,6 +930,7 @@ export const CERTIFICATE_FIELDS = gql`
     identifier
     email
     source
+    category
     issued_at
     sent_at
     revoked_at
@@ -960,6 +961,7 @@ export const CERTIFICATE_PUBLIC_FIELDS = gql`
     code
     name
     source
+    category
     issued_at
     sent_at
     revoked_at
@@ -1103,9 +1105,10 @@ export const REQUEST_CERTIFICATE = gql`
   }
 `;
 
+// `category` picks the list: sem ela, a de participantes (inscritos, presenças e solicitações).
 export const GET_CERTIFICATE_CANDIDATES = gql`
-  query GetCertificateCandidates($eventId: String!) {
-    certificateCandidates(eventId: $eventId) {
+  query GetCertificateCandidates($eventId: String!, $category: String) {
+    certificateCandidates(eventId: $eventId, category: $category) {
       key
       name
       email
@@ -1118,6 +1121,7 @@ export const GET_CERTIFICATE_CANDIDATES = gql`
         code
         name
         source
+        category
         issued_at
         sent_at
       }
@@ -1126,8 +1130,13 @@ export const GET_CERTIFICATE_CANDIDATES = gql`
 `;
 
 export const ISSUE_CERTIFICATES = gql`
-  mutation IssueCertificates($eventId: String!, $entries: [IssueEntryInput!]!, $actions: IssueActionsInput!) {
-    issueCertificates(eventId: $eventId, entries: $entries, actions: $actions) {
+  mutation IssueCertificates(
+    $eventId: String!
+    $entries: [IssueEntryInput!]!
+    $actions: IssueActionsInput!
+    $category: String
+  ) {
+    issueCertificates(eventId: $eventId, entries: $entries, actions: $actions, category: $category) {
       issued
       emailed
       errors
@@ -1136,6 +1145,91 @@ export const ISSUE_CERTIFICATES = gql`
         identifier
         sent_at
       }
+    }
+  }
+`;
+
+// Certificate request forms: one public link per category (participante, organizador, mentor...).
+export const CERTIFICATE_REQUEST_FORM_FIELDS = gql`
+  fragment CertificateRequestFormFields on CertificateRequestForm {
+    id
+    title
+    category
+    slug
+    description
+    enabled
+    submissions
+  }
+`;
+
+export const GET_CERTIFICATE_REQUEST_FORMS = gql`
+  ${CERTIFICATE_REQUEST_FORM_FIELDS}
+  query GetCertificateRequestForms($eventId: String!) {
+    certificateRequestForms(eventId: $eventId) {
+      ...CertificateRequestFormFields
+    }
+  }
+`;
+
+export const GET_CERTIFICATE_REQUEST_FORM = gql`
+  query GetCertificateRequestForm($slug: String!) {
+    certificateRequestForm(slug: $slug) {
+      title
+      category
+      description
+      enabled
+      event {
+        id
+        slug
+        title
+        start_date
+      }
+    }
+  }
+`;
+
+export const CREATE_CERTIFICATE_REQUEST_FORM = gql`
+  ${CERTIFICATE_REQUEST_FORM_FIELDS}
+  mutation CreateCertificateRequestForm($eventId: String!, $data: CertificateRequestFormInput!) {
+    createCertificateRequestForm(eventId: $eventId, data: $data) {
+      ...CertificateRequestFormFields
+    }
+  }
+`;
+
+export const UPDATE_CERTIFICATE_REQUEST_FORM = gql`
+  ${CERTIFICATE_REQUEST_FORM_FIELDS}
+  mutation UpdateCertificateRequestForm($id: String!, $data: CertificateRequestFormInput!) {
+    updateCertificateRequestForm(id: $id, data: $data) {
+      ...CertificateRequestFormFields
+    }
+  }
+`;
+
+export const DELETE_CERTIFICATE_REQUEST_FORM = gql`
+  mutation DeleteCertificateRequestForm($id: String!) {
+    deleteCertificateRequestForm(id: $id)
+  }
+`;
+
+export const SUBMIT_CERTIFICATE_REQUEST = gql`
+  mutation SubmitCertificateRequest(
+    $slug: String!
+    $name: String!
+    $identifier: String!
+    $email: String!
+    $phone: String!
+  ) {
+    submitCertificateRequest(
+      slug: $slug
+      name: $name
+      identifier: $identifier
+      email: $email
+      phone: $phone
+    ) {
+      ok
+      category
+      event_title
     }
   }
 `;
