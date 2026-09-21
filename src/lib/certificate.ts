@@ -80,6 +80,15 @@ export function formatDate(iso: string): string {
   }).format(new Date(iso));
 }
 
+/**
+ * "YYYY-MM-DD" (uma data sem hora) → "dd/mm/aaaa", por string mesmo. `formatDate` não serve:
+ * ela lê a data como meia-noite UTC e, em America/Sao_Paulo, cai no dia anterior.
+ */
+export function formatBirthDate(value?: string | null): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec((value || '').trim());
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : '';
+}
+
 export function eventLocationLabel(event: CertificateEventInfo): string {
   if (event.is_online) return 'online';
   const parts = [event.location?.title, event.location?.city].filter(

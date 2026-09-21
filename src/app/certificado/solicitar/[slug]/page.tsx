@@ -45,7 +45,9 @@ export default function SolicitarCertificadoPage() {
   const [submit, { loading: submitting }] =
     useMutation<SubmitCertificateRequestResponse>(SUBMIT_CERTIFICATE_REQUEST);
 
-  const [form, setForm] = useState({ name: '', cpf: '', email: '', phone_number: '' });
+  const [form, setForm] = useState({ name: '', cpf: '', email: '', phone_number: '', date_of_birth: '' });
+  // <input type="date"> já barra o futuro com `max`; o BFF confere de novo.
+  const today = new Date().toISOString().slice(0, 10);
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
 
@@ -66,6 +68,7 @@ export default function SolicitarCertificadoPage() {
           identifier: normalizeIdentifier(form.cpf),
           email: form.email.trim(),
           phone: form.phone_number.replace(/\D/g, ''),
+          date_of_birth: form.date_of_birth || null,
         },
       });
       if (res?.submitCertificateRequest?.ok) setSent(true);
@@ -163,6 +166,19 @@ export default function SolicitarCertificadoPage() {
                 className="h-12"
                 maxLength={14}
                 inputMode="numeric"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="date_of_birth" className="text-sm font-semibold">Data de nascimento</Label>
+              <Input
+                id="date_of_birth"
+                type="date"
+                required
+                max={today}
+                value={form.date_of_birth}
+                onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })}
+                disabled={submitting}
+                className="h-12"
               />
             </div>
             <div className="space-y-2">

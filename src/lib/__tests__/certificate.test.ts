@@ -7,6 +7,7 @@ import {
   eventLocationLabel,
   buildTemplateVars,
   categoryKey,
+  formatBirthDate,
   isDefaultCategory,
   resolveBody,
   certificateFileName,
@@ -112,6 +113,22 @@ describe('buildTemplateVars / resolveBody', () => {
       .toBe('Certificamos que Ana participou como Mentor.');
     expect(resolveBody({ body_template: template }, event, 'Ana'))
       .toBe('Certificamos que Ana participou como Participante.');
+  });
+});
+
+describe('formatBirthDate', () => {
+  it('reads a date-only string without letting the timezone shift the day', () => {
+    expect(formatBirthDate('1990-04-07')).toBe('07/04/1990');
+    // The bug this guards: new Date('2000-01-01') is UTC midnight, which in America/Sao_Paulo
+    // is still 31/12/1999.
+    expect(formatBirthDate('2000-01-01')).toBe('01/01/2000');
+  });
+  it('is empty when there is nothing to show', () => {
+    expect(formatBirthDate(null)).toBe('');
+    expect(formatBirthDate(undefined)).toBe('');
+    expect(formatBirthDate('')).toBe('');
+    expect(formatBirthDate('07/04/1990')).toBe('');
+    expect(formatBirthDate('1990-04-07T00:00:00Z')).toBe('');
   });
 });
 
