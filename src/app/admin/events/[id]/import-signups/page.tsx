@@ -258,11 +258,14 @@ export default function ImportSignupsPage() {
         variables: {
           eventSlug,
           batchId: selectedBatchId,
+          // `SignupImportInput` is name/email/phone only. The CPF is read from
+          // the sheet and shown in the preview, but the signup record has no
+          // field for it, and sending one GraphQL does not know rejects the
+          // whole batch — all 35 people failed on a single unknown key.
           signups: mappedData.map((d) => ({
             name: d.name,
             email: d.email || null,
             phone_number: d.phone_number || null,
-            cpf: d.cpf ? d.cpf.replace(/\D/g, '') : null,
           })),
         },
       });
