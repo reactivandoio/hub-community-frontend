@@ -10,7 +10,8 @@ import { useMutation, useQuery } from '@apollo/client';
 import { format } from 'date-fns';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Award, BarChart3, FileSpreadsheet, QrCode, Printer } from 'lucide-react';
+import { Award, BarChart3, Dices, FileSpreadsheet, QrCode, Printer } from 'lucide-react';
+import { raffleUrl } from '@/lib/raffle';
 
 export default function EditEventPage() {
   const router = useRouter();
@@ -212,6 +213,13 @@ export default function EditEventPage() {
           >
             <FileSpreadsheet className="w-4 h-4 mr-2" />
             Inscrições
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => router.push(raffleUrl(eventSlug))}
+          >
+            <Dices className="w-4 h-4 mr-2" />
+            Sorteio
           </Button>
           <Button
             variant="outline"

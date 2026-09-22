@@ -27,6 +27,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { useLazyQuery } from '@apollo/client';
+import { EVENT_SIGNUPS } from '@/lib/queries';
+import { RAFFLE_EVENT_PARAM, raffleNamesFromSignups } from '@/lib/raffle';
 
 // --- Clock Component ---
 const Clock = () => {
@@ -66,6 +69,35 @@ export default function SorteioPage() {
   const [showInfo, setShowInfo] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Opened from /admin/events/[id] with ?event=slug: skip the upload and draw
+  // among the people who checked in. Read from window (not useSearchParams) so
+  // the page needs no Suspense boundary.
+  const [eventLoadMessage, setEventLoadMessage] = useState('');
+  const [loadEventSignups] = useLazyQuery(EVENT_SIGNUPS, { fetchPolicy: 'network-only' });
+
+  useEffect(() => {
+    const eventSlug = new URLSearchParams(window.location.search).get(RAFFLE_EVENT_PARAM);
+    if (!eventSlug) return;
+
+    setEventLoadMessage('Carregando participantes do evento...');
+    loadEventSignups({ variables: { eventSlug } })
+      .then(({ data, error }) => {
+        if (error) throw error;
+        const list = raffleNamesFromSignups(data?.eventSignups || []);
+        if (list.length === 0) {
+          setEventLoadMessage('Ninguém fez check-in neste evento ainda. Importe uma planilha para sortear.');
+          return;
+        }
+        setEventLoadMessage('');
+        setParticipants(list);
+        setRemainingParticipants(list);
+        setStep('draw');
+      })
+      .catch(() => {
+        setEventLoadMessage('Não foi possível carregar os participantes do evento. Importe uma planilha para sortear.');
+      });
+  }, [loadEventSignups]);
 
   // Handle CSV Upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -282,7 +314,10 @@ export default function SorteioPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6 p-6 md:p-10">
-                  <div 
+                  {eventLoadMessage && (
+                    <p className="text-center text-sm text-muted-foreground">{eventLoadMessage}</p>
+                  )}
+                  <div
                     onClick={() => fileInputRef.current?.click()}
                     className="group cursor-pointer border-2 border-dashed border-muted rounded-2xl p-12 text-center transition-all hover:border-primary/50 hover:bg-accent/50"
                   >
