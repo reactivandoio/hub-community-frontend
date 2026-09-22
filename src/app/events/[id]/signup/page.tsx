@@ -49,6 +49,8 @@ import {
   IS_USER_SIGNED_UP,
 } from '@/lib/queries';
 import { signupName } from '@/lib/signup-name';
+import { acquireSignupLock, releaseSignupLock } from '@/lib/signup-lock';
+import { signupErrorMessage } from '@/lib/signup-error';
 import { adjustToBrazilTimezone } from '@/utils/event';
 
 const phoneRegex = /^\+?[\d\s()-]{8,20}$/;
@@ -57,7 +59,11 @@ const inlineSignupSchema = z.object({
   name: z.string().min(3, 'Nome completo deve ter no mínimo 3 caracteres.'),
   email: z.string().email('Email inválido.'),
   phone: z.string().regex(phoneRegex, 'Informe um número válido (ex: +55 11 98765-4321).'),
-  password: z.string().min(6, 'A senha deve ter no mínimo 6 caracteres.'),
+  password: z
+    .string()
+    .min(6, 'A senha deve ter no mínimo 6 caracteres.')
+    // Strapi refuses more than 72 bytes (bcrypt's limit).
+    .refine((p) => new TextEncoder().encode(p).length <= 72, 'A senha deve ter no máximo 72 caracteres.'),
 });
 
 type InlineSignupValues = z.infer<typeof inlineSignupSchema>;
@@ -298,19 +304,14 @@ export default function EventSignupPage() {
   const handleInlineSignup = async (values: InlineSignupValues) => {
     if (!selectedBatch || inlineBusy) return;
 
-    // Client-side dedupe: (eventId, email) short lock to avoid double-submit
-    // on page reload / flaky networks. Backend has no unique index on
-    // (event, email) for participants, so this is our guard.
-    const lockKey = `signup_lock_${slugOrId}_${values.email.toLowerCase()}`;
-    if (typeof sessionStorage !== 'undefined') {
-      const existing = sessionStorage.getItem(lockKey);
-      if (existing && Date.now() - Number(existing) < 30_000) {
-        setErrorMessage('Inscrição em andamento. Aguarde alguns segundos antes de tentar novamente.');
-        setStep('confirm');
-        return;
-      }
-      sessionStorage.setItem(lockKey, String(Date.now()));
+    // Held only by a successful signup: any failure below releases it, so a
+    // corrected retry goes through instead of hitting "em andamento".
+    if (!acquireSignupLock(slugOrId, values.email)) {
+      setErrorMessage('Inscrição em andamento. Aguarde alguns segundos antes de tentar novamente.');
+      setStep('confirm');
+      return;
     }
+    let succeeded = false;
 
     setInlineBusy(true);
     setStep('processing');
@@ -357,6 +358,7 @@ export default function EventSignupPage() {
       const result = mutData?.signupToEvent;
 
       if (result?.success) {
+        succeeded = true;
         setSignupResult(result);
         setIsNewAccount(true);
         track({
@@ -370,9 +372,10 @@ export default function EventSignupPage() {
         setStep('confirm');
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Erro ao realizar inscrição.');
+      setErrorMessage(signupErrorMessage(err));
       setStep('confirm');
     } finally {
+      if (!succeeded) releaseSignupLock(slugOrId, values.email);
       setInlineBusy(false);
     }
   };
