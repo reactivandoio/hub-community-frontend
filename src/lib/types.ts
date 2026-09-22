@@ -599,6 +599,16 @@ export interface ImportSignupsResponse {
   };
 }
 
+export interface BulkEmailResponse {
+  success: boolean;
+  message?: string | null;
+  queued_count: number;
+}
+
+export interface SendImportedSignupConfirmationsResponse {
+  sendImportedSignupConfirmations: BulkEmailResponse | null;
+}
+
 export interface ManualSignupResponse {
   manualSignup: {
     success: boolean;

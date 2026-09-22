@@ -3,12 +3,23 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Pencil, Plus, Trash2, Award, BarChart3, ClipboardList, EyeOff } from 'lucide-react';
+import { Pencil, Plus, Trash2, Award, BarChart3, ClipboardList, EyeOff, Mail } from 'lucide-react';
 import Link from 'next/link';
+import { useState } from 'react';
 
 import { EventsTableSkeleton } from '@/components/admin/events-table-skeleton';
 import { FadeIn } from '@/components/animations';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -19,8 +30,19 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { DELETE_EVENT, GET_EVENTS } from '@/lib/queries';
-import { DeleteEventResponse, EventsResponse } from '@/lib/types';
+import { bulkEmailToast } from '@/lib/bulk-email';
+import { DELETE_EVENT, GET_EVENTS, SEND_IMPORTED_SIGNUP_CONFIRMATIONS } from '@/lib/queries';
+import {
+  DeleteEventResponse,
+  EventsResponse,
+  SendImportedSignupConfirmationsResponse,
+} from '@/lib/types';
+
+interface EmailTarget {
+  /** Same identifier the Checkin mutations (importSignups) take as eventSlug. */
+  eventSlug: string;
+  title: string;
+}
 
 export default function EventsAdminPage() {
   const { toast } = useToast();
@@ -31,6 +53,30 @@ export default function EventsAdminPage() {
     }
   );
   const [deleteEvent] = useMutation<DeleteEventResponse>(DELETE_EVENT);
+  const [sendConfirmations, { loading: sendingEmails }] =
+    useMutation<SendImportedSignupConfirmationsResponse>(SEND_IMPORTED_SIGNUP_CONFIRMATIONS);
+  const [emailTarget, setEmailTarget] = useState<EmailTarget | null>(null);
+
+  const handleSendConfirmations = async () => {
+    if (!emailTarget) return;
+    try {
+      const { data } = await sendConfirmations({
+        variables: { eventSlug: emailTarget.eventSlug },
+      });
+      toast(bulkEmailToast(data?.sendImportedSignupConfirmations));
+    } catch (error) {
+      console.error('Error sending imported signup confirmations:', error);
+      toast(
+        bulkEmailToast({
+          success: false,
+          message: error instanceof Error ? error.message : null,
+          queued_count: 0,
+        })
+      );
+    } finally {
+      setEmailTarget(null);
+    }
+  };
 
   const handleDelete = async (documentId: string) => {
     if (!confirm('Tem certeza que deseja excluir este evento?')) return;
@@ -153,6 +199,19 @@ export default function EventsAdminPage() {
                           <Award className="h-4 w-4" />
                         </Button>
                       </Link>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Enviar confirmação aos importados"
+                        onClick={() =>
+                          setEmailTarget({
+                            eventSlug: event.slug || event.documentId || String(event.id),
+                            title: event.title,
+                          })
+                        }
+                      >
+                        <Mail className="h-4 w-4" />
+                      </Button>
                       <Link href={`/admin/events/${event.documentId}`}>
                         <Button variant="ghost" size="icon" title="Editar">
                           <Pencil className="h-4 w-4" />
@@ -177,6 +236,35 @@ export default function EventsAdminPage() {
           </TableBody>
         </Table>
       </div>
+
+      <AlertDialog
+        open={emailTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !sendingEmails) setEmailTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Enviar confirmação — {emailTarget?.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Enviar email de confirmação com QR para os inscritos importados deste evento? Quem
+              já recebeu vai receber de novo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={sendingEmails}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={sendingEmails}
+              onClick={(e) => {
+                e.preventDefault();
+                handleSendConfirmations();
+              }}
+            >
+              {sendingEmails ? 'Enviando...' : 'Enviar emails'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
     </FadeIn>
   );

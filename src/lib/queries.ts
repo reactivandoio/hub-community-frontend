@@ -842,6 +842,16 @@ export const IMPORT_SIGNUPS = gql`
   }
 `;
 
+export const SEND_IMPORTED_SIGNUP_CONFIRMATIONS = gql`
+  mutation SendImportedSignupConfirmations($eventSlug: String!) {
+    sendImportedSignupConfirmations(eventSlug: $eventSlug) {
+      success
+      message
+      queued_count
+    }
+  }
+`;
+
 export const MANUAL_SIGNUP = gql`
   mutation ManualSignup($eventSlug: String!, $batchId: String!, $input: ManualSignupInput!) {
     manualSignup(eventSlug: $eventSlug, batchId: $batchId, input: $input) {

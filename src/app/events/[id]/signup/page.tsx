@@ -25,7 +25,6 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
-import * as z from 'zod';
 
 import { AddToCalendarButton } from '@/components/add-to-calendar-button';
 import { SignupTicketQr } from '@/components/signup-ticket-qr';
@@ -51,39 +50,13 @@ import {
 import { signupName } from '@/lib/signup-name';
 import { acquireSignupLock, releaseSignupLock } from '@/lib/signup-lock';
 import { signupErrorMessage } from '@/lib/signup-error';
+import {
+  cleanSignupPhone,
+  guestSignupSuccessMessage,
+  inlineSignupSchema,
+  type InlineSignupValues,
+} from '@/lib/inline-signup';
 import { adjustToBrazilTimezone } from '@/utils/event';
-
-const phoneRegex = /^\+?[\d\s()-]{8,20}$/;
-
-const inlineSignupSchema = z.object({
-  name: z.string().min(3, 'Nome completo deve ter no mínimo 3 caracteres.'),
-  email: z.string().email('Email inválido.'),
-  phone: z.string().regex(phoneRegex, 'Informe um número válido (ex: +55 11 98765-4321).'),
-  password: z
-    .string()
-    .min(6, 'A senha deve ter no mínimo 6 caracteres.')
-    // Strapi refuses more than 72 bytes (bcrypt's limit).
-    .refine((p) => new TextEncoder().encode(p).length <= 72, 'A senha deve ter no máximo 72 caracteres.'),
-});
-
-type InlineSignupValues = z.infer<typeof inlineSignupSchema>;
-
-function deriveUsername(email: string): string {
-  const local = email
-    .split('@')[0]
-    .toLowerCase()
-    .replace(/[^a-z0-9-]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 20) || 'user';
-  const suffix = Math.random().toString(36).slice(2, 6);
-  return `${local}-${suffix}`;
-}
-
-function isDuplicateEmailError(err: unknown): boolean {
-  const msg = (err instanceof Error ? err.message : String(err || '')).toLowerCase();
-  return msg.includes('email') && (msg.includes('taken') || msg.includes('already') || msg.includes('exists'));
-}
 
 interface Batch {
   id: string;
@@ -106,7 +79,7 @@ type SignupStep = 'select' | 'confirm' | 'processing' | 'success' | 'payment';
 export default function EventSignupPage() {
   const params = useParams();
   const router = useRouter();
-  const { user, isAuthenticated, signUp: authSignUp, updatePhone } = useAuth();
+  const { user, isAuthenticated, updatePhone } = useAuth();
   const { track } = useTracking();
   const slugOrId = params.id as string;
 
@@ -124,13 +97,12 @@ export default function EventSignupPage() {
   const [phoneInput, setPhoneInput] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [isNewAccount, setIsNewAccount] = useState(false);
-  const [duplicateEmailEmail, setDuplicateEmailEmail] = useState<string | null>(null);
   const [inlineBusy, setInlineBusy] = useState(false);
 
   // Inline signup form (for unauthenticated users)
   const inlineForm = useForm<InlineSignupValues>({
     resolver: zodResolver(inlineSignupSchema),
-    defaultValues: { name: '', email: '', phone: '', password: '' },
+    defaultValues: { name: '', email: '', phone: '' },
   });
 
   // Queries & Mutations
@@ -316,33 +288,12 @@ export default function EventSignupPage() {
     setInlineBusy(true);
     setStep('processing');
     setErrorMessage('');
-    setDuplicateEmailEmail(null);
 
-    const username = deriveUsername(values.email);
-    const cleanedPhone = values.phone.replace(/[^\d+\s()-]/g, '');
+    const cleanedPhone = cleanSignupPhone(values.phone);
 
     try {
-      // Step 1: create the account. JWT is intentionally not issued by the
-      // BFF (email must be confirmed first) — that's fine, we don't need it
-      // because signupToEvent below is unauthenticated.
-      try {
-        await authSignUp({
-          name: values.name,
-          email: values.email,
-          password: values.password,
-          username,
-          phone: cleanedPhone,
-        });
-      } catch (err) {
-        if (isDuplicateEmailError(err)) {
-          setDuplicateEmailEmail(values.email);
-          setStep('confirm');
-          return;
-        }
-        throw err;
-      }
-
-      // Step 2: register them for the event
+      // No account step: the BFF creates it (password pending) and e-mails
+      // the ticket with a "Crie sua senha" link.
       const variables: any = {
         eventId: slugOrId,
         name: values.name,
@@ -879,30 +830,9 @@ export default function EventSignupPage() {
                 <h2 className="text-lg font-semibold text-foreground">Seus dados</h2>
               </div>
               <p className="text-sm text-muted-foreground">
-                Preencha abaixo para criar sua conta e confirmar sua inscrição em{' '}
+                Preencha abaixo para confirmar sua inscrição em{' '}
                 <strong>{event.title}</strong>.
               </p>
-
-              {duplicateEmailEmail && (
-                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-sm space-y-3">
-                  <p className="text-foreground">
-                    O email <strong>{duplicateEmailEmail}</strong> já tem cadastro. Se você já
-                    confirmou sua conta, faça login para se inscrever. Caso contrário, verifique
-                    sua caixa de entrada — enviamos um link de confirmação.
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-full"
-                    onClick={() => {
-                      const currentPath = `/events/${slugOrId}/signup`;
-                      router.push(`/?login=true&redirect=${encodeURIComponent(currentPath)}`);
-                    }}
-                  >
-                    Fazer login
-                  </Button>
-                </div>
-              )}
 
               <Form {...inlineForm}>
                 <form onSubmit={inlineForm.handleSubmit(handleInlineSignup)} className="space-y-4">
@@ -966,26 +896,6 @@ export default function EventSignupPage() {
                     )}
                   />
 
-                  <FormField
-                    control={inlineForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Senha</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            placeholder="Mínimo 6 caracteres"
-                            autoComplete="new-password"
-                            disabled={inlineBusy}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
                   <div className="bg-muted/30 rounded-xl p-4 space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">
@@ -1011,7 +921,6 @@ export default function EventSignupPage() {
                       onClick={() => {
                         setStep('select');
                         setErrorMessage('');
-                        setDuplicateEmailEmail(null);
                       }}
                       disabled={inlineBusy}
                     >
@@ -1029,7 +938,7 @@ export default function EventSignupPage() {
                           Processando...
                         </>
                       ) : (
-                        'Criar conta e inscrever-se'
+                        'Inscrever-se'
                       )}
                     </Button>
                   </div>
@@ -1072,12 +981,11 @@ export default function EventSignupPage() {
                 <div className="bg-primary/5 border border-primary/20 rounded-xl p-6 text-left">
                   <div className="flex items-center gap-2 mb-2">
                     <Mail className="h-5 w-5 text-primary" />
-                    <h3 className="font-semibold text-foreground">Confirme seu email</h3>
+                    <h3 className="font-semibold text-foreground">Confira seu email</h3>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Enviamos um link para{' '}
-                    <strong>{inlineForm.getValues('email')}</strong> para você confirmar sua
-                    conta e acessar os detalhes do evento. Verifique também sua caixa de spam.
+                    {guestSignupSuccessMessage(inlineForm.getValues('email'))}. Verifique também
+                    sua caixa de spam.
                   </p>
                 </div>
               )}
