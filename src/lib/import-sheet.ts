@@ -94,3 +94,24 @@ export function detectColumn(headers: string[], candidates: string[]): string {
 
   return best;
 }
+
+/**
+ * One row of the `importSignups` mutation. The CPF goes as digits: the BFF keeps
+ * it on the participant's HubCommunity account (the signup itself has no field
+ * for it). Only send keys `SignupImportInput` declares — an unknown one makes
+ * GraphQL reject the whole batch.
+ */
+export function toSignupImportInput(row: {
+  name: string;
+  email?: string;
+  phone_number?: string;
+  cpf?: string;
+}) {
+  const cpf = (row.cpf || '').replace(/\D/g, '');
+  return {
+    name: row.name,
+    email: row.email || null,
+    phone_number: row.phone_number || null,
+    cpf: cpf || null,
+  };
+}
