@@ -1266,3 +1266,21 @@ export const SUBMIT_CERTIFICATE_REQUEST = gql`
     }
   }
 `;
+
+export const UPDATE_CPFS = gql`
+  mutation UpdateCpfs($rows: [CpfMappingInput!]!) {
+    updateCpfs(rows: $rows) {
+      saved
+      created
+      unchanged
+      different
+      skipped
+      failed
+      items {
+        email
+        cpf
+        status
+      }
+    }
+  }
+`;

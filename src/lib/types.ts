@@ -851,3 +851,15 @@ export interface IssueResult {
 }
 
 export interface IssueCertificatesResponse { issueCertificates: IssueResult }
+
+export interface UpdateCpfsResponse {
+  updateCpfs: {
+    saved: number;
+    created: number;
+    unchanged: number;
+    different: number;
+    skipped: number;
+    failed: number;
+    items: { email: string; cpf: string; status: import('./cpf-mapping').CpfMappingStatus }[];
+  };
+}
