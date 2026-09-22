@@ -745,6 +745,7 @@ export const GET_EVENT_ANALYTICS = gql`
         checked_in
         checked_in_at
         origin
+        cpf
       }
       checked_in_count
       attendance_rate

@@ -60,6 +60,7 @@ import { getApolloClient } from '@/lib/apollo-client';
 import { GET_EVENT_ANALYTICS, GET_EVENT_TRACKING_METRICS } from '@/lib/queries';
 import { EventAnalyticsResponse, SignupEntry } from '@/lib/types';
 import { ORIGIN_LABELS, absentCount, hourLabel, originSummary } from '@/lib/checkin-analytics';
+import { formatCpf } from '@/lib/cpf';
 
 /* ─── Color Palette ──────────────────────────────────────────── */
 const COLORS = {
@@ -249,7 +250,7 @@ export default function EventAnalyticsPage() {
       }
 
       // Build CSV content
-      const header = ['Nome', 'E-mail', 'WhatsApp', 'Produto', 'Data de Inscrição'];
+      const header = ['Nome', 'E-mail', 'CPF', 'WhatsApp', 'Produto', 'Data de Inscrição'];
       const rows = signups.map((s) => {
         const date = s.created_at
           ? new Date(s.created_at).toLocaleDateString('pt-BR', {
@@ -264,6 +265,7 @@ export default function EventAnalyticsPage() {
         return [
           s.name || '',
           s.email || '',
+          formatCpf(s.cpf),
           s.phone_number || '',
           s.product_name || '',
           date,
