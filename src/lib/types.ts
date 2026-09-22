@@ -1,3 +1,4 @@
+import type { SignupOrigin } from './checkin-analytics';
 import { BlocksContent } from '@strapi/blocks-react-renderer';
 import type { SignatureFont } from '@/lib/certificate-fonts-meta';
 
@@ -539,6 +540,9 @@ export interface SignupEntry {
   phone_number: string;
   created_at: string;
   product_name: string;
+  checked_in?: boolean | null;
+  checked_in_at?: string | null;
+  origin?: SignupOrigin | null;
 }
 
 export interface EventAnalytics {
@@ -554,6 +558,12 @@ export interface EventAnalytics {
   products_breakdown: ProductAnalytics[];
   signups_timeline: TimelineDataPoint[];
   all_signups: SignupEntry[];
+  checked_in_count: number;
+  attendance_rate: number | null;
+  day_of_signups: number;
+  day_of_signups_by_origin: { origin: SignupOrigin; count: number }[];
+  signups_by_origin: { origin: SignupOrigin; total: number; checked_in: number }[];
+  checkins_timeline: TimelineDataPoint[];
 }
 
 export interface EventAnalyticsResponse {
