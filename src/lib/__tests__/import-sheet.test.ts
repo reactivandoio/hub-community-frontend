@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectColumn, tableFromMatrix } from '../import-sheet';
+import { detectColumn, tableFromMatrix, toSignupImportInput } from '../import-sheet';
 
 describe('tableFromMatrix', () => {
   it('keys the rows by the same trimmed headers the mapping uses', () => {
@@ -87,5 +87,19 @@ describe('detectColumn', () => {
 
   it('returns empty when nothing matches', () => {
     expect(detectColumn(['Coluna A', 'Coluna B'], ['Nome'])).toBe('');
+  });
+});
+
+describe('toSignupImportInput', () => {
+  it('sends the CPF as digits, and null when the sheet has none', () => {
+    expect(
+      toSignupImportInput({ name: 'Ana', email: 'ana@x.io', phone_number: '62', cpf: '071.234.567-89' }),
+    ).toEqual({ name: 'Ana', email: 'ana@x.io', phone_number: '62', cpf: '07123456789' });
+    expect(toSignupImportInput({ name: 'Bia', email: '', phone_number: '', cpf: '' })).toEqual({
+      name: 'Bia',
+      email: null,
+      phone_number: null,
+      cpf: null,
+    });
   });
 });
