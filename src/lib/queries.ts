@@ -742,6 +742,25 @@ export const GET_EVENT_ANALYTICS = gql`
         phone_number
         created_at
         product_name
+        checked_in
+        checked_in_at
+        origin
+      }
+      checked_in_count
+      attendance_rate
+      day_of_signups
+      day_of_signups_by_origin {
+        origin
+        count
+      }
+      signups_by_origin {
+        origin
+        total
+        checked_in
+      }
+      checkins_timeline {
+        date
+        count
       }
     }
   }

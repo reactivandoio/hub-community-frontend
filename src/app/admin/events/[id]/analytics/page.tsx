@@ -20,6 +20,9 @@ import {
   Share2,
   Globe,
   Download,
+  UserCheck,
+  UserX,
+  Clock,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -56,6 +59,7 @@ import {
 import { getApolloClient } from '@/lib/apollo-client';
 import { GET_EVENT_ANALYTICS, GET_EVENT_TRACKING_METRICS } from '@/lib/queries';
 import { EventAnalyticsResponse, SignupEntry } from '@/lib/types';
+import { ORIGIN_LABELS, absentCount, hourLabel, originSummary } from '@/lib/checkin-analytics';
 
 /* ─── Color Palette ──────────────────────────────────────────── */
 const COLORS = {
@@ -204,6 +208,8 @@ export default function EventAnalyticsPage() {
       variables: { slugOrId: id },
       skip: !id,
       fetchPolicy: 'network-only',
+      // Keeps check-ins live on the event day without reloading.
+      pollInterval: 30_000,
     }
   );
 
@@ -488,6 +494,113 @@ export default function EventAnalyticsPage() {
             bgColor={COLORS.accentDim}
             delay={150}
           />
+        </div>
+
+        {/* ─── Check-in ────────────────────────────────────────── */}
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <UserCheck className="w-4 h-4 text-primary" />
+            Check-in
+            <span className="text-xs font-normal text-muted-foreground">
+              atualiza a cada 30s
+            </span>
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <MetricCard
+              title="Check-ins"
+              value={analytics.checked_in_count}
+              subtitle={
+                analytics.attendance_rate !== null
+                  ? `${analytics.attendance_rate.toLocaleString('pt-BR')}% dos ${analytics.total_signups} inscritos`
+                  : undefined
+              }
+              icon={UserCheck}
+              color={COLORS.primary}
+              bgColor={COLORS.primaryDim}
+              delay={0}
+            />
+            <MetricCard
+              title="Ausentes"
+              value={absentCount(analytics.total_signups, analytics.checked_in_count)}
+              subtitle="inscritos sem check-in"
+              icon={UserX}
+              color={COLORS.accent}
+              bgColor={COLORS.accentDim}
+              delay={50}
+            />
+            <MetricCard
+              title="Inscritos no dia do evento"
+              value={analytics.day_of_signups}
+              subtitle={originSummary(analytics.day_of_signups_by_origin) || undefined}
+              icon={Clock}
+              color={COLORS.info}
+              bgColor={COLORS.infoDim}
+              delay={100}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <Card className="border-border/50 lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="text-base font-semibold">Check-ins por hora</CardTitle>
+                <CardDescription>Horário de São Paulo</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {analytics.checkins_timeline.length > 0 ? (
+                  <div className="h-[220px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={analytics.checkins_timeline.map((point) => ({
+                          ...point,
+                          label: hourLabel(point.date),
+                        }))}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-border/30" />
+                        <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
+                        <YAxis allowDecimals={false} tickLine={false} axisLine={false} fontSize={12} width={32} />
+                        <Tooltip
+                          cursor={{ fill: 'rgba(16, 185, 129, 0.08)' }}
+                          formatter={(value) => [value, 'Check-ins']}
+                        />
+                        <Bar dataKey="count" fill={COLORS.primary} radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-8 text-center">
+                    Nenhum check-in ainda.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/50">
+              <CardHeader>
+                <CardTitle className="text-base font-semibold">Por origem</CardTitle>
+                <CardDescription>Inscritos e presentes</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead>Origem</TableHead>
+                      <TableHead className="text-right">Inscritos</TableHead>
+                      <TableHead className="text-right">Check-in</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {analytics.signups_by_origin.map((row) => (
+                      <TableRow key={row.origin}>
+                        <TableCell className="text-sm">{ORIGIN_LABELS[row.origin]}</TableCell>
+                        <TableCell className="text-sm text-right">{row.total}</TableCell>
+                        <TableCell className="text-sm text-right">{row.checked_in}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* ─── Website Tracking Section ────────────────────────── */}
@@ -944,6 +1057,7 @@ export default function EventAnalyticsPage() {
                       <TableHead>WhatsApp</TableHead>
                       <TableHead>Produto</TableHead>
                       <TableHead>Data</TableHead>
+                      <TableHead>Check-in</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -990,6 +1104,20 @@ export default function EventAnalyticsPage() {
                           </TableCell>
                           <TableCell className="text-sm whitespace-nowrap text-muted-foreground">
                             {date}
+                          </TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">
+                            {signup.checked_in ? (
+                              <span className="text-primary font-medium">
+                                {signup.checked_in_at
+                                  ? new Date(signup.checked_in_at).toLocaleTimeString('pt-BR', {
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })
+                                  : 'Sim'}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                         </TableRow>
                       );
