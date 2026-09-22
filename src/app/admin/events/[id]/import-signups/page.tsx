@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Download,
   FileSpreadsheet,
+  IdCard,
   Loader2,
   Package,
   Plus,
@@ -22,6 +23,7 @@ import * as XLSX from 'xlsx';
 
 import { detectColumn, tableFromMatrix, toSignupImportInput } from '@/lib/import-sheet';
 
+import { CpfMappingUpload } from '@/components/admin/cpf-mapping-upload';
 import { FadeIn } from '@/components/animations';
 import { Button } from '@/components/ui/button';
 import {
@@ -101,7 +103,7 @@ function maskPhone(value: string): string {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 }
 
-type PageMode = 'select' | 'csv' | 'manual';
+type PageMode = 'select' | 'csv' | 'manual' | 'cpf';
 
 export default function ImportSignupsPage() {
   const router = useRouter();
@@ -381,7 +383,7 @@ export default function ImportSignupsPage() {
         {/* Mode Select */}
         {/* ══════════════════════════════════════════════════ */}
         {mode === 'select' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* CSV Import */}
             <button
               onClick={() => setMode('csv')}
@@ -409,8 +411,24 @@ export default function ImportSignupsPage() {
                 Inscreva um participante manualmente. Uma conta no HubCommunity será criada automaticamente.
               </p>
             </button>
+
+            {/* CPF mapping */}
+            <button
+              onClick={() => setMode('cpf')}
+              className="text-left bg-card border border-border rounded-2xl p-8 hover:border-primary/50 hover:shadow-md transition-all group"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-violet-500/10 flex items-center justify-center mb-5 group-hover:bg-violet-500/15 transition-colors">
+                <IdCard className="w-7 h-7 text-violet-600" />
+              </div>
+              <h2 className="text-lg font-semibold mb-2">Atualizar CPFs</h2>
+              <p className="text-sm text-muted-foreground">
+                Envie uma planilha com e-mail e CPF para gravar o CPF na conta de cada participante.
+              </p>
+            </button>
           </div>
         )}
+
+        {mode === 'cpf' && <CpfMappingUpload />}
 
         {/* ══════════════════════════════════════════════════ */}
         {/* Manual Signup Mode */}
