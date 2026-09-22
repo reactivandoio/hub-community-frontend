@@ -543,6 +543,7 @@ export interface SignupEntry {
   checked_in?: boolean | null;
   checked_in_at?: string | null;
   origin?: SignupOrigin | null;
+  cpf?: string | null;
 }
 
 export interface EventAnalytics {
