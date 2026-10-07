@@ -17,6 +17,7 @@ import {
   Ticket,
   Copy,
   ExternalLink,
+  ImagePlus,
   UserPlus,
   Video,
 } from 'lucide-react';
@@ -444,7 +445,13 @@ export default function EventSignupPage() {
                 size="lg"
               />
 
-              <div className="pt-4 flex gap-3 justify-center">
+              <div className="pt-4 flex flex-wrap gap-3 justify-center">
+                <Link href={`/events/${event.slug || slugOrId}/arte`}>
+                  <Button className="rounded-full">
+                    <ImagePlus className="h-4 w-4 mr-2" />
+                    Gerar minha arte
+                  </Button>
+                </Link>
                 <Link href={`/events/${event.slug || slugOrId}`}>
                   <Button variant="outline" className="rounded-full">
                     Ver detalhes do evento
@@ -1018,11 +1025,22 @@ export default function EventSignupPage() {
                 size="lg"
               />
 
-              <Link href={`/events/${event.slug || slugOrId}`}>
-                <Button className="rounded-full" size="lg">
-                  Ver página do evento
-                </Button>
-              </Link>
+              <div className="flex flex-wrap gap-3 justify-center">
+                {/* The generator checks the signup by the logged-in e-mail, so guests go via login. */}
+                {isAuthenticated && (
+                  <Link href={`/events/${event.slug || slugOrId}/arte`}>
+                    <Button className="rounded-full" size="lg">
+                      <ImagePlus className="h-4 w-4 mr-2" />
+                      Gerar minha arte &quot;me inscrevi&quot;
+                    </Button>
+                  </Link>
+                )}
+                <Link href={`/events/${event.slug || slugOrId}`}>
+                  <Button className="rounded-full" size="lg" variant={isAuthenticated ? 'outline' : 'default'}>
+                    Ver página do evento
+                  </Button>
+                </Link>
+              </div>
             </div>
           )}
 

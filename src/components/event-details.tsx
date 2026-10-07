@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Clock,
   ExternalLink,
+  ImagePlus,
   MapPin,
   Share2,
   Users,
@@ -494,6 +495,15 @@ export function EventDetails({ slugOrId }: EventDetailsProps) {
             >
               <CheckCircle2 className="h-4 w-4 mr-2" />
               Já Inscrito — Ver Inscrição
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="rounded-full w-full font-semibold border-primary/40 text-primary hover:bg-primary/10"
+              onClick={() => router.push(`/events/${event?.slug || slugOrId}/arte`)}
+            >
+              <ImagePlus className="h-4 w-4 mr-2" />
+              Gerar minha arte &quot;me inscrevi&quot;
             </Button>
           </div>
         ) : (
