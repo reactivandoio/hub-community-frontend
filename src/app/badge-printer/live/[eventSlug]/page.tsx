@@ -16,6 +16,7 @@ import {
 import { useParams } from 'next/navigation';
 import { QRCodeCanvas } from 'qrcode.react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 import { FadeIn } from '@/components/animations';
 import { Badge } from '@/components/ui/badge';
@@ -44,6 +45,7 @@ import {
   CHECKIN_SIGNUP,
 } from '@/lib/queries';
 import {
+  CheckinSignupResponse,
   CredentialCheckedInData,
   EventSignup,
   EventSignupsResponse,
@@ -75,6 +77,9 @@ export default function LiveBadgePrinterPage() {
   const [showManualCheckin, setShowManualCheckin] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
+  // Signups credentialed from the manual dialog print right there, so the
+  // subscription echo of that same check-in must not print them again.
+  const manualIdsRef = useRef<Set<string>>(new Set());
 
   // Hidden QR code canvas for badge printing
   const qrCanvasRef = useRef<HTMLDivElement>(null);
@@ -93,23 +98,7 @@ export default function LiveBadgePrinterPage() {
     }
   );
 
-  const [checkinSignup] = useMutation(CHECKIN_SIGNUP);
-
-  const handleManualCheckin = async (signupId: string) => {
-    setCheckingInId(signupId);
-    try {
-      await checkinSignup({
-        variables: { eventSlug, signupId },
-      });
-      // A assinatura (subscription) via WebSocket interceptará o evento de check-in efetuado
-      // e fará a impressão automática se a flag estiver ativada.
-      refetchSignups();
-    } catch (err) {
-      console.error('Error checking in manually:', err);
-    } finally {
-      setCheckingInId(null);
-    }
-  };
+  const [checkinSignup] = useMutation<CheckinSignupResponse>(CHECKIN_SIGNUP);
 
   const filteredSignups = searchTerm
     ? (signupsData?.eventSignups || []).filter((s) => {
@@ -137,6 +126,7 @@ export default function LiveBadgePrinterPage() {
 
     // Avoid duplicates
     if (printedBadges.some((pb) => pb.signup.id === signup.id)) return;
+    if (manualIdsRef.current.has(signup.id)) return;
 
     if (isAutoprint) {
       // Add to print queue
@@ -216,6 +206,31 @@ export default function LiveBadgePrinterPage() {
     },
     [eventName, badgeLink]
   );
+
+  // Check in, then open the print dialog for that badge. The BFF answers failures
+  // with success: false, so they are shown instead of printing.
+  const handleManualCheckin = async (signup: EventSignup) => {
+    setCheckingInId(signup.id);
+    manualIdsRef.current.add(signup.id);
+    try {
+      const { data } = await checkinSignup({
+        variables: { eventSlug, signupId: signup.id },
+      });
+      const result = data?.checkinSignup;
+      if (!result?.success) {
+        manualIdsRef.current.delete(signup.id);
+        toast.error(`Check-in de ${signup.name} falhou: ${result?.message || 'erro desconhecido'}`);
+        return;
+      }
+      refetchSignups();
+      await handleManualPrint(result.signup || signup);
+    } catch (err) {
+      manualIdsRef.current.delete(signup.id);
+      toast.error(`Check-in de ${signup.name} falhou: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setCheckingInId(null);
+    }
+  };
 
   // Stats
   const totalSignups = signupsData?.eventSignups?.length || 0;
@@ -334,7 +349,7 @@ export default function LiveBadgePrinterPage() {
                                 size="sm"
                                 variant={signup.checked_in ? "outline" : "default"}
                                 disabled={checkingInId === signup.id || signup.checked_in}
-                                onClick={() => handleManualCheckin(signup.id)}
+                                onClick={() => handleManualCheckin(signup)}
                               >
                                 {checkingInId === signup.id ? (
                                   <Loader2 className="w-4 h-4 animate-spin" />

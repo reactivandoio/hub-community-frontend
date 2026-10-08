@@ -6,6 +6,10 @@ export interface BadgePrintData {
 }
 
 const PRINT_TIMEOUT_MS = 1500;
+// With Chrome's --kiosk-printing, print() and afterprint come back before the job is
+// spooled; removing the iframe then cancels it (the dialog just flashes). Keep the
+// iframe around long enough for the job to reach the printer.
+const IFRAME_REMOVE_DELAY_MS = 60_000;
 
 function escapeHtml(value: string): string {
   return value
@@ -152,7 +156,7 @@ export function printBadge(data: BadgePrintData): Promise<void> {
     const cleanup = () => {
       if (cleaned) return;
       cleaned = true;
-      iframe.remove();
+      setTimeout(() => iframe.remove(), IFRAME_REMOVE_DELAY_MS);
       resolve();
     };
 
