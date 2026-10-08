@@ -40,8 +40,9 @@ export function badgeNameFontPt(name: string): number {
 }
 // With Chrome's --kiosk-printing, print() and afterprint come back before the job is
 // spooled; removing the iframe then cancels it (the dialog just flashes). Keep the
-// iframe around long enough for the job to reach the printer.
-const IFRAME_REMOVE_DELAY_MS = 60_000;
+// iframe around long enough for the job to reach the printer — but no longer: while it
+// exists the kiosk page stops responding to clicks, so a long delay froze the station.
+const IFRAME_REMOVE_DELAY_MS = 8_000;
 
 function escapeHtml(value: string): string {
   return value
