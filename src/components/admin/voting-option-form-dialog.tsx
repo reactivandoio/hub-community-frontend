@@ -1,5 +1,6 @@
 'use client';
 
+import { useMutation } from '@apollo/client';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -29,6 +30,7 @@ import {
   votingOptionSchema,
   type VotingOptionFormValues,
 } from '@/lib/schemas';
+import { CREATE_VOTING_OPTION, UPDATE_VOTING_OPTION } from '@/lib/queries';
 import { VotingOption } from '@/lib/types';
 
 interface VotingOptionFormDialogProps {
@@ -49,6 +51,8 @@ export function VotingOptionFormDialog({
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+  const [createVotingOption] = useMutation<{ createVotingOption: VotingOption }>(CREATE_VOTING_OPTION);
+  const [updateVotingOption] = useMutation<{ updateVotingOption: VotingOption }>(UPDATE_VOTING_OPTION);
 
   const form = useForm<VotingOptionFormValues>({
     resolver: zodResolver(votingOptionSchema),
@@ -91,32 +95,22 @@ export function VotingOptionFormDialog({
 
       if (initialData?.documentId) {
         // Update existing option
-        const res = await fetch(`https://manager.hubcommunity.io/api/voting-options/${initialData.documentId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data: optionInput }),
+        const { data: updated } = await updateVotingOption({
+          variables: { id: initialData.documentId, data: optionInput },
         });
+        if (!updated?.updateVotingOption) throw new Error('Falha ao atualizar opção.');
 
-        if (!res.ok) throw new Error('Falha ao atualizar opção.');
-        const resData = await res.json();
-        
-        onSave(resData.data);
+        onSave(updated.updateVotingOption);
         toast({
           title: 'Opção atualizada',
           description: 'A opção de voto foi atualizada.',
         });
       } else {
         // Create new option
-        const res = await fetch('https://manager.hubcommunity.io/api/voting-options', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data: optionInput }),
-        });
+        const { data: created } = await createVotingOption({ variables: { data: optionInput } });
+        if (!created?.createVotingOption) throw new Error('Falha ao criar opção.');
 
-        if (!res.ok) throw new Error('Falha ao criar opção.');
-        const resData = await res.json();
-        
-        onSave(resData.data);
+        onSave(created.createVotingOption);
         toast({
           title: 'Opção adicionada',
           description: 'A opção de voto foi adicionada com sucesso.',

@@ -1,5 +1,6 @@
 'use client';
 
+import { useApolloClient } from '@apollo/client';
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -17,10 +18,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { VotingSession, VotingSessionsResponse } from '@/lib/types';
+import { DELETE_VOTING_SESSION, GET_VOTING_SESSIONS } from '@/lib/queries';
+import { VotingSession } from '@/lib/types';
 
 export default function VotingSessionsAdminPage() {
   const { toast } = useToast();
+  const client = useApolloClient();
   const [sessions, setSessions] = useState<VotingSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,10 +31,11 @@ export default function VotingSessionsAdminPage() {
   const fetchSessions = async () => {
     try {
       setLoading(true);
-      const res = await fetch('https://manager.hubcommunity.io/api/voting-sessions');
-      if (!res.ok) throw new Error('Falha ao buscar sessões de votação');
-      const data: VotingSessionsResponse = await res.json();
-      setSessions(data.data || []);
+      const { data } = await client.query<{ votingSessions: VotingSession[] }>({
+        query: GET_VOTING_SESSIONS,
+        fetchPolicy: 'network-only',
+      });
+      setSessions(data?.votingSessions || []);
     } catch (err: any) {
       setError(err.message);
       toast({
@@ -52,11 +56,8 @@ export default function VotingSessionsAdminPage() {
     if (!confirm('Tem certeza que deseja excluir esta sessão de votação?')) return;
 
     try {
-      const res = await fetch(`https://manager.hubcommunity.io/api/voting-sessions/${documentId}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) throw new Error('Falha ao excluir');
-      
+      await client.mutate({ mutation: DELETE_VOTING_SESSION, variables: { id: documentId } });
+
       toast({
         title: 'Sessão excluída',
         description: 'A sessão de votação foi removida com sucesso.',

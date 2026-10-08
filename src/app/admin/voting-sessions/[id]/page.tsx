@@ -1,18 +1,21 @@
 'use client';
 
+import { useApolloClient } from '@apollo/client';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { VotingSessionForm } from '@/components/admin/voting-session-form';
 import { FadeIn } from '@/components/animations';
 import { useToast } from '@/hooks/use-toast';
-import { VotingSessionInput, VotingSessionResponse } from '@/lib/types';
+import { GET_VOTING_SESSION, UPDATE_VOTING_SESSION } from '@/lib/queries';
+import { VotingSession, VotingSessionInput } from '@/lib/types';
 
 export default function EditVotingSessionPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
-  
+  const client = useApolloClient();
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [initialData, setInitialData] = useState<any>(null);
@@ -22,11 +25,13 @@ export default function EditVotingSessionPage() {
   useEffect(() => {
     const fetchSession = async () => {
       try {
-        const res = await fetch(`https://manager.hubcommunity.io/api/voting-sessions/${documentId}?populate=*`);
-        if (!res.ok) throw new Error('Falha ao buscar sessão de votação');
-        
-        const data: VotingSessionResponse = await res.json();
-        const session = data.data;
+        const { data } = await client.query<{ votingSession: VotingSession | null }>({
+          query: GET_VOTING_SESSION,
+          variables: { id: documentId },
+          fetchPolicy: 'network-only',
+        });
+        const session = data?.votingSession;
+        if (!session) throw new Error('Falha ao buscar sessão de votação');
 
         setInitialData({
           title: session.title,
@@ -53,7 +58,7 @@ export default function EditVotingSessionPage() {
     if (documentId) {
       fetchSession();
     }
-  }, [documentId, router, toast]);
+  }, [client, documentId, router, toast]);
 
   const handleSubmit = async (data: any) => {
     try {
@@ -67,17 +72,10 @@ export default function EditVotingSessionPage() {
         event_id: data.event_id || undefined,
       };
 
-      const res = await fetch(`https://manager.hubcommunity.io/api/voting-sessions/${documentId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ data: input }),
+      await client.mutate({
+        mutation: UPDATE_VOTING_SESSION,
+        variables: { id: documentId, data: input },
       });
-
-      if (!res.ok) {
-        throw new Error('Falha ao atualizar sessão de votação');
-      }
 
       toast({
         title: 'Sessão atualizada',

@@ -1284,3 +1284,88 @@ export const UPDATE_CPFS = gql`
     }
   }
 `;
+
+// Voting sessions: admin management goes through the BFF (admin only). The public
+// /votacao pages still read and vote on Strapi directly.
+const VOTING_OPTION_FIELDS = `
+  id
+  documentId
+  name
+  description
+  pitch_order
+`;
+
+const VOTING_SESSION_FIELDS = `
+  id
+  documentId
+  title
+  description
+  event_id
+  status
+  max_votes_per_user
+  createdAt
+  updatedAt
+`;
+
+export const GET_VOTING_SESSIONS = gql`
+  query GetVotingSessions {
+    votingSessions {
+      ${VOTING_SESSION_FIELDS}
+    }
+  }
+`;
+
+export const GET_VOTING_SESSION = gql`
+  query GetVotingSession($id: String!) {
+    votingSession(id: $id) {
+      ${VOTING_SESSION_FIELDS}
+      voting_options {
+        ${VOTING_OPTION_FIELDS}
+      }
+    }
+  }
+`;
+
+export const CREATE_VOTING_SESSION = gql`
+  mutation CreateVotingSession($data: VotingSessionInput!) {
+    createVotingSession(data: $data) {
+      ${VOTING_SESSION_FIELDS}
+    }
+  }
+`;
+
+export const UPDATE_VOTING_SESSION = gql`
+  mutation UpdateVotingSession($id: String!, $data: VotingSessionInput!) {
+    updateVotingSession(id: $id, data: $data) {
+      ${VOTING_SESSION_FIELDS}
+    }
+  }
+`;
+
+export const DELETE_VOTING_SESSION = gql`
+  mutation DeleteVotingSession($id: String!) {
+    deleteVotingSession(id: $id)
+  }
+`;
+
+export const CREATE_VOTING_OPTION = gql`
+  mutation CreateVotingOption($data: VotingOptionInput!) {
+    createVotingOption(data: $data) {
+      ${VOTING_OPTION_FIELDS}
+    }
+  }
+`;
+
+export const UPDATE_VOTING_OPTION = gql`
+  mutation UpdateVotingOption($id: String!, $data: VotingOptionInput!) {
+    updateVotingOption(id: $id, data: $data) {
+      ${VOTING_OPTION_FIELDS}
+    }
+  }
+`;
+
+export const DELETE_VOTING_OPTION = gql`
+  mutation DeleteVotingOption($id: String!) {
+    deleteVotingOption(id: $id)
+  }
+`;

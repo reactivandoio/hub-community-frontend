@@ -1,17 +1,22 @@
 'use client';
 
+import { useMutation } from '@apollo/client';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { VotingSessionForm } from '@/components/admin/voting-session-form';
 import { FadeIn } from '@/components/animations';
 import { useToast } from '@/hooks/use-toast';
-import { VotingSessionInput } from '@/lib/types';
+import { CREATE_VOTING_SESSION } from '@/lib/queries';
+import { VotingSession, VotingSessionInput } from '@/lib/types';
 
 export default function NewVotingSessionPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [createVotingSession] = useMutation<{ createVotingSession: VotingSession }>(
+    CREATE_VOTING_SESSION,
+  );
 
   const handleSubmit = async (data: any) => {
     try {
@@ -28,15 +33,8 @@ export default function NewVotingSessionPage() {
         input.event_id = data.event_id;
       }
 
-      const res = await fetch('https://manager.hubcommunity.io/api/voting-sessions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ data: input }),
-      });
-
-      if (!res.ok) {
+      const { data: created } = await createVotingSession({ variables: { data: input } });
+      if (!created?.createVotingSession) {
         throw new Error('Falha ao criar sessão de votação');
       }
 
@@ -45,8 +43,7 @@ export default function NewVotingSessionPage() {
         description: 'A sessão de votação foi criada com sucesso.',
       });
 
-      const resData = await res.json();
-      return resData.data.documentId;
+      return created.createVotingSession.documentId;
     } catch (error) {
       console.error('Error creating voting session:', error);
       toast({

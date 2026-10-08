@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -28,7 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { GET_EVENTS } from '@/lib/queries';
+import { DELETE_VOTING_OPTION, GET_EVENTS } from '@/lib/queries';
 import {
   votingSessionSchema,
   type VotingSessionFormValues,
@@ -53,6 +53,7 @@ export function VotingSessionForm({
 }: VotingSessionFormProps) {
   const router = useRouter();
   const { toast } = useToast();
+  const [deleteVotingOption] = useMutation(DELETE_VOTING_OPTION);
 
   const [options, setOptions] = useState<VotingOption[]>(
     initialData?.voting_options || []
@@ -105,11 +106,8 @@ export function VotingSessionForm({
   const handleDeleteOption = async (documentId: string) => {
     if (!confirm('Tem certeza que deseja remover esta opção?')) return;
     try {
-      const res = await fetch(`https://manager.hubcommunity.io/api/voting-options/${documentId}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) throw new Error('Falha ao excluir a opção.');
-      
+      await deleteVotingOption({ variables: { id: documentId } });
+
       setOptions(options.filter(o => o.documentId !== documentId));
       toast({
         title: 'Opção removida',
