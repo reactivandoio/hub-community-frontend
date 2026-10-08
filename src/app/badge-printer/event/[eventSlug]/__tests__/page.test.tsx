@@ -12,7 +12,8 @@ vi.mock('next/navigation', () => ({
 }));
 
 const mockPrintBadge = vi.fn().mockResolvedValue(undefined);
-vi.mock('@/lib/badge-print', () => ({
+vi.mock('@/lib/badge-print', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/badge-print')>()),
   printBadge: (data: unknown) => mockPrintBadge(data),
 }));
 
@@ -101,7 +102,7 @@ describe('EventBadgePrinterPage — print', () => {
     renderPage([batchesMock, signupsMock([signup({})]), checkin, signupsMock([signup({ checked_in: true })])]);
     const row = (await screen.findByText('Ana Souza')).closest('tr') as HTMLElement;
     await userEvent.click(within(row).getByRole('button', { name: /imprimir/i }));
-    await waitFor(() => expect(mockPrintBadge).toHaveBeenCalledWith(expect.objectContaining({ fullName: 'Ana Souza', logoText: 'COMUNIDADE' })));
+    await waitFor(() => expect(mockPrintBadge).toHaveBeenCalledWith(expect.objectContaining({ fullName: 'Ana Souza', logoText: 'PARTICIPANTE' })));
     await waitFor(() => expect(within(row).getByText(/credenciad/i)).toBeInTheDocument());
   });
 });

@@ -5,6 +5,12 @@ export interface BadgePrintData {
   link?: string;
 }
 
+// Badge defaults when a station has nothing saved: a generic role and a QR to the
+// event's "me inscrevi" art page.
+export const DEFAULT_BADGE_NAME = 'PARTICIPANTE';
+export const defaultBadgeLink = (eventSlug: string): string =>
+  `https://hubcommunity.io/events/${eventSlug}/arte`;
+
 const PRINT_TIMEOUT_MS = 1500;
 // With Chrome's --kiosk-printing, print() and afterprint come back before the job is
 // spooled; removing the iframe then cancels it (the dialog just flashes). Keep the

@@ -38,7 +38,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { printBadge } from '@/lib/badge-print';
+import { DEFAULT_BADGE_NAME, defaultBadgeLink, printBadge } from '@/lib/badge-print';
 import {
   CREDENTIAL_CHECKED_IN,
   EVENT_SIGNUPS,
@@ -50,6 +50,9 @@ import {
   EventSignup,
   EventSignupsResponse,
 } from '@/lib/types';
+
+// Station settings survive reloads and are per event.
+const settingsKey = (slug: string) => `badge-printer-live-v1:${slug}`;
 
 // Radix dialog exit animation (200ms) plus a margin.
 const DIALOG_CLOSE_MS = 300;
@@ -64,9 +67,35 @@ export default function LiveBadgePrinterPage() {
   const eventSlug = params?.eventSlug as string;
 
   // Settings
-  const [eventName, setEventName] = useState('COMUNIDADE');
-  const [badgeLink, setBadgeLink] = useState('https://hubcommunity.io');
+  const [eventName, setEventName] = useState(DEFAULT_BADGE_NAME);
+  const [badgeLink, setBadgeLink] = useState(() => defaultBadgeLink(eventSlug));
   const [isAutoprint, setIsAutoprint] = useState(true);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!eventSlug) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem(settingsKey(eventSlug)) || '{}');
+      if (typeof saved.eventName === 'string') setEventName(saved.eventName);
+      if (typeof saved.link === 'string') setBadgeLink(saved.link);
+      if (typeof saved.autoprint === 'boolean') setIsAutoprint(saved.autoprint);
+    } catch {
+      // storage unavailable or corrupt: keep the defaults
+    }
+    setSettingsLoaded(true);
+  }, [eventSlug]);
+
+  useEffect(() => {
+    if (!eventSlug || !settingsLoaded) return;
+    try {
+      localStorage.setItem(
+        settingsKey(eventSlug),
+        JSON.stringify({ eventName, link: badgeLink, autoprint: isAutoprint }),
+      );
+    } catch {
+      // storage unavailable: settings just won't persist
+    }
+  }, [eventSlug, settingsLoaded, eventName, badgeLink, isAutoprint]);
   const [showSettings, setShowSettings] = useState(false);
 
   // State
@@ -415,7 +444,7 @@ export default function LiveBadgePrinterPage() {
                     <Input
                       value={eventName}
                       onChange={(e) => setEventName(e.target.value)}
-                      placeholder="Ex: COMUNIDADE"
+                      placeholder="Ex: PARTICIPANTE"
                     />
                   </div>
                   <div className="space-y-2">
@@ -423,7 +452,7 @@ export default function LiveBadgePrinterPage() {
                     <Input
                       value={badgeLink}
                       onChange={(e) => setBadgeLink(e.target.value)}
-                      placeholder="https://hubcommunity.io"
+                      placeholder={defaultBadgeLink(eventSlug)}
                     />
                   </div>
                   <div className="space-y-2">
