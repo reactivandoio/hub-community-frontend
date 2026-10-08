@@ -51,7 +51,7 @@ const batchesMock: MockedResponse = {
         id: 'e1',
         title: 'React Summit',
         products: [
-          { id: 'p1', name: 'Ingresso', enabled: true, batches: [{ id: '3', batch_number: 1, value: 0, enabled: true }] },
+          { id: 'p1', name: 'Ingresso', enabled: true, can_be_listed: true, batches: [{ id: '3', batch_number: 1, value: 0, enabled: true }] },
         ],
       },
     },
@@ -117,7 +117,7 @@ describe('EventBadgePrinterPage — walk-in', () => {
         query: MANUAL_SIGNUP,
         variables: { eventSlug: 'react-summit', batchId: '3', input: { name: 'Caio Melo', email: 'caio@x.io' } },
       },
-      result: { data: { manualSignup: { success: true, message: 'ok', account_created: true, signup: created } } },
+      result: { data: { manualSignup: { success: true, message: 'ok', account_created: true, matched_by: null, signup: created } } },
     };
     const checkin: MockedResponse = {
       request: { query: CHECKIN_SIGNUP, variables: { eventSlug: 'react-summit', signupId: 's9' } },
@@ -143,7 +143,7 @@ describe('EventBadgePrinterPage — walk-in', () => {
         query: MANUAL_SIGNUP,
         variables: { eventSlug: 'react-summit', batchId: '3', input: { name: 'Caio Melo', email: 'caio@x.io' } },
       },
-      result: { data: { manualSignup: { success: false, message: 'Lote esgotado.', account_created: false, signup: null } } },
+      result: { data: { manualSignup: { success: false, message: 'Lote esgotado.', account_created: false, matched_by: null, signup: null } } },
     };
     renderPage([batchesMock, signupsMock([]), failing]);
     await screen.findByText(/nenhum inscrito/i);

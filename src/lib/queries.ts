@@ -878,6 +878,7 @@ export const MANUAL_SIGNUP = gql`
       success
       message
       account_created
+      matched_by
       signup {
         id
         name
@@ -901,6 +902,7 @@ export const EVENT_BATCHES = gql`
         id
         name
         enabled
+        can_be_listed
         batches {
           id
           batch_number

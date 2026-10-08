@@ -19,6 +19,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { FadeIn } from '@/components/animations';
+import { ManualSignupDialog, type ManualSignupResult } from '@/components/badge-printer/manual-signup-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -109,6 +110,7 @@ export default function LiveBadgePrinterPage() {
   const [showManualCheckin, setShowManualCheckin] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
+  const [showManualSignup, setShowManualSignup] = useState(false);
   // Signups credentialed from the manual dialog print right there, so the
   // subscription echo of that same check-in must not print them again.
   const manualIdsRef = useRef<Set<string>>(new Set());
@@ -244,8 +246,11 @@ export default function LiveBadgePrinterPage() {
   // Printing while the Radix dialog is open leaves it stuck (X does nothing, then the
   // body keeps pointer-events: none and the dialog never reopens). Close it first and
   // let its exit animation finish before printing.
-  const closeDialogThenPrint = async (signup: EventSignup) => {
-    setShowManualCheckin(false);
+  const closeDialogThenPrint = async (
+    signup: EventSignup,
+    closeDialog: () => void = () => setShowManualCheckin(false),
+  ) => {
+    closeDialog();
     await new Promise((resolve) => setTimeout(resolve, DIALOG_CLOSE_MS));
     document.body.style.pointerEvents = '';
     await handleManualPrint(signup);
@@ -253,7 +258,10 @@ export default function LiveBadgePrinterPage() {
 
   // Check in, then open the print dialog for that badge. The BFF answers failures
   // with success: false, so they are shown instead of printing.
-  const handleManualCheckin = async (signup: EventSignup) => {
+  const handleManualCheckin = async (
+    signup: EventSignup,
+    closeDialog?: () => void,
+  ): Promise<boolean> => {
     setCheckingInId(signup.id);
     manualIdsRef.current.add(signup.id);
     try {
@@ -264,15 +272,40 @@ export default function LiveBadgePrinterPage() {
       if (!result?.success) {
         manualIdsRef.current.delete(signup.id);
         toast.error(`Check-in de ${signup.name} falhou: ${result?.message || 'erro desconhecido'}`);
-        return;
+        return false;
       }
       refetchSignups();
-      await closeDialogThenPrint(result.signup || signup);
+      await closeDialogThenPrint(result.signup || signup, closeDialog);
+      return true;
     } catch (err) {
       manualIdsRef.current.delete(signup.id);
       toast.error(`Check-in de ${signup.name} falhou: ${err instanceof Error ? err.message : String(err)}`);
+      return false;
     } finally {
       setCheckingInId(null);
+    }
+  };
+
+  // A walk-in signed up from the "Inscrição Manual" dialog: same check-in and print
+  // as "Credenciar". Someone already checked in (signed up before) just gets the badge.
+  const handleManualSignup = async ({ signup, matched_by, account_created }: ManualSignupResult & { signup: EventSignup }) => {
+    const closeSignup = () => setShowManualSignup(false);
+    const how = account_created
+      ? 'conta criada; e-mails de confirmação e de cadastro enviados'
+      : matched_by === 'cpf'
+        ? 'conta encontrada pelo CPF; e-mail de confirmação enviado'
+        : matched_by === 'email'
+          ? 'conta encontrada pelo e-mail; e-mail de confirmação enviado'
+          : 'inscrição confirmada';
+    if (signup.checked_in) {
+      manualIdsRef.current.add(signup.id);
+      refetchSignups();
+      toast.info(`${signup.name} já estava inscrito(a) e credenciado(a). Imprimindo o crachá.`);
+      await closeDialogThenPrint(signup, closeSignup);
+      return;
+    }
+    if (await handleManualCheckin(signup, closeSignup)) {
+      toast.success(`${signup.name} inscrito(a) e credenciado(a) — ${how}.`);
     }
   };
 
@@ -418,6 +451,16 @@ export default function LiveBadgePrinterPage() {
                   </div>
                 </DialogContent>
               </Dialog>
+              <ManualSignupDialog
+                eventSlug={eventSlug}
+                open={showManualSignup}
+                onOpenChange={(open) => {
+                  setShowManualSignup(open);
+                  // Safety net for a body left locked by an interrupted close.
+                  if (!open) setTimeout(() => { document.body.style.pointerEvents = ''; }, DIALOG_CLOSE_MS);
+                }}
+                onRegistered={handleManualSignup}
+              />
               <Button
                 variant="outline"
                 size="sm"
