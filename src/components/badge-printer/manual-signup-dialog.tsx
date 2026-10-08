@@ -17,6 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { activeBatchId } from '@/lib/active-batch';
+import { maskBirthDate, parseBirthDate } from '@/lib/birth-date';
 import { formatCpf } from '@/lib/certificate';
 import { cleanSignupPhone } from '@/lib/inline-signup';
 import { EVENT_BATCHES, MANUAL_SIGNUP } from '@/lib/queries';
@@ -29,9 +30,10 @@ interface Form {
   email: string;
   phone: string;
   cpf: string;
+  birthDate: string;
 }
 
-const EMPTY_FORM: Form = { name: '', email: '', phone: '', cpf: '' };
+const EMPTY_FORM: Form = { name: '', email: '', phone: '', cpf: '', birthDate: '' };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Same rule as the public signup form (lib/inline-signup.ts).
@@ -47,7 +49,8 @@ interface ManualSignupDialogProps {
 
 /**
  * Signs a walk-in up on the event's active batch: the same fields as the public
- * signup form (name, e-mail, WhatsApp) plus the CPF, all required. The BFF finds an existing
+ * signup form (name, e-mail, WhatsApp) plus the CPF and date of birth the account
+ * keeps (asked by the profile for certificates), all required. The BFF finds an existing
  * account by CPF, then e-mail, and sends the e-mails.
  */
 export function ManualSignupDialog({ eventSlug, open, onOpenChange, onRegistered }: ManualSignupDialogProps) {
@@ -64,7 +67,8 @@ export function ManualSignupDialog({ eventSlug, open, onOpenChange, onRegistered
   const [manualSignup] = useMutation<ManualSignupResponse>(MANUAL_SIGNUP);
 
   const set = (field: keyof Form) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = field === 'cpf' ? formatCpfInput(e.target.value) : e.target.value;
+    const raw = e.target.value;
+    const value = field === 'cpf' ? formatCpfInput(raw) : field === 'birthDate' ? maskBirthDate(raw) : raw;
     setForm((f) => ({ ...f, [field]: value }));
   };
 
@@ -78,13 +82,15 @@ export function ManualSignupDialog({ eventSlug, open, onOpenChange, onRegistered
     const phone = cleanSignupPhone(form.phone).trim();
     if (!PHONE_RE.test(phone)) return setError('Informe um WhatsApp válido (ex: +55 62 99999-9999).');
     if (cpfDigits.length !== 11) return setError('Informe o CPF com 11 dígitos.');
+    const dateOfBirth = parseBirthDate(form.birthDate);
+    if (!dateOfBirth) return setError('Informe uma data de nascimento válida (DD/MM/AAAA).');
     if (!batchId) {
       return setError(loadingBatches ? 'Carregando o lote do evento, tente de novo.' : 'Este evento não tem lote ativo para inscrição.');
     }
 
     setBusy(true);
     try {
-      const input = { name: form.name.trim(), email, phone_number: phone, cpf: cpfDigits };
+      const input = { name: form.name.trim(), email, phone_number: phone, cpf: cpfDigits, date_of_birth: dateOfBirth };
       const { data } = await manualSignup({ variables: { eventSlug, batchId, input } });
       const result = data?.manualSignup;
       if (!result?.success || !result.signup) {
@@ -156,6 +162,19 @@ export function ManualSignupDialog({ eventSlug, open, onOpenChange, onRegistered
                   disabled={busy}
                 />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="manual-birth-date">Data de nascimento</Label>
+              <Input
+                id="manual-birth-date"
+                inputMode="numeric"
+                placeholder="DD/MM/AAAA"
+                maxLength={10}
+                autoComplete="off"
+                value={form.birthDate}
+                onChange={set('birthDate')}
+                disabled={busy}
+              />
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
