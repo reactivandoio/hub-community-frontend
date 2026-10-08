@@ -70,7 +70,9 @@ const batchesMock: MockedResponse = {
   },
 };
 
-const INPUT = { name: 'Caio Melo', email: 'caio@x.io', phone_number: '+55 62 99999-9999', cpf: '52998224725' };
+const INPUT = {
+  name: 'Caio Melo', email: 'caio@x.io', phone_number: '+55 62 99999-9999', cpf: '52998224725', date_of_birth: '1990-04-07',
+};
 
 const manualMock = (
   result: { account_created: boolean; matched_by: 'cpf' | 'email' | null; signup: ReturnType<typeof signup> },
@@ -97,6 +99,7 @@ const fillAndSubmit = async () => {
   await userEvent.type(screen.getByLabelText(/e-mail/i), 'Caio@X.io ');
   await userEvent.type(screen.getByLabelText(/whatsapp/i), INPUT.phone_number);
   await userEvent.type(screen.getByLabelText(/cpf/i), '529.982.247-25');
+  await userEvent.type(screen.getByLabelText(/data de nascimento/i), '07041990');
   await userEvent.click(screen.getByRole('button', { name: /inscrever e imprimir/i }));
 };
 
@@ -150,6 +153,21 @@ describe('LiveBadgePrinterPage — Inscrição Manual', () => {
     await userEvent.type(screen.getByLabelText(/whatsapp/i), INPUT.phone_number);
     await userEvent.click(screen.getByRole('button', { name: /inscrever e imprimir/i }));
     expect(await screen.findByText(/CPF com 11 dígitos/)).toBeInTheDocument();
+    expect(mockPrintBadge).not.toHaveBeenCalled();
+  });
+
+  it('masks the date of birth and refuses one that does not exist', async () => {
+    renderPage([]);
+    await userEvent.click(await screen.findByRole('button', { name: /inscrição manual/i }));
+    await userEvent.type(screen.getByLabelText(/nome completo/i), INPUT.name);
+    await userEvent.type(screen.getByLabelText(/e-mail/i), INPUT.email);
+    await userEvent.type(screen.getByLabelText(/whatsapp/i), INPUT.phone_number);
+    await userEvent.type(screen.getByLabelText(/cpf/i), '52998224725');
+    const birth = screen.getByLabelText(/data de nascimento/i);
+    await userEvent.type(birth, '31021990');
+    expect(birth).toHaveValue('31/02/1990');
+    await userEvent.click(screen.getByRole('button', { name: /inscrever e imprimir/i }));
+    expect(await screen.findByText(/data de nascimento válida/)).toBeInTheDocument();
     expect(mockPrintBadge).not.toHaveBeenCalled();
   });
 
