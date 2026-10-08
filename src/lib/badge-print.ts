@@ -12,6 +12,32 @@ export const defaultBadgeLink = (eventSlug: string): string =>
   `https://hubcommunity.io/events/${eventSlug}/arte`;
 
 const PRINT_TIMEOUT_MS = 1500;
+
+// Connecting words that never stand alone as the surname.
+const NAME_PARTICLES = new Set(['da', 'de', 'do', 'das', 'dos', 'e']);
+
+/**
+ * At most two names on the badge, so long names are never cut with "…": first name
+ * plus the last real surname ("Augusto Cesar da Silva Crisóstomo" → "Augusto Crisóstomo").
+ */
+export function badgeName(fullName: string): string {
+  const words = fullName.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 1) return words[0] || '';
+  const surname = words.slice(1).reverse().find((w) => !NAME_PARTICLES.has(w.toLowerCase()));
+  return surname ? `${words[0]} ${surname}` : words[0];
+}
+
+// 18pt fits about 12 uppercase characters per line in the 60mm name column; a longer
+// word gets a proportionally smaller font instead of being cut.
+const NAME_FONT_PT = 18;
+const NAME_FIT_CHARS = 12;
+const NAME_MIN_FONT_PT = 10;
+
+export function badgeNameFontPt(name: string): number {
+  const longest = Math.max(0, ...name.split(/\s+/).map((w) => w.length));
+  if (longest <= NAME_FIT_CHARS) return NAME_FONT_PT;
+  return Math.max(NAME_MIN_FONT_PT, Math.floor((NAME_FONT_PT * NAME_FIT_CHARS) / longest));
+}
 // With Chrome's --kiosk-printing, print() and afterprint come back before the job is
 // spooled; removing the iframe then cancels it (the dialog just flashes). Keep the
 // iframe around long enough for the job to reach the printer.
@@ -27,7 +53,11 @@ function escapeHtml(value: string): string {
 }
 
 export function buildBadgeHtml(data: BadgePrintData): string {
+  // The job title keeps the full name, so the print queue still identifies the person.
   const fullName = escapeHtml(data.fullName);
+  const shortName = badgeName(data.fullName);
+  const fontPt = badgeNameFontPt(shortName);
+  const nameStyle = fontPt === NAME_FONT_PT ? '' : ` style="font-size: ${fontPt}pt"`;
   const logoText = escapeHtml(data.logoText);
   const link = data.link ? escapeHtml(data.link) : '';
   const qrDataUrl = data.qrDataUrl;
@@ -128,7 +158,7 @@ export function buildBadgeHtml(data: BadgePrintData): string {
       <div class="info-section">
         <div class="logo-text">${logoText}</div>
         <div class="badge-main">
-          <h1 class="name-text">${fullName}</h1>
+          <h1 class="name-text"${nameStyle}>${escapeHtml(shortName)}</h1>
           <div class="separator"></div>
           ${link ? `<p class="link-text">${link}</p>` : ''}
         </div>
