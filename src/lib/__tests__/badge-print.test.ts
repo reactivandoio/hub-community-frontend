@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildBadgeHtml } from '../badge-print';
+import { badgeName, badgeNameFontPt, buildBadgeHtml } from '../badge-print';
 
 const baseData = {
   fullName: 'João Silva',
@@ -69,5 +69,52 @@ describe('buildBadgeHtml', () => {
     const html = buildBadgeHtml(baseData);
     expect(html).not.toContain('window.print()');
     expect(html).not.toContain('window.onload');
+  });
+});
+
+describe('badgeName', () => {
+  it('keeps first name and last surname', () => {
+    expect(badgeName('AUGUSTO CESAR DA SILVA CRISÓSTOMO')).toBe('AUGUSTO CRISÓSTOMO');
+    expect(badgeName('Maria Clara Souza')).toBe('Maria Souza');
+  });
+
+  it('keeps a single name or two names as they are', () => {
+    expect(badgeName('Pedro')).toBe('Pedro');
+    expect(badgeName('  João   Silva ')).toBe('João Silva');
+  });
+
+  it('skips trailing particles when picking the surname', () => {
+    expect(badgeName('Ana Paula dos')).toBe('Ana Paula');
+    expect(badgeName('José da')).toBe('José');
+    expect(badgeName('Luiz Souza e Silva')).toBe('Luiz Silva');
+    expect(badgeName('Carla De Souza DOS')).toBe('Carla Souza');
+  });
+
+  it('returns empty for a blank name', () => {
+    expect(badgeName('   ')).toBe('');
+  });
+});
+
+describe('badgeNameFontPt', () => {
+  it('keeps 18pt when every word fits', () => {
+    expect(badgeNameFontPt('AUGUSTO CRISÓSTOMO')).toBe(18);
+  });
+
+  it('shrinks for a long word, never below 10pt', () => {
+    expect(badgeNameFontPt('MARIA WOLKENSTEINBERG')).toBe(14);
+    expect(badgeNameFontPt('X'.repeat(40))).toBe(10);
+  });
+});
+
+describe('buildBadgeHtml name', () => {
+  it('prints the short name and keeps the full name in the job title', () => {
+    const html = buildBadgeHtml({ ...baseData, fullName: 'Augusto Cesar da Silva Crisóstomo' });
+    expect(html).toContain('<h1 class="name-text">Augusto Crisóstomo</h1>');
+    expect(html).toContain('<title>Crachá - Augusto Cesar da Silva Crisóstomo</title>');
+  });
+
+  it('sets a smaller font inline when the name is too wide', () => {
+    const html = buildBadgeHtml({ ...baseData, fullName: 'Maria Wolkensteinberg' });
+    expect(html).toContain('<h1 class="name-text" style="font-size: 14pt">Maria Wolkensteinberg</h1>');
   });
 });
