@@ -153,14 +153,15 @@ export default function EventBadgePrinterPage() {
   }, [signups, searchTerm]);
   const checkedInCount = signups.filter((s) => s.checked_in).length;
 
-  // Print, then check in (the server-side "printed" mark). Failures to check in are
-  // logged but never undo a badge that already came out of the printer.
+  // Fire the print, then check in (the server-side "printed" mark). The check-in does
+  // not wait for the print: in kiosk mode the page may not get control back until the
+  // print iframe is gone. Failures to check in are logged but never undo a badge.
   const printAndCheckin = useCallback(
     async (signup: EventSignup) => {
       setPrintingId(signup.id);
       try {
         const qrDataUrl = qrRef.current?.querySelector('canvas')?.toDataURL() || '';
-        await printBadge({ fullName: signup.name, qrDataUrl, logoText: settings.eventName, link: settings.link });
+        void printBadge({ fullName: signup.name, qrDataUrl, logoText: settings.eventName, link: settings.link });
         if (!signup.checked_in) {
           await checkinSignup({ variables: { eventSlug, signupId: signup.id } });
           await refetch();

@@ -224,16 +224,18 @@ export default function LiveBadgePrinterPage() {
       const canvas = qrCanvasRef.current?.querySelector('canvas');
       const qrDataUrl = canvas ? canvas.toDataURL() : '';
 
-      await printBadge({
+      // Counted as soon as the print is fired: in kiosk mode the page may not get
+      // control back until the print iframe is gone, so nothing waits on it.
+      setPrintedBadges((prev) => {
+        if (prev.some((pb) => pb.signup.id === signup.id)) return prev;
+        return [{ signup, printedAt: new Date() }, ...prev];
+      });
+
+      void printBadge({
         fullName: signup.name,
         qrDataUrl,
         logoText: eventName,
         link: badgeLink,
-      });
-
-      setPrintedBadges((prev) => {
-        if (prev.some((pb) => pb.signup.id === signup.id)) return prev;
-        return [{ signup, printedAt: new Date() }, ...prev];
       });
     },
     [eventName, badgeLink]
