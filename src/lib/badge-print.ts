@@ -144,6 +144,8 @@ export function printBadge(data: BadgePrintData): Promise<void> {
 
     const iframe = document.createElement('iframe');
     iframe.setAttribute('aria-hidden', 'true');
+    iframe.tabIndex = -1;
+    iframe.style.pointerEvents = 'none';
     iframe.style.position = 'fixed';
     iframe.style.right = '0';
     iframe.style.bottom = '0';

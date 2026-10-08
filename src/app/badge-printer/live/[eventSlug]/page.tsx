@@ -51,6 +51,9 @@ import {
   EventSignupsResponse,
 } from '@/lib/types';
 
+// Radix dialog exit animation (200ms) plus a margin.
+const DIALOG_CLOSE_MS = 300;
+
 interface PrintedBadge {
   signup: EventSignup;
   printedAt: Date;
@@ -207,6 +210,16 @@ export default function LiveBadgePrinterPage() {
     [eventName, badgeLink]
   );
 
+  // Printing while the Radix dialog is open leaves it stuck (X does nothing, then the
+  // body keeps pointer-events: none and the dialog never reopens). Close it first and
+  // let its exit animation finish before printing.
+  const closeDialogThenPrint = async (signup: EventSignup) => {
+    setShowManualCheckin(false);
+    await new Promise((resolve) => setTimeout(resolve, DIALOG_CLOSE_MS));
+    document.body.style.pointerEvents = '';
+    await handleManualPrint(signup);
+  };
+
   // Check in, then open the print dialog for that badge. The BFF answers failures
   // with success: false, so they are shown instead of printing.
   const handleManualCheckin = async (signup: EventSignup) => {
@@ -223,7 +236,7 @@ export default function LiveBadgePrinterPage() {
         return;
       }
       refetchSignups();
-      await handleManualPrint(result.signup || signup);
+      await closeDialogThenPrint(result.signup || signup);
     } catch (err) {
       manualIdsRef.current.delete(signup.id);
       toast.error(`Check-in de ${signup.name} falhou: ${err instanceof Error ? err.message : String(err)}`);
@@ -289,7 +302,14 @@ export default function LiveBadgePrinterPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Dialog open={showManualCheckin} onOpenChange={setShowManualCheckin}>
+              <Dialog
+                open={showManualCheckin}
+                onOpenChange={(open) => {
+                  setShowManualCheckin(open);
+                  // Safety net for a body left locked by an interrupted close.
+                  if (!open) setTimeout(() => { document.body.style.pointerEvents = ''; }, DIALOG_CLOSE_MS);
+                }}
+              >
                 <DialogTrigger asChild>
                   <Button variant="default" size="sm" className="gap-2">
                     <Search className="w-4 h-4" />
@@ -340,7 +360,7 @@ export default function LiveBadgePrinterPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => handleManualPrint(signup)}
+                                onClick={() => closeDialogThenPrint(signup)}
                                 title="Imprimir Crachá"
                               >
                                 <Printer className="w-4 h-4" />
