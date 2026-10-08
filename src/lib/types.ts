@@ -625,6 +625,8 @@ export interface ManualSignupResponse {
     success: boolean;
     message?: string;
     account_created: boolean;
+    /** how the existing account was found; null when it was created now */
+    matched_by?: 'cpf' | 'email' | null;
     /** created, or pre-existing when the person was already registered */
     signup?: EventSignup | null;
   };
@@ -638,6 +640,8 @@ export interface EventBatchesResponse {
       id: string;
       name: string;
       enabled: boolean;
+      /** false for hidden products (e.g. import-only); missing on older answers */
+      can_be_listed?: boolean | null;
       batches: { id: string; batch_number: number; value: number; enabled: boolean }[];
     }[];
   } | null;
