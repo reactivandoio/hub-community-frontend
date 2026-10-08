@@ -36,7 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { printBadge } from '@/lib/badge-print';
+import { DEFAULT_BADGE_NAME, defaultBadgeLink, printBadge } from '@/lib/badge-print';
 import { formatCpf } from '@/lib/certificate';
 import { CHECKIN_SIGNUP, EVENT_BATCHES, EVENT_SIGNUPS, MANUAL_SIGNUP } from '@/lib/queries';
 import type {
@@ -56,14 +56,18 @@ interface Settings {
   batchId: string;
 }
 
-const DEFAULT_SETTINGS: Settings = { eventName: 'COMUNIDADE', link: 'https://hubcommunity.io', batchId: '' };
+const defaultSettings = (slug: string): Settings => ({
+  eventName: DEFAULT_BADGE_NAME,
+  link: defaultBadgeLink(slug),
+  batchId: '',
+});
 
 const loadSettings = (slug: string): Settings => {
   try {
     const raw = localStorage.getItem(settingsKey(slug));
-    return raw ? { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } : DEFAULT_SETTINGS;
+    return raw ? { ...defaultSettings(slug), ...JSON.parse(raw) } : defaultSettings(slug);
   } catch {
-    return DEFAULT_SETTINGS;
+    return defaultSettings(slug);
   }
 };
 
@@ -86,7 +90,7 @@ export default function EventBadgePrinterPage() {
   const params = useParams();
   const eventSlug = params?.eventSlug as string;
 
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<Settings>(() => defaultSettings(eventSlug));
   const [searchTerm, setSearchTerm] = useState('');
   const [printingId, setPrintingId] = useState<string | null>(null);
   const [walkInOpen, setWalkInOpen] = useState(false);

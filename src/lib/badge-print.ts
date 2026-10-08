@@ -5,6 +5,12 @@ export interface BadgePrintData {
   link?: string;
 }
 
+// Badge defaults when a station has nothing saved: a generic role and a QR to the
+// event's "me inscrevi" art page.
+export const DEFAULT_BADGE_NAME = 'PARTICIPANTE';
+export const defaultBadgeLink = (eventSlug: string): string =>
+  `https://hubcommunity.io/events/${eventSlug}/arte`;
+
 const PRINT_TIMEOUT_MS = 1500;
 // With Chrome's --kiosk-printing, print() and afterprint come back before the job is
 // spooled; removing the iframe then cancels it (the dialog just flashes). Keep the
@@ -144,6 +150,8 @@ export function printBadge(data: BadgePrintData): Promise<void> {
 
     const iframe = document.createElement('iframe');
     iframe.setAttribute('aria-hidden', 'true');
+    iframe.tabIndex = -1;
+    iframe.style.pointerEvents = 'none';
     iframe.style.position = 'fixed';
     iframe.style.right = '0';
     iframe.style.bottom = '0';

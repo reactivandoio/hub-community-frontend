@@ -38,7 +38,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { printBadge } from '@/lib/badge-print';
+import { DEFAULT_BADGE_NAME, defaultBadgeLink, printBadge } from '@/lib/badge-print';
 import {
   CREDENTIAL_CHECKED_IN,
   EVENT_SIGNUPS,
@@ -51,6 +51,12 @@ import {
   EventSignupsResponse,
 } from '@/lib/types';
 
+// Station settings survive reloads and are per event.
+const settingsKey = (slug: string) => `badge-printer-live-v1:${slug}`;
+
+// Radix dialog exit animation (200ms) plus a margin.
+const DIALOG_CLOSE_MS = 300;
+
 interface PrintedBadge {
   signup: EventSignup;
   printedAt: Date;
@@ -61,9 +67,35 @@ export default function LiveBadgePrinterPage() {
   const eventSlug = params?.eventSlug as string;
 
   // Settings
-  const [eventName, setEventName] = useState('COMUNIDADE');
-  const [badgeLink, setBadgeLink] = useState('https://hubcommunity.io');
+  const [eventName, setEventName] = useState(DEFAULT_BADGE_NAME);
+  const [badgeLink, setBadgeLink] = useState(() => defaultBadgeLink(eventSlug));
   const [isAutoprint, setIsAutoprint] = useState(true);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!eventSlug) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem(settingsKey(eventSlug)) || '{}');
+      if (typeof saved.eventName === 'string') setEventName(saved.eventName);
+      if (typeof saved.link === 'string') setBadgeLink(saved.link);
+      if (typeof saved.autoprint === 'boolean') setIsAutoprint(saved.autoprint);
+    } catch {
+      // storage unavailable or corrupt: keep the defaults
+    }
+    setSettingsLoaded(true);
+  }, [eventSlug]);
+
+  useEffect(() => {
+    if (!eventSlug || !settingsLoaded) return;
+    try {
+      localStorage.setItem(
+        settingsKey(eventSlug),
+        JSON.stringify({ eventName, link: badgeLink, autoprint: isAutoprint }),
+      );
+    } catch {
+      // storage unavailable: settings just won't persist
+    }
+  }, [eventSlug, settingsLoaded, eventName, badgeLink, isAutoprint]);
   const [showSettings, setShowSettings] = useState(false);
 
   // State
@@ -207,6 +239,16 @@ export default function LiveBadgePrinterPage() {
     [eventName, badgeLink]
   );
 
+  // Printing while the Radix dialog is open leaves it stuck (X does nothing, then the
+  // body keeps pointer-events: none and the dialog never reopens). Close it first and
+  // let its exit animation finish before printing.
+  const closeDialogThenPrint = async (signup: EventSignup) => {
+    setShowManualCheckin(false);
+    await new Promise((resolve) => setTimeout(resolve, DIALOG_CLOSE_MS));
+    document.body.style.pointerEvents = '';
+    await handleManualPrint(signup);
+  };
+
   // Check in, then open the print dialog for that badge. The BFF answers failures
   // with success: false, so they are shown instead of printing.
   const handleManualCheckin = async (signup: EventSignup) => {
@@ -223,7 +265,7 @@ export default function LiveBadgePrinterPage() {
         return;
       }
       refetchSignups();
-      await handleManualPrint(result.signup || signup);
+      await closeDialogThenPrint(result.signup || signup);
     } catch (err) {
       manualIdsRef.current.delete(signup.id);
       toast.error(`Check-in de ${signup.name} falhou: ${err instanceof Error ? err.message : String(err)}`);
@@ -289,7 +331,14 @@ export default function LiveBadgePrinterPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Dialog open={showManualCheckin} onOpenChange={setShowManualCheckin}>
+              <Dialog
+                open={showManualCheckin}
+                onOpenChange={(open) => {
+                  setShowManualCheckin(open);
+                  // Safety net for a body left locked by an interrupted close.
+                  if (!open) setTimeout(() => { document.body.style.pointerEvents = ''; }, DIALOG_CLOSE_MS);
+                }}
+              >
                 <DialogTrigger asChild>
                   <Button variant="default" size="sm" className="gap-2">
                     <Search className="w-4 h-4" />
@@ -340,7 +389,7 @@ export default function LiveBadgePrinterPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => handleManualPrint(signup)}
+                                onClick={() => closeDialogThenPrint(signup)}
                                 title="Imprimir Crachá"
                               >
                                 <Printer className="w-4 h-4" />
@@ -395,7 +444,7 @@ export default function LiveBadgePrinterPage() {
                     <Input
                       value={eventName}
                       onChange={(e) => setEventName(e.target.value)}
-                      placeholder="Ex: COMUNIDADE"
+                      placeholder="Ex: PARTICIPANTE"
                     />
                   </div>
                   <div className="space-y-2">
@@ -403,7 +452,7 @@ export default function LiveBadgePrinterPage() {
                     <Input
                       value={badgeLink}
                       onChange={(e) => setBadgeLink(e.target.value)}
-                      placeholder="https://hubcommunity.io"
+                      placeholder={defaultBadgeLink(eventSlug)}
                     />
                   </div>
                   <div className="space-y-2">
