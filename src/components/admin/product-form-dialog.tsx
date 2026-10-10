@@ -1,6 +1,7 @@
 'use client';
 
 import { BatchFormDialog } from '@/components/admin/batch-form-dialog';
+import { formatCents, reaisToCents } from '@/lib/money';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -187,7 +188,7 @@ export function ProductFormDialog({
                       >
                         <div>
                           <div className="font-medium">
-                            Lote {batch.batch_number} - R$ {batch.value}
+                            Lote {batch.batch_number} - {formatCents(reaisToCents(batch.value))}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             Qtd: {batch.max_quantity || 'Ilimitado'} | Válido até:{' '}

@@ -8,6 +8,7 @@ import { FadeIn } from '@/components/animations';
 import { useToast } from '@/hooks/use-toast';
 import { CREATE_EVENT, UPDATE_EVENT_SALE } from '@/lib/queries';
 import { CreateEventResponse, EventInput, UpdateEventSaleResponse } from '@/lib/types';
+import { reaisToCents } from '@/lib/money';
 
 export default function NewEventPage() {
   const router = useRouter();
@@ -49,12 +50,13 @@ export default function NewEventPage() {
               id: eventId,
               data: {
                 max_slots: Number(data.max_slots) || 0,
+                ...(data.payment_provider ? { payment_provider: data.payment_provider } : {}),
                 products: data.products.map((p: any) => ({
                   name: p.name,
                   enabled: p.enabled !== false,
                   batches: (p.batches || []).map((b: any) => ({
                     batch_number: Number(b.batch_number) || 1,
-                    value: Number(b.value) || 0,
+                    value: reaisToCents(b.value),
                     max_quantity: Number(b.max_quantity) || 0,
                     valid_from: b.valid_from || undefined,
                     valid_until: b.valid_until || undefined,

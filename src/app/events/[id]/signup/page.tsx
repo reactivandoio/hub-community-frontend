@@ -29,6 +29,7 @@ import { useForm } from 'react-hook-form';
 
 import { AddToCalendarButton } from '@/components/add-to-calendar-button';
 import { SignupTicketQr } from '@/components/signup-ticket-qr';
+import { SignupPixPayment } from '@/components/signup-pix-payment';
 import { FadeIn } from '@/components/animations';
 import { Button } from '@/components/ui/button';
 import {
@@ -258,11 +259,9 @@ export default function EventSignupPage() {
           eventDocumentId: event?.documentId,
           metadata: { route: `/events/${slugOrId}/signup`, isNewAccount: false },
         });
-        if (finalPrice === 0) {
-          setStep('success');
-        } else {
-          setStep('payment');
-        }
+        // The server's word wins: a coupon or half price may have made it free.
+        const isFree = typeof result.is_free === 'boolean' ? result.is_free : finalPrice === 0;
+        setStep(isFree ? 'success' : 'payment');
       } else {
         setErrorMessage(result?.message || 'Erro ao realizar inscrição.');
         setStep('confirm');
@@ -272,6 +271,15 @@ export default function EventSignupPage() {
       setStep('confirm');
     }
   };
+
+  // Opa Pingou: the webhook confirmed the payment while the Pix step was polling.
+  const handlePaid = useCallback(() => setStep('success'), []);
+
+  // The charge expired or was canceled: the slot is free again, start over.
+  const handleRetryPayment = useCallback(() => {
+    setSignupResult(null);
+    setStep('select');
+  }, []);
 
   // Handle inline signup + event registration (guest path)
   const handleInlineSignup = async (values: InlineSignupValues) => {
@@ -1045,7 +1053,25 @@ export default function EventSignupPage() {
           )}
 
           {/* Step: Payment (Paid Event) */}
-          {step === 'payment' && signupResult?.payment && (
+          {step === 'payment' && signupResult?.payment?.payment_provider === 'opapingou' && (
+            <div className="space-y-6">
+              <SignupPixPayment
+                signupId={String(signupResult.signup_id)}
+                initial={signupResult.payment}
+                onPaid={handlePaid}
+                onRetry={handleRetryPayment}
+              />
+              <div className="text-center">
+                <Link href={`/events/${event.slug || slugOrId}`}>
+                  <Button variant="ghost" className="rounded-full">
+                    Voltar para o evento
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {step === 'payment' && signupResult?.payment && signupResult.payment.payment_provider !== 'opapingou' && (
             <div className="space-y-6">
               <div className="bg-card border border-border rounded-2xl p-6 text-center space-y-6">
                 <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto">

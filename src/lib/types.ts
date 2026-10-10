@@ -377,8 +377,25 @@ export interface DeleteEventResponse {
   };
 }
 
+export type PaymentProvider = 'pixai' | 'opapingou';
+
+// Eventando Payment.status ("PEDING_PAYMENT" is the stored spelling).
+export type PaymentStatus = 'PEDING_PAYMENT' | 'CONFIRMED' | 'EXPIRED' | 'CANCELED' | 'REFUND';
+
+export interface SignupPaymentStatus {
+  signup_id: string;
+  status: PaymentStatus;
+  provider?: PaymentProvider | null;
+  expires_at?: string | null;
+  confirmed_at?: string | null;
+  pix_br_code?: string | null;
+  payment_link?: string | null;
+  value?: number | null;
+}
+
 export interface EventSaleInput {
   max_slots?: number;
+  payment_provider?: PaymentProvider;
   products?: {
     name: string;
     enabled: boolean;

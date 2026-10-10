@@ -288,6 +288,45 @@ export const SIGNUP_TO_EVENT = gql`
   }
 `;
 
+// Paid signups (REA-6): the payment step polls this until the provider's webhook
+// confirms or the charge expires.
+export const SIGNUP_PAYMENT_STATUS = gql`
+  query SignupPaymentStatus($signupId: ID!) {
+    signupPaymentStatus(signupId: $signupId) {
+      signup_id
+      status
+      provider
+      expires_at
+      confirmed_at
+      pix_br_code
+      payment_link
+      value
+    }
+  }
+`;
+
+// Admin only: payment state of each paid signup (Eventando Payment).
+export const EVENT_PAYMENTS = gql`
+  query EventPayments($slugOrId: String!) {
+    eventPayments(slugOrId: $slugOrId) {
+      email
+      name
+      status
+      value
+      expires_at
+    }
+  }
+`;
+
+// Admin only, kept out of GET_EVENT_BY_SLUG_OR_ID so the public page never depends on it.
+export const EVENT_PAYMENT_SETTINGS = gql`
+  query EventPaymentSettings($eventId: ID!) {
+    eventPaymentSettings(eventId: $eventId) {
+      payment_provider
+    }
+  }
+`;
+
 export const IS_USER_SIGNED_UP = gql`
   query IsUserSignedUp($eventId: String!, $email: String!) {
     isUserSignedUp(eventId: $eventId, email: $email) {
