@@ -152,6 +152,58 @@ cobrança) com `node --test` (o repositório não tem runner; sem dependência n
 - Analytics do evento: card "Pagamentos" (pagos, pendentes, expirados, cancelados, total
   recebido) via `eventPayments`; não aparece em evento gratuito nem se a query falhar.
 
+### 3.4 Cupom de desconto (regras do Pedro, 2026-10-10)
+
+Reaproveita o `api::coupon` do Eventando, o `validateCoupon` e o CRUD do BFF e o campo de cupom
+da inscrição no frontend. As regras abaixo são do Pedro; as marcadas "proposta" ainda esperam ok.
+
+**Regras**
+- Um cupom vale para **um único evento**. O código é **único por evento**, não no sistema todo
+  (hoje é `unique` global; a unicidade passa a ser `(event, code)`, conferida no servidor dentro
+  da mesma transação, porque o Strapi 4 não declara índice composto no schema).
+- Tipo **percentual** (1–100) ou **valor fixo** (centavos). Tipo e valor **travam depois do
+  primeiro uso** (o admin ainda pode desativar, mudar datas e limite).
+- **Validade:** `starts_at` e `expires_at`; vazio = vale pelo período do lote (`valid_from` /
+  `valid_until`).
+- **Limite total** `max_uses` (vazio = ilimitado) e **um cupom por evento por CPF**.
+- **Meia-entrada não soma com cupom:** aplica o **maior** dos dois descontos, nunca os dois. Empate:
+  proposta = aplica a meia e não consome o cupom. A pessoa vê qual desconto foi aplicado e por quê.
+- **Arredondamento:** o **valor final** arredonda para baixo (centavo inteiro):
+  `final = floor(base × (100 − pct) / 100)`; fixo: `final = max(0, base − fixo)`.
+- **Valor final zero:** inscrição sem cobrança, `CONFIRMED` na hora, e-mail com ingresso, uso conta.
+- **Valor final abaixo do mínimo de cobrança** (e maior que zero): sobe para o mínimo, com aviso
+  na tela ("valor mínimo de cobrança: R$ x"). Mínimo configurável por provedor
+  (`OPAPINGOU_MIN_CHARGE_CENTS`, `PIXAI_MIN_CHARGE_CENTS`). Opa Pingou: o código (`packages/core`,
+  `MIN_CHARGE_CENTS = 1`, máximo R$ 25.000,00) aceita 1 centavo, a conferir no staging. Pix Aí:
+  valor não encontrado — pendente do Pedro.
+- **Pix pago depois de vencer** com o cupom já esgotado: honra (pode passar 1 do limite).
+- Só **admin** cria, edita e apaga cupons (`requireAdmin` do PR #33 do BFF; o PR de cupom do BFF
+  vai empilhado nele ou depois do merge).
+
+**Onde se calcula:** só no Eventando, em `src/utils/pricing.js` (puro, inteiros):
+`{ originalCents, discountKind: 'coupon'|'student'|null, discountCents, minApplied, finalCents }`.
+`customCreate` e a rota nova `POST /api/coupon/preview` usam o mesmo módulo; o `validateCoupon` do
+BFF chama o preview; o navegador só exibe. `amountCents` enviado ao Opa Pingou = `finalCents`.
+
+**CPF:** a inscrição do Eventando não tem CPF (ele fica na conta do Hub, por e-mail). Proposta:
+quando houver cupom, o CPF passa a ser obrigatório no formulário, com dígito verificador, e o
+Payment guarda só `coupon_cpf_hash` = HMAC-SHA256(CPF, segredo em env) — basta para a regra
+"um por CPF" sem guardar o CPF em claro no Eventando.
+
+**Sem corrida e sem consumo por Pix vencido:** dentro de `strapi.db.transaction`, `SELECT … FOR
+UPDATE` nas linhas do cupom, do lote e do evento; expira os pendentes vencidos; conta só
+`CONFIRMED` e `PEDING_PAYMENT` dentro do prazo (limite total e CPF); grava o Payment pendente com a
+`Idempotency-Key`; solta a trava; só então chama o Opa Pingou. Falha definitiva → `CANCELED`, o
+uso e a vaga voltam. A mesma trava cobre a contagem de vagas do lote e do evento.
+
+**Modelo:** Coupon ganha `discount_type`, `discount_value_cents`, `starts_at`, `batches`
+(manyToMany, vazio = todos); `code` deixa de ser único global. Payment ganha `discount_kind`,
+`discount_cents`, `min_charge_applied`, `coupon_cpf_hash`.
+
+**Frontend:** aba "Cupons" no admin do evento (lista com usos/limite; criar e editar com valor fixo
+em reais → centavos; tipo e valor bloqueados após o primeiro uso); na inscrição, CPF quando houver
+cupom, preço final, desconto aplicado e aviso de mínimo vindos do servidor.
+
 ## 4. Estados e a vaga
 
 | Estado | Participante vê | Vaga | Admin vê |
@@ -197,3 +249,5 @@ depende deles, e ele só aparece depois que o Eventando devolver `payment_provid
 3. Validade da cobrança/reserva da vaga: proposto `ONE_HOUR`.
 4. Só Pix (`PIX_QR`) ou também link Mercado Pago (`PAYMENT_LINK`, cartão)? Proposto: só Pix.
 5. Reembolso manual (acima) aceito?
+6. Cupom (§3.4): valor mínimo de cobrança do Pix Aí; CPF obrigatório com cupom e guardado só como
+   hash; empate meia × cupom; "um cupom por evento por CPF" = qualquer cupom do evento.
