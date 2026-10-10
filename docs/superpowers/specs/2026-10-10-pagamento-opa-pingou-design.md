@@ -1,13 +1,73 @@
 # REA-6 — Inscrição paga com o Opa Pingou (Pix): desenho
 
-Data: 2026-10-10. Status: frontend implementado neste PR; Eventando Manager e BFF especificados
-abaixo e ainda por implementar (esta aba só escreve no hub-community-frontend).
+Data: 2026-10-10. Status: frontend implementado neste PR; Eventando Manager, BFF e cupom
+especificados abaixo e ainda por implementar. Plano: `docs/superpowers/plans/2026-10-10-rea-6-pagamento-opa-pingou.md`.
 
 > Correção do primeiro levantamento: a conclusão "o Opa Pingou não tem API de comerciante" veio
 > de um checkout local parado em `973e2d2`. A `origin/main` (tag de produção `v1.1.0`, a0a1e60)
 > já tem API REST com chave, idempotência e webhooks assinados. Lição registrada no termhub.
 
-## 1. Contrato real do Opa Pingou (origin/main = v1.1.0)
+## 0. Contrato do Pedro e decisões (2026-10-10) — prevalece sobre o resto deste spec
+
+O contrato do Opa Pingou escrito pelo Pedro é a referência; onde as seções abaixo (levantadas do
+código do Opa Pingou por outro agente) divergirem, vale esta seção, e vale a API real se ela
+divergir do contrato.
+
+**API.** Produção `https://api.opapingou.com.br`, staging `https://api-stg.opapingou.com.br` (o
+staging fala com bancos reais: cobrança paga lá é dinheiro de verdade). `Authorization: Bearer
+opk_live_…|opk_test_…`; a chave define a empresa e as contas que recebem. Erros
+`application/problem+json`: tratar pelo `code`, registrar o `requestId`, nunca o texto. Limite: 300
+req/min por chave e 60/min para criar cobrança; 429 → espera com recuo crescente e repete. Rotas
+usadas: `GET /v1/health`, `GET /v1/me` (`profile:read`), `POST /v1/charges` (`charges:write`),
+`GET /v1/charges/{id}` (`charges:read`); para o cadastro do webhook, `POST /v1/webhook-endpoints`
+(`webhooks:write`). Não existe REST de pagamentos nem de contas bancárias.
+
+**Cobrança.** Corpo estrito `{ amountCents (int > 0), validity, description? (≤140), kind? }`;
+**sem `bankAccountId`** (o Opa Pingou escolhe a conta). Validade **`FIFTEEN_MIN`** para o Pix e para
+a reserva da vaga. Meios: **Pix (`PIX_QR`) e link de pagamento (`PAYMENT_LINK`)** — o participante
+escolhe; o link é o checkout do Mercado Pago e exige conta Mercado Pago conectada na empresa (sem
+ela a API devolve `PAYMENT_LINK_UNAVAILABLE`, e a opção some com aviso). `brCode` e `paymentLink`
+podem vir nulos. Guardar em cada cobrança: `id`, `txid`, `Idempotency-Key`, `status`, `expiresAt`.
+
+**Idempotência.** `Idempotency-Key = signup-payment-<paymentId>-v<n>`, gravada **antes** da
+chamada; timeout ou erro de rede repete com a mesma chave (`Idempotent-Replayed: true`); 409
+`IDEMPOTENCY_KEY_REUSED` e 400 `IDEMPOTENCY_KEY_REQUIRED` são erro nosso: não repete, registra e
+alerta. Chave vale 24 h. Cobrança vencida nunca é reaproveitada: nova tentativa, nova chave. Trocar
+de Pix para link (ou o contrário) também é nova tentativa.
+
+**Webhook.** Rota pública `POST https://bff.hubcommunity.io/webhooks/opapingou`. Assinatura
+`Opa-Signature: t=<s>,v1=<hex>` = HMAC-SHA256(`whsec_`, `"<t>.<corpo bruto>"`) em hex minúsculo,
+comparação em tempo constante, recusa se |agora − t| > 300 s. Tratados: `charge.paid`,
+`charge.expired`, `charge.canceled`, `payment.confirmed`, `payment.refunded`,
+`payment.charged_back`; `ping` → 200; demais (`bank_account.*`, `recurrence.*`,
+`recurring_charge.*`) → 200 ignorado. **Responde 2xx rápido e processa depois**: o evento é gravado
+por `Opa-Event-Id` (repetido é ignorado) e processado fora da requisição; o Opa Pingou reenvia por
+até 24 h, então eventos chegam repetidos e fora de ordem. `testMode: true` é ignorado em produção.
+`charge.paid` e `payment.confirmed` **nunca liberam pelo corpo**: reconsulta `GET /v1/charges/{id}` e
+usa o `status` devolvido; o objeto `payment` não é documentado, então `payment.confirmed` só
+reconsulta se trouxer o id da cobrança — senão fica registrado e a confirmação vem pelo
+`charge.paid`. `payment.refunded` e `payment.charged_back`: só registra e alerta.
+
+**Reembolso.** Só manual, pelo suporte no WhatsApp. Texto e número configuráveis
+(`REFUND_SUPPORT_TEXT`, `REFUND_SUPPORT_WHATSAPP`); número ainda não informado — sem número
+configurado, a tela não mostra o contato.
+
+**Flag.** `OPAPINGOU_ENABLED`, desligada por padrão, no Eventando e no BFF; com ela desligada nada
+muda (PixAI segue como hoje) e a rota de webhook responde 404.
+
+**Segredos.** Só em variável de ambiente e em secret do GitHub; nunca em código, log, mensagem de
+erro, PR ou spec. Secrets: `OPAPINGOU_API_KEY` em `reactivandoio/eventando-manager` e
+`OPAPINGOU_WEBHOOK_SECRET` em `reactivandoio/hub-community-bff`, gravados por
+`scripts/opapingou-secrets.sh` (entrada oculta, stdin para o `gh`). Hoje nenhum deploy lê secret do
+GitHub: o Eventando é atualizado à mão (`make update` + pm2, `.env` no servidor) e o workflow do BFF
+só faz SSH + `make update`. O plano acrescenta um passo que leva os secrets ao `.env` do servidor
+via SSH por stdin.
+
+**Testes.** Automatizados com a API simulada: criação, repetição idempotente, 409, 401, 429,
+assinatura válida, inválida, timestamp vencido, evento duplicado, fora de ordem. Roteiro manual em
+produção/staging com R$ 1,00 — só com ok explícito do Pedro (dinheiro real).
+
+## 1. Contrato levantado do código do Opa Pingou (origin/main = v1.1.0; a §0 prevalece)
 
 Fonte: `opapingou/monorepo` em `origin/main` — `apps/api/src/rest/v1/*`,
 `apps/api/src/outbound-webhooks/*`, `packages/core/src/api/*`, docs em
@@ -67,6 +127,10 @@ algo que o Opa Pingou não marcou como `PAID`.
 
 ### 3.1 Eventando Manager
 
+> Atualizado pela §0: validade `FIFTEEN_MIN`, sem `bankAccountId`, `kind` escolhido pelo
+> participante (`PIX_QR` ou `PAYMENT_LINK`), `Idempotency-Key` gravada antes da chamada, flag
+> `OPAPINGOU_ENABLED`. O plano detalha.
+
 Schema:
 - `Event.payment_provider`: enum `pixai|opapingou`, default `pixai` (eventos atuais não mudam).
 - `Payment`: `status` ganha `EXPIRED`; novos `provider` (string), `provider_charge_id` (string),
@@ -106,6 +170,9 @@ Testes: módulos puros (mapeamento de status, regras de transição, montagem do
 cobrança) com `node --test` (o repositório não tem runner; sem dependência nova).
 
 ### 3.2 BFF
+
+> Atualizado pela §0: o webhook responde 2xx depois de gravar o evento (por `Opa-Event-Id`) e
+> processa fora da requisição; a lista de eventos tratados é a da §0. O plano detalha.
 
 - `src/services/opapingou/signature.js`: `verifyOpaSignature(rawBody, header, secret, nowS)` —
   parse `t=…,v1=…` (vários `v1`), |agora − t| ≤ 300, `timingSafeEqual` do hex.
@@ -155,9 +222,9 @@ cobrança) com `node --test` (o repositório não tem runner; sem dependência n
 ### 3.4 Cupom de desconto (regras do Pedro, 2026-10-10)
 
 Reaproveita o `api::coupon` do Eventando, o `validateCoupon` e o CRUD do BFF e o campo de cupom
-da inscrição no frontend. As regras abaixo são do Pedro; as marcadas "proposta" ainda esperam ok.
+da inscrição no frontend. As regras abaixo são do Pedro.
 
-**Regras**
+**Regras** (todas confirmadas pelo Pedro, exceto o CPF)
 - Um cupom vale para **um único evento**. O código é **único por evento**, não no sistema todo
   (hoje é `unique` global; a unicidade passa a ser `(event, code)`, conferida no servidor dentro
   da mesma transação, porque o Strapi 4 não declara índice composto no schema).
@@ -165,17 +232,18 @@ da inscrição no frontend. As regras abaixo são do Pedro; as marcadas "propost
   primeiro uso** (o admin ainda pode desativar, mudar datas e limite).
 - **Validade:** `starts_at` e `expires_at`; vazio = vale pelo período do lote (`valid_from` /
   `valid_until`).
-- **Limite total** `max_uses` (vazio = ilimitado) e **um cupom por evento por CPF**.
+- **Limite total** `max_uses` (vazio = ilimitado) e **um cupom por evento por CPF**: cada CPF usa
+  no máximo um cupom qualquer naquele evento.
 - **Meia-entrada não soma com cupom:** aplica o **maior** dos dois descontos, nunca os dois. Empate:
-  proposta = aplica a meia e não consome o cupom. A pessoa vê qual desconto foi aplicado e por quê.
+  vale a meia e o cupom não é consumido. A pessoa vê qual desconto foi aplicado e por quê.
 - **Arredondamento:** o **valor final** arredonda para baixo (centavo inteiro):
   `final = floor(base × (100 − pct) / 100)`; fixo: `final = max(0, base − fixo)`.
 - **Valor final zero:** inscrição sem cobrança, `CONFIRMED` na hora, e-mail com ingresso, uso conta.
 - **Valor final abaixo do mínimo de cobrança** (e maior que zero): sobe para o mínimo, com aviso
   na tela ("valor mínimo de cobrança: R$ x"). Mínimo configurável por provedor
-  (`OPAPINGOU_MIN_CHARGE_CENTS`, `PIXAI_MIN_CHARGE_CENTS`). Opa Pingou: o código (`packages/core`,
-  `MIN_CHARGE_CENTS = 1`, máximo R$ 25.000,00) aceita 1 centavo, a conferir no staging. Pix Aí:
-  valor não encontrado — pendente do Pedro.
+  (`OPAPINGOU_MIN_CHARGE_CENTS`, `PIXAI_MIN_CHARGE_CENTS`, ambos 1 por padrão). Opa Pingou: o código
+  (`packages/core`, `MIN_CHARGE_CENTS = 1`, máximo R$ 25.000,00) aceita 1 centavo. Pix Aí: sem
+  mínimo (conferido pelo Pedro). A regra do aviso fica para o caso de um mínimo aparecer.
 - **Pix pago depois de vencer** com o cupom já esgotado: honra (pode passar 1 do limite).
 - Só **admin** cria, edita e apaga cupons (`requireAdmin` do PR #33 do BFF; o PR de cupom do BFF
   vai empilhado nele ou depois do merge).
@@ -185,10 +253,8 @@ da inscrição no frontend. As regras abaixo são do Pedro; as marcadas "propost
 `customCreate` e a rota nova `POST /api/coupon/preview` usam o mesmo módulo; o `validateCoupon` do
 BFF chama o preview; o navegador só exibe. `amountCents` enviado ao Opa Pingou = `finalCents`.
 
-**CPF:** a inscrição do Eventando não tem CPF (ele fica na conta do Hub, por e-mail). Proposta:
-quando houver cupom, o CPF passa a ser obrigatório no formulário, com dígito verificador, e o
-Payment guarda só `coupon_cpf_hash` = HMAC-SHA256(CPF, segredo em env) — basta para a regra
-"um por CPF" sem guardar o CPF em claro no Eventando.
+**CPF:** decidido pelo Pedro: a inscrição guarda o CPF (§3.5); a regra "um cupom por evento
+por CPF" usa esse campo.
 
 **Sem corrida e sem consumo por Pix vencido:** dentro de `strapi.db.transaction`, `SELECT … FOR
 UPDATE` nas linhas do cupom, do lote e do evento; expira os pendentes vencidos; conta só
@@ -198,11 +264,50 @@ uso e a vaga voltam. A mesma trava cobre a contagem de vagas do lote e do evento
 
 **Modelo:** Coupon ganha `discount_type`, `discount_value_cents`, `starts_at`, `batches`
 (manyToMany, vazio = todos); `code` deixa de ser único global. Payment ganha `discount_kind`,
-`discount_cents`, `min_charge_applied`, `coupon_cpf_hash`.
+`discount_cents`, `min_charge_applied`; o CPF fica em `Signup.cpf` (§3.5).
 
 **Frontend:** aba "Cupons" no admin do evento (lista com usos/limite; criar e editar com valor fixo
-em reais → centavos; tipo e valor bloqueados após o primeiro uso); na inscrição, CPF quando houver
+em reais → centavos; tipo e valor bloqueados após o primeiro uso); na inscrição, campo CPF (§3.5),
 cupom, preço final, desconto aplicado e aviso de mínimo vindos do servidor.
+
+### 3.5 CPF na inscrição (decisões do Pedro, 2026-10-10)
+
+O Eventando passa a guardar o CPF em **toda inscrição**, gratuita ou paga, com ou sem cupom, em
+**texto puro** (só dígitos; o Pedro dispensou cifrar). Contexto: o Eventando vai fazer parte do Hub
+Community e os termos de uso serão atualizados.
+
+- **Campo:** `Signup.cpf`, string de 11 dígitos, `private: true` no schema do Strapi — os
+  controladores padrão (`/api/signups`) nunca o devolvem, nem com token. Não é `required` no
+  schema, para não travar a edição das inscrições antigas no admin; a obrigatoriedade fica nas
+  rotas que criam inscrição.
+- **Obrigatório em toda inscrição nova:** `POST /api/signup/:id` (`customCreate`, gratuita ou
+  paga, PixAI ou Opa Pingou) recusa sem CPF válido; a inscrição manual na porta do BFF
+  (`manualSignup`, REA-4) passa o CPF que já coleta.
+- **Validação no servidor** (`src/utils/cpf.js`, puro): tira máscara, exige 11 dígitos, recusa
+  sequências repetidas e confere os dois dígitos verificadores. Erro → 400 com mensagem amigável,
+  sem ecoar o valor. O navegador só aplica máscara.
+- **Inscrições já existentes sem CPF:** continuam válidas (check-in, crachá, certificado e
+  sorteio não mudam) com `cpf` nulo. Recomendação: preencher por um script de uma vez,
+  `scripts/backfill-signup-cpf`, que copia o CPF da conta do Hub ou do `sw-form` com o mesmo e-mail
+  (a mesma regra do `withCpf` do BFF), só onde o `cpf` está vazio e o CPF é válido; roda primeiro
+  em modo de simulação (só contagens, sem CPF na saída) e grava só com ok do Pedro. O que sobrar
+  sem CPF fica nulo. Inscrição antiga sem CPF não conta para a regra do cupom.
+- **Regra do cupom:** dentro da transação do §3.4, conta `Payment` com `coupon` não nulo, do mesmo
+  evento, cuja inscrição tem o mesmo `cpf`, em `CONFIRMED` ou `PEDING_PAYMENT` no prazo. Achou →
+  "Você já usou um cupom neste evento." Pix vencido ou cancelado não conta.
+- **Cuidados:**
+  - Leitura só por quem tem permissão: nenhuma rota pública devolve o CPF; o BFF não recebe o CPF
+    do Eventando nesta entrega (a regra do cupom roda no Eventando). Se o admin precisar ver, será
+    por rota própria com `requireAdmin` (PR #33), mascarado (`***.456.789-**`).
+  - Nunca em log, mensagem de erro, payload de webhook, e-mail ou analytics; a resposta de
+    `customCreate` (que hoje devolve `...signupEntry`) passa a remover o `cpf`.
+  - As rotas sem autenticação do Eventando que devolvem inscrição populada
+    (`POST /api/payment/integration`, `/api/payment/email`, `/api/payment/resend-email`) passam a
+    exigir token de integração neste trabalho, porque devolveriam o CPF. O datasource do PixAI hoje
+    registra `{ err, config }` no `console.log` (inclui o token do PixAI e nome/e-mail na
+    descrição): passa a registrar só método, rota, status e `requestId`.
+  - Depende do PR #33 (Fase 1 LGPD) para as rotas de admin; base legal e aviso de coleta entram nos
+    termos de uso que o Pedro vai atualizar.
 
 ## 4. Estados e a vaga
 
@@ -218,36 +323,46 @@ cupom, preço final, desconto aplicado e aviso de mínimo vindos do servidor.
 provedor avisa). Proposta: reembolso manual pelo banco/provedor e o admin marca o Payment como
 `REFUND` no Eventando; quando o Opa Pingou expuser estorno, ouvir `payment.refunded`. Pendência.
 
-## 5. Configuração para produção
+## 5. Configuração
 
-Eventando Manager (servidor):
-- `OPAPINGOU_API_URL=https://api.opapingou.com.br`
-- `OPAPINGOU_API_KEY=opk_live_…` (escopos `charges:write`, `charges:read`; de preferência
-  restrita à conta que recebe)
-- `OPAPINGOU_CHARGE_VALIDITY=ONE_HOUR` (decisão pendente, ver §6)
-- `OPAPINGOU_BANK_ACCOUNT_ID=` (opcional)
+Eventando Manager (`.env` do servidor; a chave vem do secret `OPAPINGOU_API_KEY`):
+- `OPAPINGOU_ENABLED=false` (liga só depois do roteiro manual)
+- `OPAPINGOU_API_URL=https://api.opapingou.com.br` (staging: `https://api-stg.opapingou.com.br`)
+- `OPAPINGOU_API_KEY=opk_…`
+- `OPAPINGOU_CHARGE_VALIDITY=FIFTEEN_MIN`
+- `OPAPINGOU_MIN_CHARGE_CENTS=1`, `PIXAI_MIN_CHARGE_CENTS=1` (nenhum mínimo conhecido além de
+  1 centavo; se aparecer, sobe o valor e mostra o aviso)
+- `REFUND_SUPPORT_TEXT`, `REFUND_SUPPORT_WHATSAPP` (número a informar)
 
-BFF:
+BFF (`.env` do servidor; o segredo vem do secret `OPAPINGOU_WEBHOOK_SECRET`):
+- `OPAPINGOU_ENABLED=false`
 - `OPAPINGOU_WEBHOOK_SECRET=whsec_…`
+- `OPAPINGOU_ACCEPT_TEST_MODE=false` em produção
 
-No Opa Pingou (tela `/app/webhooks` da empresa que recebe): endpoint
-`https://bff.hubcommunity.io/webhooks/opapingou` com eventos `charge.paid`, `charge.expired`,
-`charge.canceled`.
+Opa Pingou: endpoint `https://bff.hubcommunity.io/webhooks/opapingou`, eventos `charge.paid`,
+`charge.expired`, `charge.canceled`, `payment.confirmed`, `payment.refunded`,
+`payment.charged_back`. Até o deploy do BFF essa rota não existe (o Apollo, montado em `/`,
+responde 400 a qualquer POST): o Opa Pingou recebe erro e reenvia; sem sucesso por ~45 h ele
+desativa o endpoint (`disabledReason: auto`) e é preciso reativá-lo (`PATCH status: ACTIVE`).
 
-Teste: mesmas variáveis com `opk_test_…`, conta `testMode` e um endpoint de webhook criado com a
-chave de teste (aponta para staging/túnel do BFF).
+Ordem de deploy: Eventando (schema) → BFF → frontend; a flag só liga depois do roteiro manual.
 
-Ordem de deploy: Eventando (schema) → BFF → frontend. O frontend novo chama
-`signupPaymentStatus`, `eventPaymentSettings` e `eventPayments`; só o passo Pix do Opa Pingou
-depende deles, e ele só aparece depois que o Eventando devolver `payment_provider: 'opapingou'`.
+## 6. Pendências
 
-## 6. Pendências / decisões do Pedro
+Resolvidas pelo Pedro (2026-10-10): ambiente (o do contrato), nome dos secrets (definidos acima),
+conta que recebe (automática, sem `bankAccountId`), validade `FIFTEEN_MIN`, Pix e link, reembolso
+manual via WhatsApp, todas as regras de cupom da §3.4, CPF em toda inscrição e em texto
+puro (§3.5).
 
-1. Credenciais de teste: chave `opk_test_…` de uma conta `testMode` e o `whsec_…` do endpoint
-   de teste (sem isso não dá para a evidência ponta a ponta exigida pelo card).
-2. Conta que recebe (qual conta conectada; chave restrita a ela?).
-3. Validade da cobrança/reserva da vaga: proposto `ONE_HOUR`.
-4. Só Pix (`PIX_QR`) ou também link Mercado Pago (`PAYMENT_LINK`, cartão)? Proposto: só Pix.
-5. Reembolso manual (acima) aceito?
-6. Cupom (§3.4): valor mínimo de cobrança do Pix Aí; CPF obrigatório com cupom e guardado só como
-   hash; empate meia × cupom; "um cupom por evento por CPF" = qualquer cupom do evento.
+Em aberto:
+1. **Backfill do CPF** das inscrições antigas (§3.5): ok para rodar o script, depois da simulação?
+2. Número do WhatsApp de suporte para reembolso.
+3. Ok para implementar o plano `docs/superpowers/plans/2026-10-10-rea-6-pagamento-opa-pingou.md`.
+4. Ok para merge, deploy, ligar a flag e o roteiro manual de R$ 1,00.
+5. Chave `opk_live_` exposta no chat do termhub: recomenda-se rotacioná-la e digitar a nova no
+   script.
+6. Secrets ainda não gravados: o Pedro roda `scripts/opapingou-secrets.sh` (entrada oculta) — ele
+   valida a chave com `GET /v1/me`, cadastra o endpoint e grava os dois secrets.
+7. O Eventando não tem secrets de SSH no GitHub (`SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY` estão só
+   no BFF): roda no mesmo servidor do BFF? Sem isso o workflow `sync-secrets.yml` não tem como
+   levar a chave ao `.env`.
