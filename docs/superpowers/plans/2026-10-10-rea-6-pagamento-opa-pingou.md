@@ -356,18 +356,15 @@ mesma regra do `withCpf` do BFF — a conta primeiro).
 - [ ] **Step 5:** o script roda por padrão em simulação (imprime só contagens, nunca CPF);
   `--apply` grava. Rodar `--apply` só com ok do Pedro. Commit.
 
-### Task E8: secret e deploy
+### Task E8: secret do Opa Pingou
 
-**Files:**
-- Create: `scripts/opapingou-secrets.sh` (cópia revisada do script que o Pedro roda; entrada
-  oculta, stdin para o `gh`), `.github/workflows/sync-secrets.yml` (`workflow_dispatch`: SSH ao
-  servidor e grava `OPAPINGOU_API_KEY` no `.env` lendo do stdin, `umask 077`, sem `pm2 restart`
-  automático)
-- Modify: `.env.example` (nomes das variáveis, sem valores)
+**Files:** `scripts/opapingou-secrets.sh` (cópia revisada do script que o Pedro roda), `.env.example`
+(nomes, sem valores).
 
-- [ ] **Step 1:** testar o script contra um servidor local e um `gh` falso (feito em 2026-10-10:
-  nenhuma das duas credenciais apareceu na saída nem em argumentos de comando).
-- [ ] **Step 2:** commit. Rodar o workflow só com ok do Pedro (é deploy).
+- O script grava `OPAPINGOU_API_KEY` como secret do repositório; quando a seção D estiver no ar,
+  passa a gravar no Environment `production`, e o `.env` do servidor recebe a chave pelo
+  `env-swap.sh` (Task D2). Nada de passo de deploy próprio para o Opa Pingou.
+- [ ] Commit. Rodar só com ok do Pedro.
 
 ---
 
@@ -507,12 +504,10 @@ extend type Query {
 - [ ] **Step 1–4:** testes dos resolvers (admin exigido, preview vindo do Eventando, pendente não é
   inscrito) → FAIL → implementar → PASS. Commit.
 
-### Task B5: segredo no deploy
+### Task B5: segredo do webhook no deploy
 
-**Files:**
-- Modify: `.github/workflows/deploy-prod.yml` (passo que grava `OPAPINGOU_WEBHOOK_SECRET` no
-  `.env` do servidor pelo stdin do `ssh`, antes do `make update`), `.env.example`
-
+- `OPAPINGOU_WEBHOOK_SECRET` segue o mesmo caminho da seção D (Environment `production` →
+  `env-swap.sh`); `.env.example` ganha os nomes `OPAPINGOU_*`.
 - [ ] Commit. Rodar só com ok do Pedro.
 
 ---
@@ -553,6 +548,111 @@ Testes: `pnpm test`, `pnpm build`.
 
 ---
 
+## Variáveis de ambiente: do servidor para os secrets do GitHub (pedido do Pedro, 2026-10-10)
+
+### Como é hoje (verificado em 2026-10-10 nos `origin/main`)
+
+| Repositório | Deploy | De onde lê o `.env` em produção | Secrets no GitHub |
+|---|---|---|---|
+| `hub-community-frontend` | `deploy-prod.yml` no push da `main`: SSH → `cd ~/projects/hub-community-frontend && make update` (`git pull`, `pnpm build`, `pm2 restart hub-community-front`) | arquivo no servidor, lido pelo Next no `pnpm build` (`NEXT_PUBLIC_*` entram no bundle) e no `start` | `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY` |
+| `hub-community-bff` | igual, `make update` (`yarn build`, `pm2 restart hub-community-bff`) | arquivo no servidor (`dotenv`) | os mesmos 3 de SSH |
+| `hub-community-backend` (Strapi do Hub, entra no deploy) | igual, `make update` (`yarn build`, `pm2 restart hub-community-manager`) | arquivo no servidor (Strapi) | os mesmos 3 de SSH |
+| `eventando-manager` | **sem workflow**: `make update` rodado à mão no servidor (`pm2 restart eventando-manager`) | arquivo no servidor (Strapi) | nenhum |
+
+Nenhum workflow passa variável de aplicação: todos só abrem SSH e rodam `make update`. O
+`ci.yml` do frontend referencia `secrets.NEXT_PUBLIC_GRAPHQL_URL` e os `NEXT_PUBLIC_FIREBASE_*`,
+que **não existem** no repositório — o build do CI roda com eles vazios. Não deu para conferir se
+os três `SSH_HOST` são o mesmo servidor (o valor de secret não é legível).
+
+Variáveis que hoje existem só no servidor (nomes tirados dos `.env*.example` e do código; os
+valores nunca foram lidos):
+- frontend: `NEXT_PUBLIC_GRAPHQL_URL`, `GRAPHQL_URL`, `NEXT_PUBLIC_SITE_URL`, `NODE_ENV`,
+  `MANAGER_URL`, `MANAGER_TOKEN`, `MANAGER_TOKEN_INTEGRATION`, `NEXT_PUBLIC_FIREBASE_*` (7),
+  `NEXT_PUBLIC_ADMIN_PASSWORD`.
+- BFF: `NODE_ENV`, `PORT`, `MANAGER_URL`, `MANAGER_TOKEN_INTEGRATION`, `EVENTANDO_MANAGER_URL`,
+  `EVENTANDO_MANAGER_TOKEN_INTEGRATION`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
+  `SMTP_PASSWORD`, `EMAIL_FROM`, `EMAIL_REPLY_TO`, `FRONTEND_URL` (+ `OPAPINGOU_*` deste plano).
+- backend: `HOST`, `PORT`, `PUBLIC_URL`, `FRONTEND_URL`, `APP_KEYS`, `ADMIN_JWT_SECRET`,
+  `API_TOKEN_SALT`, `TRANSFER_TOKEN_SALT`, `JWT_SECRET`, `DATABASE_*`, `SMTP_HOST`, `SMTP_PORT`,
+  `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, `EMAIL_DEFAULT_FROM`, `EMAIL_DEFAULT_REPLY_TO`.
+- Eventando: `ENV`, `NODE_ENV`, `HOST`, `PORT`, `APP_KEYS`, `API_TOKEN_SALT`,
+  `ADMIN_JWT_SECRET`, `TRANSFER_TOKEN_SALT`, `JWT_SECRET`, `DATABASE_*`, `SMTP_*`, `EMAIL_FROM`,
+  `EMAIL_REPLY_TO` (+ `OPAPINGOU_*`, `REFUND_SUPPORT_*`, `*_MIN_CHARGE_CENTS` deste plano).
+- A lista real é a do `.env` de cada servidor (pode ter variáveis que não estão nos exemplos); a
+  Task D1 a levanta só pelos nomes.
+
+Achado: `NEXT_PUBLIC_ADMIN_PASSWORD` vai para o bundle do navegador — qualquer visitante lê. Fora
+do escopo do REA-6; recomendo trocar por checagem no servidor (o PR #33 já tem `requireAdmin`).
+
+### Desenho
+
+- Cada repositório ganha um **Environment `production`** no GitHub. O que é segredo (tokens,
+  senhas, chaves, `APP_KEYS`, `*_SECRET`, `*_SALT`, `DATABASE_PASSWORD`, `SMTP_PASS*`,
+  `OPAPINGOU_API_KEY`, `OPAPINGOU_WEBHOOK_SECRET`) vira **secret**; o que não é (URLs, portas,
+  `NODE_ENV`, `HOST`, `DATABASE_HOST/NAME/PORT`, `EMAIL_FROM`, flags, validade do Pix, mínimos de
+  cobrança, texto de reembolso) vira **variável** do Environment (`vars`), legível e editável sem
+  esconder. Mesmo nome da variável do `.env`. Opcional: o Pedro como revisor obrigatório do
+  Environment, para o deploy esperar o ok dele.
+- Os workflows novos ficam com **`workflow_dispatch`** (disparo manual) até o Pedro autorizar
+  trocar o deploy atual; o `deploy-prod.yml` de hoje **não é removido nem alterado** nessa fase —
+  o workflow novo é um arquivo à parte (`env-sync.yml`).
+- O workflow `env-sync.yml` monta o `.env` no runner a partir de `toJSON(secrets)` e `toJSON(vars)`
+  (filtrando `SSH_*` e `GITHUB_TOKEN`), sem eco e com `::add-mask::` para cada valor, e o envia **pelo stdin do `ssh`**
+  para `~/projects/<repo>/.env.next` (`umask 077`). No servidor, `scripts/env-swap.sh`:
+  1. confere que `.env.next` tem todas as chaves do `.env` atual (lista de chaves faltando →
+     aborta e não troca nada; imprime só nomes);
+  2. guarda `.env` em `.env.bak-<data>` (`chmod 600`, mantém os 5 últimos);
+  3. `mv .env.next .env` (troca atômica) e roda `make update`.
+- **Modo comparação** (`ENV_SWAP_MODE=compare`, padrão na primeira fase): não troca; para cada
+  chave imprime só `igual`/`diferente`/`faltando`/`sobrando` (compara `sha256` dos valores no
+  servidor, nunca o valor). Só quando tudo der `igual` o modo passa a `apply`.
+- Rollback: `cp .env.bak-<data> .env && make update` (documentado no runbook do PR).
+- `make update` não muda: o build e o `pm2 restart` continuam como hoje, então o momento de queda
+  é o mesmo de qualquer deploy atual.
+
+### Task D1: levantar nomes e migrar valores do servidor para os secrets (Pedro roda)
+
+**Files:** `scripts/env-to-gh-secrets.sh` (nos quatro repositórios ou num repositório de infra, a
+decidir com o Pedro).
+
+- Roda na máquina do Pedro: `ssh <host> 'cat ~/projects/<repo>/.env' | scripts/env-to-gh-secrets.sh
+  reactivandoio/<repo>`; para cada linha `CHAVE=valor` (tira aspas externas, recusa linha
+  multilinha e avisa pelo nome) faz `printf '%s' "$valor" | gh secret set CHAVE --env production
+  -R reactivandoio/<repo>`. Imprime só os nomes gravados. Nada vai para arquivo.
+- Teste: contra um `.env` falso e um `gh` falso (como foi feito com `opapingou-secrets.sh`),
+  conferindo que nenhum valor aparece na saída nem em argumentos.
+
+### Task D2: `env-swap.sh` e workflow em modo comparação
+
+**Files:** em cada repositório, `scripts/env-swap.sh` e `.github/workflows/env-sync.yml`
+(`workflow_dispatch`; o `deploy-prod.yml` atual fica como está). O Eventando, que não tem
+workflow, ganha só o `env-sync.yml` manual.
+
+- Teste: `bats`-like em shell puro contra um diretório temporário (`.env` e `.env.next` falsos):
+  chave faltando aborta, troca atômica, backup criado, modo comparação não altera nada e não
+  imprime valores.
+
+### Task D3: virar para `apply`, repositório por repositório
+
+Ordem: Eventando → BFF → backend → frontend. Cada um só depois de um deploy em modo comparação
+com tudo `igual`, e com o ok do Pedro.
+
+### Task D4: CI do frontend
+
+Os `secrets.NEXT_PUBLIC_*` do `ci.yml` passam a vir do mesmo Environment (ou de valores públicos
+de teste), para o build do CI deixar de rodar com valores vazios.
+
+### O que preciso do Pedro para a seção D
+
+1. Acesso SSH ao servidor (ou ele mesmo roda a Task D1): host e usuário, e se os quatro serviços
+   estão no mesmo servidor e em `~/projects/<repo>`.
+2. Onde o Eventando roda (mesmo servidor? mesmo usuário?) e o nome no pm2 (`eventando-manager`,
+   pelo makefile).
+3. Confirmação de que o frontend é hospedado nesse servidor com pm2 (`hub-community-front`), como
+   indica o workflow — e não em Vercel ou outro serviço.
+4. Se quer o revisor obrigatório no Environment `production`.
+5. Ok para cada passo que toca o servidor (D1, D2 em comparação, D3).
+
 ## Roteiro manual (só com ok do Pedro)
 
 1. Flag ligada só no ambiente do teste; evento com lote de R$ 1,00.
@@ -563,4 +663,7 @@ Testes: `pnpm test`, `pnpm build`.
 
 ## Ordem
 
-E1 → E2 → E3 → E4 → E5 → E6 → E7 → B1 → B2 → B3 → B4 → F1 → F2 → F3 → E8/B5 (deploy, com ok).
+E1 → E2 → E3 → E4 → E5 → E6 → E7 → B1 → B2 → B3 → B4 → F1 → F2 → F3 → D1 → D2 (comparação) → D3/E8/B5 (com ok, repositório por repositório).
+
+Nada desta seção roda sem ok do Pedro: nenhum workflow disparado, nenhum deploy, nenhuma alteração
+no servidor.

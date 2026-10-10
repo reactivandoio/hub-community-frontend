@@ -363,6 +363,6 @@ Em aberto:
    script.
 6. Secrets ainda não gravados: o Pedro roda `scripts/opapingou-secrets.sh` (entrada oculta) — ele
    valida a chave com `GET /v1/me`, cadastra o endpoint e grava os dois secrets.
-7. O Eventando não tem secrets de SSH no GitHub (`SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY` estão só
-   no BFF): roda no mesmo servidor do BFF? Sem isso o workflow `sync-secrets.yml` não tem como
-   levar a chave ao `.env`.
+7. Variáveis de ambiente pelos secrets do GitHub nos quatro repositórios (pedido do Pedro): o que
+   preciso dele está no plano, seção "Variáveis de ambiente" (acesso SSH, onde roda o Eventando,
+   confirmação da hospedagem do frontend, revisor do Environment).
