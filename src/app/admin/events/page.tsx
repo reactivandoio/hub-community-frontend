@@ -50,6 +50,9 @@ export default function EventsAdminPage() {
     GET_EVENTS,
     {
       variables: { sort: [{ start_date: 'DESC' }], include_unlisted: true },
+      // Events are created and edited on other pages; always revalidate so the
+      // list shows them without a manual refresh.
+      fetchPolicy: 'cache-and-network',
     }
   );
   const [deleteEvent] = useMutation<DeleteEventResponse>(DELETE_EVENT);

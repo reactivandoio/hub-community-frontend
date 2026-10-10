@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { InMemoryCache } from '@apollo/client';
 import { MockedProvider, type MockedResponse } from '@apollo/client/testing';
 import { GET_EVENTS } from '@/lib/queries';
 import EventsAdminPage from '../page';
@@ -50,5 +51,32 @@ describe('EventsAdminPage', () => {
     expect(await screen.findByText('Interno')).toBeInTheDocument();
     expect(screen.getByText('Meetup')).toBeInTheDocument();
     expect(screen.getAllByText('Não listado')).toHaveLength(1);
+  });
+
+  // An event created on /admin/events/new must show up when the admin comes
+  // back, even though the list is already in Apollo's cache.
+  it('revalidates a cached list against the server', async () => {
+    const cache = new InMemoryCache({ addTypename: false });
+    cache.writeQuery({
+      query: GET_EVENTS,
+      variables: listMock.request.variables,
+      data: { events: { data: [event('e1', 'Meetup', false)] } },
+    });
+    const withNewEvent: MockedResponse = {
+      ...listMock,
+      result: {
+        data: {
+          events: { data: [event('e3', 'Recém-criado', false), event('e1', 'Meetup', false)] },
+        },
+      },
+    };
+
+    await render(
+      <MockedProvider mocks={[withNewEvent]} cache={cache} addTypename={false}>
+        <EventsAdminPage />
+      </MockedProvider>,
+    );
+
+    expect(await screen.findByText('Recém-criado')).toBeInTheDocument();
   });
 });
