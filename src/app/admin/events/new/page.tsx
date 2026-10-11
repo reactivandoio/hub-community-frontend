@@ -30,6 +30,7 @@ export default function NewEventPage() {
         call_link: data.call_link || '',
         unlisted: data.unlisted || false,
         description: data.description, // Assuming it's compatible or handled by backend/form
+        images: data.images,
         communities: data.communityId ? [data.communityId] : [],
         location: data.location?.id || data.location,
         talks: data.talks?.map((t: any) => t.id) || [],
@@ -103,7 +104,11 @@ export default function NewEventPage() {
       </div>
 
       <div className="border rounded-lg p-6 bg-card">
-        <EventForm onSubmit={handleSubmit} isLoading={loading} />
+        <EventForm
+          onSubmit={handleSubmit}
+          onSaved={id => router.push(`/admin/events/${id}`)}
+          isLoading={loading}
+        />
       </div>
     </div>
     </FadeIn>

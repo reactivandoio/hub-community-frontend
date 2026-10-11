@@ -52,6 +52,7 @@ import {
   Video,
   X,
 } from 'lucide-react';
+import { UploadError, uploadFiles } from '@/lib/upload';
 import Image from 'next/image';
 import {
   createEventSchema,
@@ -64,6 +65,8 @@ import { useForm } from 'react-hook-form';
 interface EventFormProps {
   initialData?: CreateEventFormValues & { id?: string };
   onSubmit: (data: CreateEventFormValues) => Promise<string | undefined>;
+  /** Called after "Salvar Evento" saved the event, with its id. */
+  onSaved?: (id: string) => void;
   isLoading?: boolean;
 }
 
@@ -81,6 +84,7 @@ const MOCK_COMMUNITIES: {
 export function EventForm({
   initialData,
   onSubmit,
+  onSaved,
   isLoading,
 }: EventFormProps) {
   const router = useRouter();
@@ -157,6 +161,7 @@ export function EventForm({
   );
   const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -178,6 +183,7 @@ export function EventForm({
   const handleCropComplete = useCallback((croppedFile: File, previewUrl: string) => {
     setCoverImageFile(croppedFile);
     setCoverImagePreview(previewUrl);
+    setUploadError(null);
     setCropDialogOpen(false);
     setRawImageSrc(null);
   }, []);
@@ -201,6 +207,7 @@ export function EventForm({
   const handleRemoveImage = () => {
     setCoverImagePreview(null);
     setCoverImageFile(null);
+    setUploadError(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -325,44 +332,38 @@ export function EventForm({
   };
 
   const handleFormSubmit = async (data: CreateEventFormValues) => {
-    let uploadedImagesResult: string[] | undefined = undefined;
-
-    // 1. Upload cover image FIRST if a new file was selected
+    // 1. Upload cover image FIRST if a new file was selected. If it fails the
+    // event is not saved, so the admin sees why instead of losing the cover.
     if (coverImageFile) {
       setIsUploading(true);
+      setUploadError(null);
       try {
-        const uploadData = new FormData();
-        uploadData.append('files', coverImageFile);
         // DO NOT append ref, refId, field to avoid 500 error when ID is UUID
-
-        const uploadRes = await fetch('/api/upload', {
-          method: 'POST',
-          body: uploadData,
-        });
-
-        if (!uploadRes.ok) {
-          const errData = await uploadRes.json();
-          console.error('Upload error:', errData);
-        } else {
-          const res = await uploadRes.json();
-          if (res && res.length > 0) {
-             uploadedImagesResult = res.map((r: any) => r.id?.toString() || r.documentId);
-          }
-        }
+        data.images = await uploadFiles(coverImageFile);
       } catch (err) {
-        console.error('Error uploading cover image:', err);
+        const message =
+          err instanceof UploadError
+            ? err.message
+            : 'Não foi possível enviar a imagem de capa.';
+        setUploadError(message);
+        formToast({
+          variant: 'destructive',
+          title: 'Erro no upload da capa',
+          description: `${message} O evento não foi salvo.`,
+        });
+        return;
       } finally {
         setIsUploading(false);
       }
     }
 
-    // 2. Add uploaded image ID to formData so the mutation can use it
-    if (uploadedImagesResult) {
-       data.images = uploadedImagesResult;
+    // 2. Submit
+    const savedId = await onSubmit(data);
+    if (savedId) {
+      // The cover is now linked to the event; don't upload it again.
+      setCoverImageFile(null);
+      onSaved?.(savedId);
     }
-
-    // 3. Submit
-    await onSubmit(data);
   };
 
   return (
@@ -665,6 +666,12 @@ export function EventForm({
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Enviando imagem...
                 </div>
+              )}
+
+              {uploadError && (
+                <p role="alert" className="text-sm font-medium text-destructive">
+                  {uploadError}
+                </p>
               )}
             </div>
 
