@@ -1,0 +1,69 @@
+name: Deploy com .env do GitHub
+
+# Roda no runner self-hosted do thor (labels self-hosted e thor), no próprio servidor: sem SSH.
+# compare: monta o .env a partir dos secrets do Environment "production" e do repositório,
+#          compara com o do servidor (só nomes e igual/diferente) e não troca nada.
+# apply:   troca o .env do servidor (guarda o anterior em .env.bak-<data>) e roda make update.
+#
+# Só disparo manual. Nenhum workflow que use este runner pode ter pull_request ou
+# pull_request_target: o runner roda no servidor de produção.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "compare (só compara, não troca nada) ou apply (troca o .env e faz o deploy)"
+        type: choice
+        options: [compare, apply]
+        default: compare
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, thor]
+    environment: production
+    env:
+      # Caminho absoluto do projeto no servidor; a variável APP_DIR (Environment production
+      # ou repositório) substitui o padrão.
+      APP_DIR: ${{ vars.APP_DIR || '/root/projects/hub-community-frontend' }}
+      # Arquivo que o serviço lê no servidor.
+      ENV_FILE: .env
+      MODE: ${{ inputs.mode }}
+    steps:
+      - name: Conferir o diretório do projeto
+        run: |
+          [ -n "$APP_DIR" ] || { echo "Defina a variável APP_DIR (caminho absoluto do projeto no servidor)." >&2; exit 1; }
+          case "$APP_DIR" in /*) ;; *) echo "APP_DIR precisa ser um caminho absoluto." >&2; exit 1 ;; esac
+          [ -d "$APP_DIR/.git" ] && { [ -f "$APP_DIR/makefile" ] || [ -f "$APP_DIR/Makefile" ]; } || { echo "$APP_DIR não parece o projeto (sem .git ou Makefile)." >&2; exit 1; }
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Montar o .env a partir dos secrets
+        env:
+          ALL_SECRETS: ${{ toJSON(secrets) }}
+        run: |
+          umask 077
+          printf '%s' "$ALL_SECRETS" \
+            | jq -r 'to_entries[]
+                | select(.key | test("^(SSH_|GITHUB_|ACTIONS_)"; "i") | not)
+                | "\(.key)=\(.value)"' > "$RUNNER_TEMP/app.env"
+          echo "Variáveis no .env montado:"
+          cut -d= -f1 "$RUNNER_TEMP/app.env" | sort | sed 's/^/  /'
+
+      - name: Pôr o .env montado ao lado do atual
+        run: install -m 600 "$RUNNER_TEMP/app.env" "$APP_DIR/$ENV_FILE.next"
+
+      - name: ${{ inputs.mode == 'apply' && 'Trocar o .env e fazer o deploy' || 'Comparar com o .env do servidor' }}
+        # stdin vazio, para o make update (git, yarn) não esperar entrada.
+        run: bash .github/scripts/env-swap.sh "$MODE" "$APP_DIR" "$ENV_FILE" < /dev/null
+
+      - name: Limpar
+        if: always()
+        run: rm -f "$RUNNER_TEMP/app.env"
