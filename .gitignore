@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# .env do deploy-env.yml: colado (.env.temp), em troca (.env.next) e backups — nunca commitar
+.env.temp
+.env.next
+.env.bak-*
