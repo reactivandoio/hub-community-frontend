@@ -108,7 +108,7 @@ check "apply com variável faltando: .env intacto e .next apagado" 'grep -q "doi
 setup_srv
 OUT=$(bash "$SWAP" apply "$S" .env 2>&1); RC=$?
 check "apply: troca, guarda backup e roda make update" '[ $RC -eq 0 ] && grep -q "outro" "$S/.env" && ls "$S"/.env.bak-* >/dev/null 2>&1 && grep -q "dois" "$S"/.env.bak-* && grep -qx "make update" "$MAKE_LOG"'
-check "apply: arquivos com permissão 600" '[ "$(stat -f %Lp "$S/.env" 2>/dev/null || stat -c %a "$S/.env")" = 600 ]'
+check "apply: arquivos com permissão 600" '[ "$(stat -c %a "$S/.env" 2>/dev/null || stat -f %Lp "$S/.env")" = 600 ]'
 
 setup_srv
 for i in 1 2 3 4 5 6 7; do : > "$S/.env.bak-2026010100000$i"; done
@@ -127,6 +127,24 @@ OUT=$(bash -c "$STEP" 2>&1); RC=$?
 check "workflow: monta o .env" '[ $RC -eq 0 ] && grep -qx "A=1" "$RUNNER_TEMP/app.env" && grep -qx "B=\"x y\"" "$RUNNER_TEMP/app.env" && grep -qx "OPAPINGOU_API_KEY=opk_test_abc" "$RUNNER_TEMP/app.env"'
 check "workflow: tira SSH_* e github_token do .env" '! grep -qi "^ssh_\|^github_token" "$RUNNER_TEMP/app.env"'
 check "workflow: log só com nomes" '! printf "%s" "$OUT" | grep -q "opk_test_abc\|x y"'
+
+# ---------- regras do runner self-hosted (roda em produção) ----------
+for wf in "$ROOT"/.github/workflows/*.yml; do
+  name=$(basename "$wf")
+  TRIG=$(ruby -ryaml -e 'y = YAML.load_file(ARGV[0]); on = y["on"] || y[true]; puts(on.is_a?(Hash) ? on.keys.join(" ") : Array(on).join(" "))' "$wf")
+  RUNS=$(ruby -ryaml -e 'puts YAML.load_file(ARGV[0])["jobs"].values.map { |j| Array(j["runs-on"]).join(",") }.uniq.join(" ")' "$wf")
+  if printf '%s' "$RUNS" | grep -q "thor"; then
+    check "$name: no thor, sem pull_request" '! printf "%s" "$TRIG" | grep -q "pull_request"'
+    check "$name: todos os jobs em [self-hosted, thor]" '[ "$RUNS" = "self-hosted,thor" ]'
+    check "$name: sem SSH" '! grep -q "secrets.SSH_\|ssh " "$wf"'
+    check "$name: caminho do projeto pode vir de vars.APP_DIR" 'grep -q "APP_DIR: \${{ vars.APP_DIR" "$wf"'
+    check "$name: aceita makefile minúsculo" 'grep -q "\$APP_DIR/makefile" "$wf"'
+  else
+    check "$name: fora do thor, em runner do GitHub" '[ "$RUNS" = "ubuntu-latest" ]'
+  fi
+done
+check "deploy-env.yml: só disparo manual" '[ "$(ruby -ryaml -e "y=YAML.load_file(ARGV[0]); puts((y[%q(on)]||y[true]).keys.join(%q( )))" "$ROOT/.github/workflows/deploy-env.yml")" = workflow_dispatch ]'
+check "ci.yml: roda em pull_request" 'grep -q "^  pull_request:" "$ROOT/.github/workflows/ci.yml"'
 
 echo
 [ "$fails" -eq 0 ] && echo "Todos os testes passaram." || { echo "$fails teste(s) falharam."; exit 1; }

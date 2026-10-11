@@ -1,0 +1,76 @@
+name: Deploy
+
+# Roda no runner self-hosted do thor, no próprio servidor (sem SSH), a cada push na main
+# ou manualmente. Nunca use pull_request ou pull_request_target com este runner.
+#
+# .env montado dos secrets do Environment production (só nomes no log), guarda o
+# .env atual em .env.bak-<data>, troca, roda make update e confere HTTP 200 na porta local.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, thor]
+    environment: production
+    env:
+      # Caminho absoluto do projeto no servidor; a variável APP_DIR substitui o padrão.
+      APP_DIR: ${{ vars.APP_DIR || '/root/projects/hub-community-frontend' }}
+      ENV_FILE: .env
+    steps:
+      - name: Conferir o diretório do projeto
+        run: |
+          case "$APP_DIR" in /*) ;; *) echo "APP_DIR precisa ser um caminho absoluto." >&2; exit 1 ;; esac
+          [ -d "$APP_DIR/.git" ] && { [ -f "$APP_DIR/makefile" ] || [ -f "$APP_DIR/Makefile" ]; } || { echo "$APP_DIR não parece o projeto (sem .git ou makefile)." >&2; exit 1; }
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Montar o .env a partir dos secrets
+        env:
+          ALL_SECRETS: ${{ toJSON(secrets) }}
+        run: |
+          umask 077
+          printf '%s' "$ALL_SECRETS" \
+            | jq -r 'to_entries[]
+                | select(.key | test("^(SSH_|GITHUB_|ACTIONS_)"; "i") | not)
+                | "\(.key)=\(.value)"' > "$RUNNER_TEMP/app.env"
+          echo "Variáveis no .env montado:"
+          cut -d= -f1 "$RUNNER_TEMP/app.env" | sort | sed 's/^/  /'
+
+      - name: Pôr o .env montado ao lado do atual
+        run: install -m 600 "$RUNNER_TEMP/app.env" "$APP_DIR/$ENV_FILE.next"
+
+      # Guarda o .env anterior, troca e roda make update. Aborta sem trocar nada se o .env do
+      # servidor tiver variável que não está nos secrets.
+      - name: Trocar o .env e rodar make update
+        run: bash .github/scripts/env-swap.sh apply "$APP_DIR" "$ENV_FILE" < /dev/null
+
+      - name: Conferir a saúde do serviço
+        run: |
+          # Porta fixa no script start do package.json (next start -p 4010).
+          port=4010
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -m 10 -w '%{http_code}' "http://127.0.0.1:$port/" || true)
+            if [ "$code" = 200 ]; then echo "Serviço respondeu HTTP 200 em ~$((i * 5))s."; exit 0; fi
+            sleep 5
+          done
+          echo "O serviço não voltou em 5 min (último código: $code)." >&2
+          pm2 describe hub-community-front | sed -n '1,25p' || true
+          pm2 logs hub-community-front --lines 40 --nostream || true
+          last=$(ls -1t "$APP_DIR/$ENV_FILE".bak-* 2>/dev/null | head -n 1)
+          [ -n "$last" ] && echo "Para voltar o .env: cp $last $APP_DIR/$ENV_FILE && cd $APP_DIR && make update" >&2
+          exit 1
+
+      - name: Limpar
+        if: always()
+        run: rm -f "$RUNNER_TEMP/app.env"

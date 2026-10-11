@@ -1,5 +1,5 @@
 #!/bin/bash
-# Roda no servidor, chamado pelo .github/workflows/deploy-env.yml (ssh ... bash -s).
+# Roda no servidor, chamado pelo .github/workflows/deploy-env.yml no runner self-hosted do thor.
 #
 #   env-swap.sh compare <dir> [arquivo]  compara <arquivo>.next (montado dos secrets do
 #                                        GitHub) com o <arquivo> atual e apaga o .next;
