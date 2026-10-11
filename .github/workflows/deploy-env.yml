@@ -1,0 +1,72 @@
+name: Deploy com .env do GitHub
+
+# Disparo manual enquanto o deploy-prod.yml (push na main) continua sendo o deploy de verdade.
+# compare: monta o .env a partir dos secrets do Environment "production" e do repositório,
+#          compara com o do servidor (só nomes e igual/diferente) e não troca nada.
+# apply:   troca o .env do servidor (guarda o anterior em .env.bak-<data>) e roda make update.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "compare (só compara, não troca nada) ou apply (troca o .env e faz o deploy)"
+        type: choice
+        options: [compare, apply]
+        default: compare
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      # Relativo ao $HOME do usuário de SSH, como no deploy-prod.yml.
+      APP_DIR: projects/hub-community-frontend
+      # Arquivo que o serviço lê no servidor.
+      ENV_FILE: .env
+      MODE: ${{ inputs.mode }}
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Montar o .env a partir dos secrets
+        env:
+          ALL_SECRETS: ${{ toJSON(secrets) }}
+        run: |
+          umask 077
+          printf '%s' "$ALL_SECRETS" \
+            | jq -r 'to_entries[]
+                | select(.key | test("^(SSH_|GITHUB_|ACTIONS_)"; "i") | not)
+                | "\(.key)=\(.value)"' > "$RUNNER_TEMP/app.env"
+          echo "Variáveis no .env montado:"
+          cut -d= -f1 "$RUNNER_TEMP/app.env" | sort | sed 's/^/  /'
+
+      - name: Enviar o .env para o servidor
+        run: |
+          ssh "$SSH_USER@$SSH_HOST" "umask 077 && cat > \"\$HOME/$APP_DIR/$ENV_FILE.next\"" < "$RUNNER_TEMP/app.env"
+
+      - name: ${{ inputs.mode == 'apply' && 'Trocar o .env e fazer o deploy' || 'Comparar com o .env do servidor' }}
+        run: |
+          # O script vai para um arquivo temporário e roda com stdin vazio, para o make update
+          # (git, yarn, pnpm) não ler o resto dele.
+          ssh "$SSH_USER@$SSH_HOST" "f=\$(mktemp) && cat > \"\$f\" && bash \"\$f\" '$MODE' \"\$HOME/$APP_DIR\" '$ENV_FILE' < /dev/null; rc=\$?; rm -f \"\$f\"; exit \$rc" < .github/scripts/env-swap.sh
+
+      - name: Limpar
+        if: always()
+        run: rm -f "$RUNNER_TEMP/app.env" ~/.ssh/id_rsa
