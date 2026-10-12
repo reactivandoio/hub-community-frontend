@@ -8,7 +8,15 @@
 #                                        .next no lugar e roda make update.
 #
 # Nunca imprime valores: só nomes de variáveis e o resultado da comparação.
+#
+# Variáveis aposentadas: os nomes listados em .github/env-removed (um por linha) podem estar
+# no servidor sem estar no GitHub. O apply não aborta por elas; o .env novo simplesmente não
+# as tem (a cópia antiga fica no .env.bak). Para aposentar uma: liste o nome lá, faça o merge
+# e depois rode ./env-remove-from-github.sh NOME.
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ENV_REMOVED_FILE="${ENV_REMOVED_FILE:-$SCRIPT_DIR/../env-removed}"
 
 MODE="${1:?modo: compare ou apply}"
 DIR="${2:?diretório do projeto}"
@@ -36,7 +44,12 @@ value_hash() {
 
 current_keys=$(keys "$ENV_FILE")
 next_keys=$(keys "$NEXT")
-missing=$(comm -23 <(printf '%s\n' "$current_keys" | sed '/^$/d') <(printf '%s\n' "$next_keys" | sed '/^$/d'))
+removed_keys=$( [ -f "$ENV_REMOVED_FILE" ] && grep -E '^[A-Za-z_][A-Za-z0-9_]*$' "$ENV_REMOVED_FILE" | sort -u || true)
+is_removed() { printf '%s\n' "$removed_keys" | grep -qx "$1"; }
+missing_all=$(comm -23 <(printf '%s\n' "$current_keys" | sed '/^$/d') <(printf '%s\n' "$next_keys" | sed '/^$/d'))
+# Faltando no GitHub e aposentadas: saem do servidor no apply, sem abortar.
+dropped=$(for key in $missing_all; do is_removed "$key" && echo "$key"; done; true)
+missing=$(for key in $missing_all; do is_removed "$key" || echo "$key"; done; true)
 
 case "$MODE" in
   compare)
@@ -51,6 +64,8 @@ case "$MODE" in
         else
           echo "  diferente  $key"; diff=$((diff + 1))
         fi
+      elif [ "$in_cur" = 1 ] && is_removed "$key"; then
+        echo "  aposentada $key (sai do servidor no apply; listada em .github/env-removed)"
       elif [ "$in_cur" = 1 ]; then
         echo "  faltando   $key (está no servidor, não no GitHub)"; miss=$((miss + 1))
       else
@@ -77,6 +92,7 @@ case "$MODE" in
     mv -f "$NEXT" "$ENV_FILE"
     swapped=1
     echo "$ENV_FILE trocado${backup:+ (anterior em $backup)}."
+    if [ -n "$dropped" ]; then printf '  removida do servidor (aposentada): %s\n' $dropped; fi
     export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
     # shellcheck disable=SC1091
     if [ -s "$NVM_DIR/nvm.sh" ]; then set +u; . "$NVM_DIR/nvm.sh"; set -u; fi
