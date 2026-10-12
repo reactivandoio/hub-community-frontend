@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { fetchAllSpeakers, mergeSpeakers, SPEAKER_PAGE_SIZE } from '../speaker-options';
+import {
+  fetchAllSpeakers,
+  matchesSpeakerName,
+  mergeSpeakers,
+  SPEAKER_PAGE_SIZE,
+} from '../speaker-options';
 import type { Speaker } from '../types';
 
 const speaker = (id: string, name = `Speaker ${id}`): Speaker => ({ id, name });
@@ -54,6 +59,15 @@ describe('fetchAllSpeakers', () => {
     const client = pagedClient([[speaker('1', 'Ana')]]);
     expect(await fetchAllSpeakers(client)).toEqual([speaker('1', 'Ana')]);
     expect(client.query).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('matchesSpeakerName', () => {
+  it('matches part of the name ignoring case and accents', () => {
+    expect(matchesSpeakerName('Zélia Última', 'zelia ult')).toBe(true);
+    expect(matchesSpeakerName('João', 'JOAO')).toBe(true);
+    expect(matchesSpeakerName('Ana', 'Bruno')).toBe(false);
+    expect(matchesSpeakerName(undefined, 'a')).toBe(false);
   });
 });
 

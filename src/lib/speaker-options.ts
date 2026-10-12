@@ -1,4 +1,4 @@
-import type { ApolloClient } from '@apollo/client';
+import type { ApolloClient, DocumentNode } from '@apollo/client';
 
 import { GET_SPEAKER_OPTIONS } from './queries';
 import type { Speaker } from './types';
@@ -16,13 +16,15 @@ export interface SpeakerOptionsResponse {
 }
 
 // The BFF `search` argument filters on title/description, which speakers do not
-// have, so the picker loads every page and searches in the browser.
+// have, so speaker lists load every page and search in the browser. `query` must
+// take $sort and $pagination and select speakers { data meta { pageCount } }.
 export async function fetchAllSpeakers(
   client: Pick<ApolloClient<unknown>, 'query'>,
+  query: DocumentNode = GET_SPEAKER_OPTIONS,
 ): Promise<Speaker[]> {
   const loadPage = async (page: number) => {
     const { data } = await client.query<SpeakerOptionsResponse>({
-      query: GET_SPEAKER_OPTIONS,
+      query,
       variables: {
         sort: [{ name: 'ASC' }, { id: 'ASC' }],
         pagination: { page, pageSize: SPEAKER_PAGE_SIZE },
@@ -54,6 +56,13 @@ export async function fetchAllSpeakers(
   }
 
   return mergeSpeakers(speakers, []);
+}
+
+// Case- and accent-insensitive "contains", for searching names in the browser.
+export function matchesSpeakerName(name: string | undefined, term: string): boolean {
+  const fold = (value: string) =>
+    value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  return fold(name ?? '').includes(fold(term));
 }
 
 // Union by id (the first list wins), sorted by name. Keeps speakers known only
