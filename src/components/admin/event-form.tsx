@@ -60,6 +60,8 @@ import {
   Video,
   X,
 } from 'lucide-react';
+import { useOptionalAdminAccess } from '@/components/admin/admin-guard';
+import { visibleCommunities } from '@/lib/admin-access';
 import { UploadError, uploadFiles } from '@/lib/upload';
 import Image from 'next/image';
 import {
@@ -134,10 +136,17 @@ export function EventForm({
   >(initialData?.communityId);
 
   const { data: communitiesData } = useQuery(GET_COMMUNITIES);
+  // A community-manager may only link events to the communities it organizes (the BFF checks it).
+  const adminAccess = useOptionalAdminAccess();
 
   useEffect(() => {
     if (communitiesData?.communities?.data) {
-      const options = communitiesData.communities.data.map((comm: any) => ({
+      const all = communitiesData.communities.data;
+      const allowed = adminAccess ? visibleCommunities(adminAccess, all) : all;
+      // Keep the event's current community listed even when it is not one the user manages.
+      const current = all.find((comm: any) => comm.id === initialData?.communityId);
+      const list = current && !allowed.includes(current) ? [current, ...allowed] : allowed;
+      const options = list.map((comm: any) => ({
         label: comm.title,
         value: comm.id,
         data: comm,
@@ -149,7 +158,7 @@ export function EventForm({
         setSelectedCommunityId(initialData.communityId);
       }
     }
-  }, [communitiesData, initialData, selectedCommunityId]);
+  }, [communitiesData, initialData, selectedCommunityId, adminAccess]);
 
   // Talks State
   const [talks, setTalks] = useState<Talk[]>(initialData?.talks || []);

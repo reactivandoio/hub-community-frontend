@@ -1,25 +1,14 @@
 'use client';
 
-import {
-  ArrowRight,
-  Building2,
-  Calendar,
-  Eye,
-  EyeOff,
-  Lock,
-  Mic,
-  Shield,
-  Vote,
-} from 'lucide-react';
+import { ArrowRight, Building2, Calendar, Mic, Shield, Users, Vote } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
 
+import { useAdminAccess } from '@/components/admin/admin-guard';
 import { FadeIn, StaggerContainer, StaggerItem } from '@/components/animations';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { isAdminOnlyPath } from '@/lib/admin-access';
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD ?? '';
-
+// Who gets in is decided by app/admin/layout.tsx (AdminGuard): signed in, with the admin or
+// community-manager role. A community-manager does not see the admin-only modules.
 const adminRoutes = [
   {
     title: 'Gerenciar Eventos',
@@ -61,114 +50,23 @@ const adminRoutes = [
     borderHover: 'hover:border-cyan-500/30',
     shadowHover: 'hover:shadow-cyan-500/5',
   },
+  {
+    title: 'Usuários e Roles',
+    description: 'Busque usuários, defina quem é Admin ou Community Manager e veja o histórico.',
+    href: '/admin/usuarios',
+    icon: Users,
+    color: 'text-rose-500',
+    bgColor: 'bg-rose-500/10',
+    borderHover: 'hover:border-rose-500/30',
+    shadowHover: 'hover:shadow-rose-500/5',
+  },
 ];
 
 export default function AdminPage() {
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [isChecking, setIsChecking] = useState(true);
-
-  // Check sessionStorage on mount
-  useEffect(() => {
-    const stored = sessionStorage.getItem('admin_authorized');
-    if (stored === 'true') {
-      setIsAuthorized(true);
-    }
-    setIsChecking(false);
-  }, []);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    if (password === ADMIN_PASSWORD) {
-      sessionStorage.setItem('admin_authorized', 'true');
-      setIsAuthorized(true);
-    } else {
-      setError('Senha incorreta');
-      setPassword('');
-    }
-  };
-
-  // Loading state while checking sessionStorage
-  if (isChecking) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  // Password gate
-  if (!isAuthorized) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-4">
-        <FadeIn direction="up" duration={0.4}>
-          <div className="w-full max-w-sm">
-            {/* Lock icon */}
-            <div className="flex justify-center mb-6">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <Shield className="h-8 w-8 text-primary" />
-              </div>
-            </div>
-
-            <h1 className="text-2xl font-bold text-foreground text-center mb-1">
-              Área Administrativa
-            </h1>
-            <p className="text-sm text-muted-foreground text-center mb-8">
-              Digite a senha para acessar o painel
-            </p>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Senha de acesso"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setError('');
-                  }}
-                  className={`pl-10 pr-10 h-12 rounded-xl border-border/60 focus:border-primary ${
-                    error ? 'border-destructive focus:border-destructive' : ''
-                  }`}
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
-
-              {error && (
-                <p className="text-sm text-destructive text-center animate-shake">
-                  {error}
-                </p>
-              )}
-
-              <Button
-                type="submit"
-                className="w-full h-12 rounded-xl text-base font-semibold"
-                disabled={!password.trim()}
-              >
-                Acessar Painel
-              </Button>
-            </form>
-          </div>
-        </FadeIn>
-      </div>
-    );
-  }
+  const access = useAdminAccess();
+  const routes = access.isAdmin
+    ? adminRoutes
+    : adminRoutes.filter((route) => !isAdminOnlyPath(route.href));
 
   // Admin dashboard
   return (
@@ -187,7 +85,13 @@ export default function AdminPage() {
                 </h1>
               </div>
               <p className="text-muted-foreground ml-[52px]">
-                Gerencie eventos, palestrantes, comunidades e votações
+                {access.isAdmin
+                  ? 'Gerencie eventos, palestrantes, comunidades, votações e usuários'
+                  : `Gerencie as suas comunidades e os eventos delas${
+                      access.communities.length
+                        ? `: ${access.communities.map((c) => c.title).filter(Boolean).join(', ')}`
+                        : ''
+                    }`}
               </p>
             </div>
           </FadeIn>
@@ -203,7 +107,7 @@ export default function AdminPage() {
         </FadeIn>
 
         <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {adminRoutes.map((route) => {
+          {routes.map((route) => {
             const Icon = route.icon;
             return (
               <StaggerItem key={route.href}>

@@ -36,7 +36,8 @@ type AuthAction =
   | { type: 'LOAD_FROM_STORAGE'; payload: { user: User; token: string } }
   | { type: 'SHOW_LOGOUT_ALERT' }
   | { type: 'HIDE_LOGOUT_ALERT' }
-  | { type: 'UPDATE_USER'; payload: { user: User } };
+  | { type: 'UPDATE_USER'; payload: { user: User } }
+  | { type: 'HYDRATED' };
 
 const initialState: AuthState = {
   user: null,
@@ -44,6 +45,7 @@ const initialState: AuthState = {
   isAuthenticated: false,
   isLoading: false,
   showLogoutModal: false,
+  isHydrated: false,
 };
 
 function authReducer(state: AuthState, action: AuthAction): AuthState {
@@ -95,6 +97,8 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         ...state,
         user: action.payload.user,
       };
+    case 'HYDRATED':
+      return { ...state, isHydrated: true };
     default:
       return state;
   }
@@ -143,6 +147,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Error loading auth data from storage:', error);
       // Clear potentially corrupted data
       clearStorage();
+    } finally {
+      // Pages that need a session (the admin) wait for this before deciding.
+      dispatch({ type: 'HYDRATED' });
     }
   }, []);
 

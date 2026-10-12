@@ -18,6 +18,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
 
+import { useAdminAccess } from '@/components/admin/admin-guard';
 import { FadeIn } from '@/components/animations';
 import { Button } from '@/components/ui/button';
 import {
@@ -38,6 +39,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
+import { visibleCommunities } from '@/lib/admin-access';
 import {
   CREATE_COMMUNITY,
   DELETE_COMMUNITY,
@@ -47,6 +49,7 @@ import {
 const MANAGER_URL = 'https://manager.hubcommunity.io';
 
 function CommunitiesContent() {
+  const access = useAdminAccess();
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState('');
@@ -187,7 +190,8 @@ function CommunitiesContent() {
     }
   };
 
-  const communities = data?.communities?.data || [];
+  // A community-manager sees only the communities it organizes.
+  const communities = visibleCommunities(access, data?.communities?.data || []);
 
   const filtered = search.trim()
     ? communities.filter((c: any) =>
@@ -224,10 +228,12 @@ function CommunitiesContent() {
               {communities.length} comunidade{communities.length !== 1 ? 's' : ''} cadastrada{communities.length !== 1 ? 's' : ''}
             </p>
           </div>
-          <Button onClick={() => setIsCreateOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nova Comunidade
-          </Button>
+          {access.isAdmin && (
+            <Button onClick={() => setIsCreateOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova Comunidade
+            </Button>
+          )}
         </div>
 
         {/* Search */}

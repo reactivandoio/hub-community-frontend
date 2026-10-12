@@ -1437,3 +1437,87 @@ export const UPDATE_CPFS = gql`
     }
   }
 `;
+
+// ── Hub admin: access, users and roles (REA-10) ──
+// adminAccess decides who enters /admin; everything else is admin only (checked by the BFF).
+
+export const ADMIN_ACCESS = gql`
+  query AdminAccess {
+    adminAccess {
+      role
+      isAdmin
+      isCommunityManager
+      canAccessAdmin
+      communities {
+        id
+        title
+        slug
+      }
+    }
+  }
+`;
+
+export const ADMIN_USERS = gql`
+  query AdminUsers($search: String, $role: String, $page: Int, $pageSize: Int) {
+    adminUsers(search: $search, role: $role, page: $page, pageSize: $pageSize) {
+      total
+      page
+      pageSize
+      items {
+        id
+        username
+        email
+        name
+        blocked
+        role {
+          type
+          name
+        }
+        communities {
+          id
+          title
+        }
+      }
+    }
+  }
+`;
+
+export const ADMIN_ROLES = gql`
+  query AdminRoles {
+    adminRoles {
+      type
+      name
+    }
+  }
+`;
+
+export const ROLE_CHANGES = gql`
+  query RoleChanges($userId: ID, $page: Int, $pageSize: Int) {
+    roleChanges(userId: $userId, page: $page, pageSize: $pageSize) {
+      total
+      page
+      pageSize
+      items {
+        id
+        actorEmail
+        targetId
+        targetEmail
+        fromRole
+        toRole
+        createdAt
+      }
+    }
+  }
+`;
+
+export const SET_USER_ROLE = gql`
+  mutation SetUserRole($userId: ID!, $roleType: String!) {
+    setUserRole(userId: $userId, roleType: $roleType) {
+      id
+      role {
+        type
+        name
+      }
+    }
+  }
+`;
