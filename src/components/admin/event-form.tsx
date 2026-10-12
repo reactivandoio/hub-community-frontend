@@ -31,13 +31,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { formatCents, reaisToCents } from '@/lib/money';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -78,8 +71,6 @@ interface EventFormProps {
   /** Called after "Salvar Evento" saved the event, with its id. */
   onSaved?: (id: string) => void;
   isLoading?: boolean;
-  /** REA-6: the BFF has Opa Pingou; otherwise the provider select stays hidden. */
-  showPaymentProvider?: boolean;
 }
 
 // Mock locations - deprecated, now using GET_LOCATIONS
@@ -98,7 +89,6 @@ export function EventForm({
   onSubmit,
   onSaved,
   isLoading,
-  showPaymentProvider = false,
 }: EventFormProps) {
   const router = useRouter();
   const { toast: formToast } = useToast();
@@ -175,13 +165,6 @@ export function EventForm({
     }
   }, [initialData?.products]);
 
-  // The provider comes from its own admin query and may land after the form mounts.
-  useEffect(() => {
-    if (initialData?.payment_provider) {
-      form.setValue('payment_provider', initialData.payment_provider);
-    }
-  }, [initialData?.payment_provider]);
-
   // Image Upload State
   const [coverImagePreview, setCoverImagePreview] = useState<string | null>(
     (initialData as any)?.coverImage || null
@@ -246,7 +229,6 @@ export function EventForm({
       start_date: '',
       end_date: '',
       max_slots: 0,
-      pixai_token_integration: '',
       is_online: false,
       call_link: '',
       unlisted: false,
@@ -397,7 +379,7 @@ export function EventForm({
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleFormSubmit, (errors) => {
           // Auto-navigate to the tab that contains the first error
-          const generalFields = ['title', 'slug', 'start_date', 'end_date', 'max_slots', 'description', 'location', 'communityId', 'pixai_token_integration', 'is_online', 'call_link', 'unlisted', 'images'];
+          const generalFields = ['title', 'slug', 'start_date', 'end_date', 'max_slots', 'description', 'location', 'communityId', 'is_online', 'call_link', 'unlisted', 'images'];
           const scheduleFields = ['talks'];
           const productFields = ['products'];
           const errorKeys = Object.keys(errors);
@@ -793,25 +775,6 @@ export function EventForm({
               </div>
             </div>
 
-            {!isEditing && (
-              <FormField
-                control={form.control}
-                name="pixai_token_integration"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Token de Integração Pix Aí</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Token do Pix Aí" {...field} value={field.value ?? ''} />
-                    </FormControl>
-                    <FormDescription>
-                      Insira o token de integração do Pix Aí.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
             <FormField
               control={form.control}
               name="description"
@@ -916,33 +879,24 @@ export function EventForm({
           </TabsContent>
 
           <TabsContent value="products" className="space-y-6 mt-6">
-            {showPaymentProvider && (
-            <FormField
-              control={form.control}
-              name="payment_provider"
-              render={({ field }) => (
-                <FormItem className="rounded-lg border p-4">
-                  <FormLabel className="text-base font-semibold">Pagamento dos lotes pagos</FormLabel>
-                  <Select value={field.value ?? 'pixai'} onValueChange={field.onChange}>
-                    <FormControl>
-                      <SelectTrigger className="sm:max-w-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="opapingou">Opa Pingou (Pix ou link de pagamento)</SelectItem>
-                      <SelectItem value="pixai">Pix Aí</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Lotes com valor zero continuam gratuitos. Nos pagos, a inscrição só é confirmada
-                    depois que o pagamento é aprovado.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            )}
+            <div className="rounded-lg border p-4 space-y-1">
+              <p className="text-base font-semibold">Pagamento dos lotes pagos</p>
+              <p className="text-sm text-muted-foreground">
+                Lotes pagos são cobrados pelo Opa Pingou, parceiro oficial de pagamentos do Hub
+                Community, por Pix ou link de pagamento. Lotes com valor zero continuam gratuitos; nos
+                pagos, a inscrição só é confirmada depois que o pagamento é aprovado. Ainda não tem
+                conta no Opa Pingou?{' '}
+                <a
+                  href="https://opapingou.com.br/cadastro"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary underline underline-offset-2"
+                >
+                  Crie a sua
+                </a>
+                .
+              </p>
+            </div>
 
             <div className="space-y-4 rounded-lg border p-4">
               <div className="flex items-center justify-between">

@@ -118,7 +118,7 @@ describe('EventSignupPage (REA-6)', () => {
           success: true,
           is_free: false,
           signup_id: '42',
-          payment: { payment_provider: 'opapingou', kind: 'PIX_QR', pix_br_code: 'abc', value: 5000 },
+          payment: { kind: 'PIX_QR', pix_br_code: 'abc', value: 5000 },
         },
       },
     });

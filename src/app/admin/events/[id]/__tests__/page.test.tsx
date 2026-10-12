@@ -25,7 +25,6 @@ const event = {
 // page's useEffect([data]).
 const refetch = vi.fn();
 const eventResult = { data: { eventBySlugOrId: event }, loading: false, refetch };
-const settingsResult = { data: { eventPaymentSettings: { payment_provider: 'opapingou' } }, loading: false };
 const emptyResult = { data: undefined, loading: false };
 
 vi.mock('next/navigation', () => ({
@@ -44,9 +43,9 @@ vi.mock('@apollo/client', async (importOriginal) => {
   const name = (doc: any) => doc?.definitions?.[0]?.name?.value;
   return {
     ...actual,
-    useQuery: (doc: any, opts: any) => {
+    useQuery: (doc: any) => {
       if (name(doc) === 'GetEventBySlugOrId') return eventResult;
-      if (name(doc) === 'EventPaymentSettings' && !opts?.skip) return settingsResult;
+      if (name(doc) === 'EventPaymentSettings') throw new Error('eventPaymentSettings is no longer asked for');
       return emptyResult;
     },
     useMutation: (doc: any) =>
@@ -54,8 +53,8 @@ vi.mock('@apollo/client', async (importOriginal) => {
   };
 });
 vi.mock('@/components/admin/event-form', () => ({
-  EventForm: ({ initialData, onSubmit, showPaymentProvider }: any) => {
-    lastInitial = { ...initialData, showPaymentProvider };
+  EventForm: ({ initialData, onSubmit }: any) => {
+    lastInitial = initialData;
     return <button onClick={() => onSubmit(initialData)}>Salvar Evento</button>;
   },
 }));
@@ -69,26 +68,24 @@ beforeEach(() => {
 });
 
 describe('EditEventPage (REA-6 gating)', () => {
-  it('with the new BFF: edits in reais, saves cents and the provider, shows the Cupons tab', async () => {
+  it('with the new BFF: edits in reais, saves cents, shows the Cupons tab, sends no provider (REA-15)', async () => {
     paymentsV2 = true;
     render(<EditEventPage />);
     fireEvent.click(await screen.findByText('Salvar Evento'));
     expect(lastInitial.products[0].batches[0].value).toBe(50.9);
-    expect(lastInitial.payment_provider).toBe('opapingou');
-    expect(lastInitial.showPaymentProvider).toBe(true);
     await waitFor(() => expect(updateEventSale).toHaveBeenCalled());
     const data = updateEventSale.mock.calls[0][0].variables.data;
     expect(data.products[0].batches[0].value).toBe(5090);
-    expect(data.payment_provider).toBe('opapingou');
+    expect(data).not.toHaveProperty('payment_provider');
+    expect(updateEvent.mock.calls[0][0].variables.data).not.toHaveProperty('pixai_token_integration');
     expect(screen.getByRole('tab', { name: 'Cupons' })).toBeInTheDocument();
   });
 
-  it('with the old BFF: prices round-trip untouched, no provider, no Cupons tab', async () => {
+  it('with the old BFF: prices round-trip untouched, no Cupons tab', async () => {
     paymentsV2 = false;
     render(<EditEventPage />);
     fireEvent.click(await screen.findByText('Salvar Evento'));
     expect(lastInitial.products[0].batches[0].value).toBe(5090);
-    expect(lastInitial.showPaymentProvider).toBeFalsy();
     await waitFor(() => expect(updateEventSale).toHaveBeenCalled());
     const data = updateEventSale.mock.calls[0][0].variables.data;
     expect(data.products[0].batches[0].value).toBe(5090);
@@ -96,13 +93,12 @@ describe('EditEventPage (REA-6 gating)', () => {
     expect(screen.queryByRole('tab', { name: 'Cupons' })).not.toBeInTheDocument();
   });
 
-  it('community-manager: edits the event in reais, without provider nor Cupons tab (admin only)', async () => {
+  it('community-manager: edits the event in reais, without the Cupons tab (admin only)', async () => {
     paymentsV2 = true;
     isAdmin = false;
     render(<EditEventPage />);
     fireEvent.click(await screen.findByText('Salvar Evento'));
     expect(lastInitial.products[0].batches[0].value).toBe(50.9);
-    expect(lastInitial.showPaymentProvider).toBeFalsy();
     await waitFor(() => expect(updateEventSale).toHaveBeenCalled());
     const data = updateEventSale.mock.calls[0][0].variables.data;
     expect(data.products[0].batches[0].value).toBe(5090);

@@ -9,7 +9,6 @@ import { FadeIn } from '@/components/animations';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import {
-  EVENT_PAYMENT_SETTINGS,
   GET_EVENT_BY_SLUG_OR_ID,
   UPDATE_EVENT,
   UPDATE_EVENT_SALE,
@@ -17,7 +16,6 @@ import {
 import {
   EventInput,
   EventResponse,
-  PaymentProvider,
   UpdateEventResponse,
   UpdateEventSaleResponse,
 } from '@/lib/types';
@@ -54,21 +52,10 @@ export default function EditEventPage() {
   const eventSlug = data?.eventBySlugOrId?.slug || id;
 
   // REA-6 only runs against a BFF that has it: before that, prices stay as typed
-  // (the old backend's unit), and the provider select and the Cupons tab stay hidden.
+  // (the old backend's unit), and the Cupons tab stays hidden.
   const paymentsV2 = usePaymentsV2();
-  // Payment provider and coupons are admin only on the BFF; a community-manager edits the rest.
+  // Coupons are admin only on the BFF; a community-manager edits the rest.
   const { isAdmin } = useAdminAccess();
-
-  // Separate query: if it fails the form still loads (the select just shows the default).
-  const { data: paymentData } = useQuery<{
-    eventPaymentSettings: { payment_provider: PaymentProvider | null } | null;
-  }>(EVENT_PAYMENT_SETTINGS, {
-    variables: { eventId: data?.eventBySlugOrId?.id },
-    skip: !data?.eventBySlugOrId?.id || !paymentsV2 || !isAdmin,
-    fetchPolicy: 'network-only',
-  });
-  const paymentProvider: PaymentProvider =
-    paymentData?.eventPaymentSettings?.payment_provider || 'pixai';
 
   useEffect(() => {
     if (data?.eventBySlugOrId && paymentsV2 !== null) {
@@ -112,7 +99,6 @@ export default function EditEventPage() {
         start_date: new Date(formData.start_date).toISOString(),
         end_date: new Date(formData.end_date).toISOString(),
         max_slots: Number(formData.max_slots),
-        pixai_token_integration: formData.pixai_token_integration,
         is_online: formData.is_online || false,
         call_link: formData.call_link || '',
         unlisted: formData.unlisted || false,
@@ -141,9 +127,6 @@ export default function EditEventPage() {
               id: eventId,
               data: {
                 max_slots: Number(formData.max_slots) || 0,
-                ...(paymentsV2 && formData.payment_provider
-                  ? { payment_provider: formData.payment_provider }
-                  : {}),
                 products: formData.products.map((p: any) => ({
                   id: (p.id && p.id.toString().startsWith('new-')) ? undefined : p.id || undefined,
                   name: p.name,
@@ -291,10 +274,9 @@ export default function EditEventPage() {
             <div className="border rounded-lg p-6 bg-card">
               {initialData && (
                 <EventForm
-                  initialData={{ ...initialData, payment_provider: paymentProvider }}
+                  initialData={initialData}
                   onSubmit={handleSubmit}
                   isLoading={mutationLoading}
-                  showPaymentProvider
                 />
               )}
             </div>

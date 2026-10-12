@@ -100,7 +100,6 @@ export interface Event {
   end_date: string;
   images?: string[];
   subscription_link?: string;
-  pixai_token_integration?: string;
   is_online?: boolean;
   call_link?: string;
   /** Hidden from the public listings; still reachable by its direct link. */
@@ -346,7 +345,6 @@ export interface EventInput {
   start_date: string;
   end_date: string;
   max_slots?: number;
-  pixai_token_integration?: string;
   is_online?: boolean;
   call_link?: string;
   unlisted?: boolean;
@@ -379,8 +377,6 @@ export interface DeleteEventResponse {
   };
 }
 
-export type PaymentProvider = 'pixai' | 'opapingou';
-
 // Eventando Payment.status ("PEDING_PAYMENT" is the stored spelling).
 export type PaymentStatus = 'PEDING_PAYMENT' | 'CONFIRMED' | 'EXPIRED' | 'CANCELED' | 'REFUND';
 
@@ -394,7 +390,8 @@ export interface RefundSupport {
 export interface SignupPaymentStatus {
   signup_id: string;
   status: PaymentStatus;
-  provider?: PaymentProvider | null;
+  /** "opapingou"; null only on old payments from the retired provider. */
+  provider?: string | null;
   kind?: PaymentKind | null;
   expires_at?: string | null;
   confirmed_at?: string | null;
@@ -408,7 +405,6 @@ export type DiscountKind = 'coupon' | 'student';
 
 /** `signupToEvent.payment` for an Opa Pingou signup (values in cents). */
 export interface SignupPayment {
-  payment_provider?: PaymentProvider | string | null;
   kind?: PaymentKind | null;
   pix_br_code?: string | null;
   payment_link?: string | null;
@@ -460,7 +456,6 @@ export interface CouponInput {
 
 export interface EventSaleInput {
   max_slots?: number;
-  payment_provider?: PaymentProvider;
   products?: {
     name: string;
     enabled: boolean;

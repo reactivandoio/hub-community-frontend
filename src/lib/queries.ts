@@ -430,15 +430,6 @@ export const EVENT_PAYMENTS = gql`
   }
 `;
 
-// Admin only, kept out of GET_EVENT_BY_SLUG_OR_ID so the public page never depends on it.
-export const EVENT_PAYMENT_SETTINGS = gql`
-  query EventPaymentSettings($eventId: ID!) {
-    eventPaymentSettings(eventId: $eventId) {
-      payment_provider
-    }
-  }
-`;
-
 export const IS_USER_SIGNED_UP = gql`
   query IsUserSignedUp($eventId: String!, $email: String!) {
     isUserSignedUp(eventId: $eventId, email: $email) {

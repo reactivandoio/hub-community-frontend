@@ -3,6 +3,10 @@
 Data: 2026-10-10. Status: frontend implementado neste PR; Eventando Manager, BFF e cupom
 especificados abaixo e ainda por implementar. Plano: `docs/superpowers/plans/2026-10-10-rea-6-pagamento-opa-pingou.md`.
 
+> REA-15 (2026-10-12): o Pix Aí não existe mais. O Opa Pingou é o único provedor; o seletor de
+> provedor, o token do Pix Aí e o passo de pagamento antigo saíram do frontend. As menções ao Pix Aí
+> abaixo são histórico deste desenho.
+
 > Correção do primeiro levantamento: a conclusão "o Opa Pingou não tem API de comerciante" veio
 > de um checkout local parado em `973e2d2`. A `origin/main` (tag de produção `v1.1.0`, a0a1e60)
 > já tem API REST com chave, idempotência e webhooks assinados. Lição registrada no termhub.
