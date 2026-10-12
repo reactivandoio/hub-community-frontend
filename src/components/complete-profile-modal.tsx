@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/auth-context';
 import { formatCpf, isValidCpf, normalizeIdentifier } from '@/lib/certificate';
+import { cleanSignupPhone, isValidPhone } from '@/lib/inline-signup';
 import { missingCertificateFields, type CertificateField } from '@/lib/profile-completeness';
 import { ME, UPDATE_PROFILE } from '@/lib/queries';
 import type { User } from '@/lib/types';
@@ -27,7 +28,7 @@ interface MeData {
 type Values = Record<CertificateField, string>;
 type Errors = Partial<Record<CertificateField, string>>;
 
-const EMPTY: Values = { name: '', cpf: '', date_of_birth: '' };
+const EMPTY: Values = { name: '', cpf: '', date_of_birth: '', phone: '' };
 
 function validate(values: Values, fields: CertificateField[]): Errors {
   const errors: Errors = {};
@@ -43,12 +44,15 @@ function validate(values: Values, fields: CertificateField[]): Errors {
       errors.date_of_birth = 'Informe uma data de nascimento válida.';
     }
   }
+  if (fields.includes('phone') && !isValidPhone(values.phone)) {
+    errors.phone = 'Informe um WhatsApp válido (ex: +55 11 98765-4321).';
+  }
   return errors;
 }
 
 /**
  * Blocks the app for logged-in users until the data needed to issue a certificate
- * (full name, CPF, date of birth) is on their profile. Mounted once in the root layout.
+ * (full name, CPF, date of birth, WhatsApp) is on their profile. Mounted once in the root layout.
  *
  * The stored session may be stale (older sessions never saved these fields), so the
  * server profile is synced first and the dialog only opens for what is still missing.
@@ -74,6 +78,7 @@ export function CompleteProfileModal() {
         if (me.name) fresh.name = me.name;
         if (me.cpf) fresh.cpf = me.cpf;
         if (me.date_of_birth) fresh.date_of_birth = me.date_of_birth;
+        if (me.phone) fresh.phone = me.phone;
         if (Object.keys(fresh).length > 0) syncUser?.(fresh);
       }
       setCheckedFor(user?.email ?? null);
@@ -103,6 +108,7 @@ export function CompleteProfileModal() {
     if (missing.includes('name')) input.name = values.name.trim();
     if (missing.includes('cpf')) input.cpf = normalizeIdentifier(values.cpf);
     if (missing.includes('date_of_birth')) input.date_of_birth = values.date_of_birth;
+    if (missing.includes('phone')) input.phone = cleanSignupPhone(values.phone).trim();
 
     try {
       await updateProfile({ variables: { input } });
@@ -174,6 +180,23 @@ export function CompleteProfileModal() {
               {errors.date_of_birth && (
                 <p className="text-sm text-destructive">{errors.date_of_birth}</p>
               )}
+            </div>
+          )}
+
+          {missing.includes('phone') && (
+            <div className="space-y-2">
+              <Label htmlFor="complete-profile-phone">WhatsApp</Label>
+              <Input
+                id="complete-profile-phone"
+                type="tel"
+                autoComplete="tel"
+                placeholder="+55 11 98765-4321"
+                maxLength={20}
+                value={values.phone}
+                onChange={(e) => setValue('phone', e.target.value)}
+                disabled={saving}
+              />
+              {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
             </div>
           )}
 

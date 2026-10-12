@@ -19,6 +19,12 @@ import type {
   RequestCertificateResponse,
 } from '@/lib/types';
 import { formatCpf, isValidCpf, normalizeIdentifier } from '@/lib/certificate';
+import { useAuth } from '@/contexts/auth-context';
+import {
+  completeProfileHref,
+  registrationIncomplete,
+  type RegistrationIncomplete,
+} from '@/lib/registration-incomplete';
 import { adjustToBrazilTimezone } from '@/utils/event';
 
 export default function CertificadoPage() {
@@ -78,6 +84,13 @@ function CertificadoContent() {
     'idle',
   );
   const [error, setError] = useState('');
+  // REA-22: the registration must be finished before the certificate.
+  const [incomplete, setIncomplete] = useState<RegistrationIncomplete | null>(null);
+  const { isAuthenticated } = useAuth();
+  const showError = (err: unknown) => {
+    setError(errorMessage(err));
+    setIncomplete(registrationIncomplete(err));
+  };
   const [form, setForm] = useState({ name: '', email: '', phone_number: '' });
 
   const [lookup, { loading: lookingUp }] = useLazyQuery<LookupCertificateResponse>(LOOKUP_CERTIFICATE, {
@@ -88,13 +101,14 @@ function CertificadoContent() {
   const handleLookup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIncomplete(null);
     if (!isValidCpf(cpf)) {
       setError('CPF inválido.');
       return;
     }
     const { data, error: qError } = await lookup({ variables: { eventId, identifier: normalizeIdentifier(cpf) } });
     if (qError) {
-      setError(errorMessage(qError));
+      showError(qError);
       return;
     }
     const result = data?.lookupCertificate;
@@ -112,6 +126,7 @@ function CertificadoContent() {
   const handleRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIncomplete(null);
     try {
       const { data } = await requestCertificate({
         variables: {
@@ -124,7 +139,7 @@ function CertificadoContent() {
       });
       if (data?.requestCertificate) setCertificate(data.requestCertificate);
     } catch (err) {
-      setError(errorMessage(err));
+      showError(err);
     }
   };
 
@@ -209,6 +224,25 @@ function CertificadoContent() {
             <div className="bg-destructive/15 text-destructive p-4 rounded-md flex items-center space-x-3 mb-6">
               <AlertCircle className="w-5 h-5 flex-shrink-0" />
               <p className="text-sm font-medium">{error}</p>
+            </div>
+          )}
+
+          {incomplete && (
+            <div className="rounded-md border border-primary/30 bg-primary/5 p-4 mb-6 space-y-3 text-sm" data-testid="registration-incomplete">
+              {isAuthenticated ? (
+                <p>Preencha os dados que aparecem na tela e tente de novo.</p>
+              ) : (
+                <>
+                  <p>
+                    {incomplete.passwordPending
+                      ? 'Depois de criar sua senha pelo link do e-mail, entre na sua conta: vamos pedir o que faltar no perfil.'
+                      : 'Entre na sua conta: vamos pedir o que faltar no perfil e você volta para cá.'}
+                  </p>
+                  <Link href={completeProfileHref(`/certificado?event=${encodeURIComponent(eventParam)}`)}>
+                    <Button size="sm" className="rounded-full">Entrar e completar meu cadastro</Button>
+                  </Link>
+                </>
+              )}
             </div>
           )}
 

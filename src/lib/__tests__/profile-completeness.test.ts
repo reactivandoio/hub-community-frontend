@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { missingCertificateFields } from '@/lib/profile-completeness';
 
-const complete = { email: 'ana@x.io', username: 'ana', name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17' };
+const complete = { email: 'ana@x.io', username: 'ana', name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17', phone: '+55 62 99999-0000' };
 
 describe('missingCertificateFields', () => {
   it('returns nothing for a complete profile', () => {
@@ -28,6 +28,12 @@ describe('missingCertificateFields', () => {
   });
 
   it('lists every missing field in form order', () => {
-    expect(missingCertificateFields({})).toEqual(['name', 'cpf', 'date_of_birth']);
+    expect(missingCertificateFields({})).toEqual(['name', 'cpf', 'date_of_birth', 'phone']);
+  });
+
+  it('flags a missing or too short WhatsApp (REA-22)', () => {
+    expect(missingCertificateFields({ ...complete, phone: undefined })).toEqual(['phone']);
+    expect(missingCertificateFields({ ...complete, phone: '' })).toEqual(['phone']);
+    expect(missingCertificateFields({ ...complete, phone: '1234' })).toEqual(['phone']);
   });
 });

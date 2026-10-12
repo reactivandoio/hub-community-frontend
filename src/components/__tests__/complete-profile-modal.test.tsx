@@ -55,15 +55,17 @@ describe('CompleteProfileModal — when to show', () => {
   });
 
   it('renders nothing when the stored profile is already complete', () => {
-    auth.user = { ...baseUser, name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17' };
+    auth.user = { ...baseUser, name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17', phone: '+55 62 99999-0000' };
     renderModal([]);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('syncs the fresh profile from the server and stays closed when it is complete there', async () => {
-    renderModal([meMock({ name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17' })]);
+    renderModal([meMock({ name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17', phone: '+55 62 99999-0000' })]);
     await waitFor(() =>
-      expect(auth.syncUser).toHaveBeenCalledWith({ name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17' }),
+      expect(auth.syncUser).toHaveBeenCalledWith({
+        name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17', phone: '+55 62 99999-0000',
+      }),
     );
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
@@ -74,6 +76,15 @@ describe('CompleteProfileModal — when to show', () => {
     expect(screen.queryByLabelText(/nome completo/i)).not.toBeInTheDocument();
     expect(screen.getByLabelText(/cpf/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/data de nascimento/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/whatsapp/i)).toBeInTheDocument();
+  });
+
+  it('cadastro antigo só sem WhatsApp: abre pedindo só o WhatsApp (REA-22)', async () => {
+    renderModal([meMock({ name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17' })]);
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByLabelText(/whatsapp/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/cpf/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/data de nascimento/i)).not.toBeInTheDocument();
   });
 
   it('cannot be dismissed: no close button and Escape keeps it open', async () => {
@@ -94,6 +105,7 @@ describe('CompleteProfileModal — form', () => {
     await userEvent.type(screen.getByLabelText(/nome completo/i), 'Ana Souza');
     await userEvent.type(screen.getByLabelText(/cpf/i), '11111111111');
     await userEvent.type(screen.getByLabelText(/data de nascimento/i), '1990-05-17');
+    await userEvent.type(screen.getByLabelText(/whatsapp/i), '+55 62 99999-0000');
     await userEvent.click(screen.getByRole('button', { name: /salvar/i }));
     expect(await screen.findByText(/cpf inválido/i)).toBeInTheDocument();
     expect(auth.syncUser).not.toHaveBeenCalledWith(expect.objectContaining({ cpf: expect.anything() }));
@@ -103,7 +115,7 @@ describe('CompleteProfileModal — form', () => {
     const update: MockedResponse = {
       request: {
         query: UPDATE_PROFILE,
-        variables: { input: { name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17' } },
+        variables: { input: { name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17', phone: '+55 62 99999-0000' } },
       },
       result: { data: { updateProfile: { id: '9', username: 'ana-4f2k', email: 'ana@x.io', name: 'Ana Souza', phone: null, cover_photo: null, twitter: null, linkedin: null, github: null, website: null, instagram: null } } },
     };
@@ -112,16 +124,19 @@ describe('CompleteProfileModal — form', () => {
     await userEvent.type(screen.getByLabelText(/nome completo/i), 'Ana Souza');
     await userEvent.type(screen.getByLabelText(/cpf/i), '529.982.247-25');
     await userEvent.type(screen.getByLabelText(/data de nascimento/i), '1990-05-17');
+    await userEvent.type(screen.getByLabelText(/whatsapp/i), '+55 62 99999-0000');
     await userEvent.click(screen.getByRole('button', { name: /salvar/i }));
     await waitFor(() =>
-      expect(auth.syncUser).toHaveBeenCalledWith({ name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17' }),
+      expect(auth.syncUser).toHaveBeenCalledWith({
+        name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17', phone: '+55 62 99999-0000',
+      }),
     );
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
   it('shows the server error and stays open', async () => {
     const failing: MockedResponse = {
-      request: { query: UPDATE_PROFILE, variables: { input: { name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17' } } },
+      request: { query: UPDATE_PROFILE, variables: { input: { name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17', phone: '+55 62 99999-0000' } } },
       error: new Error('Error updating profile: boom'),
     };
     renderModal([meMock(null), failing]);
@@ -129,8 +144,20 @@ describe('CompleteProfileModal — form', () => {
     await userEvent.type(screen.getByLabelText(/nome completo/i), 'Ana Souza');
     await userEvent.type(screen.getByLabelText(/cpf/i), '52998224725');
     await userEvent.type(screen.getByLabelText(/data de nascimento/i), '1990-05-17');
+    await userEvent.type(screen.getByLabelText(/whatsapp/i), '+55 62 99999-0000');
     await userEvent.click(screen.getByRole('button', { name: /salvar/i }));
     expect(await screen.findByText(/boom/i)).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+});
+
+describe('CompleteProfileModal — WhatsApp (REA-22)', () => {
+  it('rejects a too short WhatsApp before calling the server', async () => {
+    renderModal([meMock({ name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17' })]);
+    await screen.findByRole('dialog');
+    await userEvent.type(screen.getByLabelText(/whatsapp/i), '1234');
+    await userEvent.click(screen.getByRole('button', { name: /salvar/i }));
+    expect(await screen.findByText(/whatsapp válido/i)).toBeInTheDocument();
+    expect(auth.syncUser).not.toHaveBeenCalledWith(expect.objectContaining({ phone: expect.anything() }));
   });
 });
