@@ -57,6 +57,14 @@ src/
   (`/admin/events` and the voting-session picker do). The event's own page and signup flow are never
   filtered — the direct link is the point.
 
+- **Rich text / descriptions (REA-14)** — descriptions (event, talk, speaker bio, community, comments)
+  are markdown. `RichTextEditor` saves it as Strapi-style blocks, one `paragraph` per "\n\n" with the
+  markdown inside; older records may be real Strapi blocks or plain strings. `lib/rich-text.ts`
+  (`richTextToMarkdown`) turns any of these into markdown, and `components/ui/markdown-content.tsx`
+  (`MarkdownContent`) renders it safely (react-markdown + GFM + line breaks, `skipHtml`, external
+  links `rel="noopener noreferrer"`). `RichText`, `ExpandableRichText` and the editor's
+  "Pré-visualizar" all go through it — don't render descriptions any other way.
+
 - **Admin access (REA-10)** — `/admin`, `/badge-printer`, `/checkin` and `/sorteio` have a layout with
   `AdminGuard` (`components/admin/admin-guard.tsx`): signed in (else `/?login=true&redirect=…`) with the
   `admin` or `community-manager` role, read from the BFF `adminAccess` query. Admin-only paths
