@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MockedProvider, type MockedResponse } from '@apollo/client/testing';
-import { EVENT_SIGNUPS, CHECKIN_SIGNUP, MANUAL_SIGNUP, EVENT_BATCHES } from '@/lib/queries';
+import { EVENT_SIGNUPS, EVENT_SIGNUPS_HALF_PRICE, EVENT_SIGNUP_FIELDS, CHECKIN_SIGNUP, MANUAL_SIGNUP, EVENT_BATCHES } from '@/lib/queries';
 import EventBadgePrinterPage from '../page';
 
 // ─── Mocks ────────────────────────────────────────────────────────
@@ -88,6 +88,31 @@ describe('EventBadgePrinterPage — list', () => {
     await userEvent.type(screen.getByPlaceholderText(/buscar/i), 'bia');
     expect(screen.queryByText('Ana Souza')).not.toBeInTheDocument();
     expect(screen.getByText('Bia Lima')).toBeInTheDocument();
+  });
+});
+
+describe('EventBadgePrinterPage — meia-entrada (REA-16)', () => {
+  it('marks who paid half price once the BFF has the field', async () => {
+    const fieldsMock: MockedResponse = {
+      request: { query: EVENT_SIGNUP_FIELDS },
+      result: { data: { __type: { fields: [{ name: 'id' }, { name: 'half_price' }] } } },
+    };
+    const halfPriceMock: MockedResponse = {
+      request: { query: EVENT_SIGNUPS_HALF_PRICE, variables: { eventSlug: 'react-summit' } },
+      result: {
+        data: {
+          eventSignups: [
+            { ...signup({}), half_price: true },
+            { ...signup({ id: 's2', name: 'Bia Lima', email: 'bia@x.io' }), half_price: false },
+          ],
+        },
+      },
+    };
+    renderPage([batchesMock, fieldsMock, halfPriceMock]);
+    const ana = (await screen.findByText('Ana Souza')).closest('tr') as HTMLElement;
+    expect(within(ana).getByText('Meia-entrada')).toBeInTheDocument();
+    const bia = screen.getByText('Bia Lima').closest('tr') as HTMLElement;
+    expect(within(bia).queryByText('Meia-entrada')).not.toBeInTheDocument();
   });
 });
 

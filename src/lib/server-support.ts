@@ -21,6 +21,20 @@ function isSchemaError(err: { message?: string; extensions?: Record<string, unkn
   );
 }
 
+interface TypeFieldsProbe {
+  __type?: { fields?: ReadonlyArray<{ name: string }> | null } | null;
+}
+
+/** REA-16: whether a GraphQL type lists a field. null while asking; an error means no. */
+export function typeHasField(
+  { loading, data, error }: ProbeResult,
+  field: string,
+): boolean | null {
+  if (loading && !data && !error) return null;
+  if (error) return false;
+  return !!(data as TypeFieldsProbe | undefined)?.__type?.fields?.some((f) => f.name === field);
+}
+
 /** true = new BFF, false = old (or unreachable) BFF, null = still asking. */
 export function paymentsV2FromProbe({ loading, data, error }: ProbeResult): boolean | null {
   if (loading && !data && !error) return null;

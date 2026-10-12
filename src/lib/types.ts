@@ -662,6 +662,8 @@ export interface EventSignup {
   checked_in?: boolean;
   checked_in_at?: string;
   product_name?: string;
+  /** REA-16: paid half price (the server kept the half-price discount). */
+  half_price?: boolean | null;
 }
 
 export interface CheckinResponse {

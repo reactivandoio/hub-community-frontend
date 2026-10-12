@@ -54,7 +54,8 @@ import {
 } from '@/lib/queries';
 import { cpfError, isCpfMessage, maskCpfInput } from '@/lib/cpf';
 import { formatCents } from '@/lib/money';
-import { discountLabel, isPaymentLinkUnavailable, minChargeNotice } from '@/lib/payment-status';
+import { HalfPriceChoice } from '@/components/half-price-choice';
+import { discountLabel, halfPriceWinner, isPaymentLinkUnavailable, minChargeNotice } from '@/lib/payment-status';
 import type { CouponPreview, PaymentKind } from '@/lib/types';
 import { signupName } from '@/lib/signup-name';
 import { acquireSignupLock, releaseSignupLock } from '@/lib/signup-lock';
@@ -113,6 +114,10 @@ export default function EventSignupPage() {
   const [cpfInput, setCpfInput] = useState('');
   const [cpfFieldError, setCpfFieldError] = useState('');
   const [couponPreview, setCouponPreview] = useState<CouponPreview | null>(null);
+  // REA-16: half price on trust, declared with a checkbox. The coupon that last
+  // validated travels with it, so the server can pick the larger discount.
+  const [halfPrice, setHalfPrice] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState('');
   const [paymentAttempt, setPaymentAttempt] = useState(0);
   const [linkUnavailable, setLinkUnavailable] = useState(false);
   const lastSignupVars = useRef<Record<string, unknown> | null>(null);
@@ -204,11 +209,16 @@ export default function EventSignupPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.cpf]);
 
-  // The server prices a coupon per batch: another batch needs a new preview.
+  // The server prices a coupon per batch: another batch needs a new preview, and
+  // the half-price choice starts over (the next batch may not offer it).
   useEffect(() => {
     setCouponPreview(null);
+    setHalfPrice(false);
+    setAppliedCoupon('');
     if (paymentsV2) setCouponMessage('');
   }, [selectedBatch?.id, paymentsV2]);
+
+  const halfPriceOffered = !!paymentsV2 && !!selectedBatch?.half_price_eligible && (selectedBatch?.value || 0) > 0;
 
   // Calculate price. With the new BFF the coupon price is the server's (coupon or
   // half price, never both); the legacy path keeps today's percentage.
@@ -226,34 +236,55 @@ export default function EventSignupPage() {
     : couponDiscount
       ? `Desconto (${couponDiscount}%)`
       : null;
-  const couponApplied = paymentsV2 ? previewApplies && couponPreview?.discount_kind === 'coupon' : !!couponDiscount;
+  const couponApplied = paymentsV2 ? !!appliedCoupon : !!couponDiscount;
+  // Coupon and half price together: the server keeps the larger discount (half price on a tie).
+  const bestDiscountNote =
+    halfPrice && appliedCoupon && previewApplies ? halfPriceWinner(couponPreview!.discount_kind) : null;
+
+  // Asks the server for the price of the selected batch with this coupon and/or half price.
+  const refreshPrice = async (code: string, isStudent: boolean): Promise<void> => {
+    if (!selectedBatch) return;
+    if (!code && !isStudent) {
+      setCouponPreview(null);
+      return;
+    }
+    try {
+      const { data, error } = await previewCoupon({
+        variables: { eventSlug: slugOrId, batchId: selectedBatch.id, code, isStudent },
+      });
+      if (error) throw error;
+      const result: CouponPreview | null = data?.previewCoupon ?? null;
+      if (result?.valid) {
+        setCouponPreview(result);
+        setAppliedCoupon(code);
+        if (code) setCouponMessage(result.message || 'Cupom aplicado.');
+        return;
+      }
+      setCouponPreview(null);
+      setAppliedCoupon('');
+      if (code) {
+        setCouponMessage(result?.message || 'Cupom inválido.');
+        // The coupon was refused: half price alone still has its price.
+        if (isStudent) await refreshPrice('', true);
+      } else {
+        setCouponMessage(result?.message || 'Não foi possível calcular a meia-entrada.');
+      }
+    } catch {
+      setCouponPreview(null);
+      setCouponMessage(code ? 'Erro ao validar cupom.' : 'Erro ao calcular a meia-entrada.');
+    }
+  };
+
+  const toggleHalfPrice = (checked: boolean) => {
+    setHalfPrice(checked);
+    void refreshPrice(appliedCoupon, checked);
+  };
 
   // Handle coupon validation
   const handleValidateCoupon = async () => {
     if (!couponCode.trim()) return;
     if (paymentsV2) {
-      if (!selectedBatch) return;
-      try {
-        const { data, error } = await previewCoupon({
-          variables: {
-            eventSlug: slugOrId,
-            batchId: selectedBatch.id,
-            code: couponCode.trim(),
-            isStudent: false,
-          },
-        });
-        if (error) throw error;
-        const result: CouponPreview | null = data?.previewCoupon ?? null;
-        setCouponPreview(result?.valid ? result : null);
-        setCouponMessage(
-          result?.valid
-            ? result.message || 'Cupom aplicado.'
-            : result?.message || 'Cupom inválido.',
-        );
-      } catch {
-        setCouponPreview(null);
-        setCouponMessage('Erro ao validar cupom.');
-      }
+      await refreshPrice(couponCode.trim(), halfPrice);
       return;
     }
     try {
@@ -351,8 +382,9 @@ export default function EventSignupPage() {
       };
 
       if (couponCode && couponApplied) {
-        variables.coupon_code = couponCode;
+        variables.coupon_code = paymentsV2 ? appliedCoupon : couponCode;
       }
+      if (halfPrice) variables.is_student = true;
 
       const result = await submitSignup(variables);
 
@@ -442,8 +474,9 @@ export default function EventSignupPage() {
         phone_number: cleanedPhone || undefined,
       };
       if (couponCode && couponApplied) {
-        variables.coupon_code = couponCode;
+        variables.coupon_code = paymentsV2 ? appliedCoupon : couponCode;
       }
+      if (halfPrice) variables.is_student = true;
 
       const result = await submitSignup(variables);
 
@@ -773,6 +806,14 @@ export default function EventSignupPage() {
                     </div>
                   ))}
 
+                  {halfPriceOffered && (
+                    <HalfPriceChoice
+                      checked={halfPrice}
+                      onCheckedChange={toggleHalfPrice}
+                      disabled={previewingCoupon}
+                    />
+                  )}
+
                   {/* Coupon — only show for paid batches */}
                   {selectedBatch && selectedBatch.value > 0 && (
                     <div className="bg-card border border-border rounded-2xl p-6">
@@ -787,8 +828,13 @@ export default function EventSignupPage() {
                           onChange={(e) => {
                             setCouponCode(e.target.value.toUpperCase());
                             setCouponDiscount(null);
-                            setCouponPreview(null);
                             setCouponMessage('');
+                            if (appliedCoupon) {
+                              setAppliedCoupon('');
+                              void refreshPrice('', halfPrice);
+                            } else if (!halfPrice) {
+                              setCouponPreview(null);
+                            }
                           }}
                           className="flex-1"
                         />
@@ -807,7 +853,7 @@ export default function EventSignupPage() {
                       {couponMessage && (
                         <p
                           className={`text-sm mt-2 ${
-                            couponDiscount || previewApplies ? 'text-green-600' : 'text-red-500'
+                            couponDiscount || appliedCoupon ? 'text-green-600' : 'text-red-500'
                           }`}
                         >
                           {couponMessage}
@@ -834,6 +880,11 @@ export default function EventSignupPage() {
                             <span>{discountText}</span>
                             <span>-{formatCents(discountCents)}</span>
                           </div>
+                        )}
+                        {bestDiscountNote && (
+                          <p className="text-xs text-muted-foreground" data-testid="best-discount">
+                            {bestDiscountNote}
+                          </p>
                         )}
                         {previewApplies && couponPreview?.min_charge_applied && (
                           <p className="text-xs text-amber-600">{minChargeNotice(finalPrice)}</p>
@@ -879,7 +930,7 @@ export default function EventSignupPage() {
                         className="w-full mt-6 rounded-full"
                         size="lg"
                         onClick={() => setStep('confirm')}
-                        disabled={isAuthenticated && !user?.phone && !phoneInput.trim()}
+                        disabled={(isAuthenticated && !user?.phone && !phoneInput.trim()) || previewingCoupon}
                       >
                         {finalPrice === 0 ? 'Confirmar Inscrição' : 'Continuar para pagamento'}
                       </Button>
@@ -910,6 +961,12 @@ export default function EventSignupPage() {
                     <span className="font-medium text-foreground">
                       {selectedProduct.name} — {selectedBatch?.batch_number}º Lote
                     </span>
+                  </div>
+                )}
+                {discountText && discountCents > 0 && (
+                  <div className="flex justify-between py-2 border-b border-border/30 text-green-600">
+                    <span>{discountText}</span>
+                    <span>-{formatCents(discountCents)}</span>
                   </div>
                 )}
                 {(user?.phone || phoneInput) && (
