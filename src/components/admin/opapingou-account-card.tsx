@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from '@apollo/client';
 import { AlertTriangle, CheckCircle2, ExternalLink, KeyRound } from 'lucide-react';
-import { useState, type KeyboardEvent } from 'react';
+import { useEffect, useState, type KeyboardEvent } from 'react';
 
 import {
   AlertDialog,
@@ -37,6 +37,11 @@ import type { EventOpaPingouAccount } from '@/lib/types';
 interface OpaPingouAccountCardProps {
   /** Hub event id; undefined while the event is being created. */
   eventId?: string;
+  /** New event: the key typed before the first save; the page connects it right after creating the event. */
+  pendingKey?: string;
+  onPendingKeyChange?: (value: string) => void;
+  /** Saved event: whether it can charge (own account, or legacy on the Hub account). */
+  onAccountChange?: (hasAccount: boolean) => void;
 }
 
 type AccountData = { eventOpaPingouAccount: EventOpaPingouAccount };
@@ -49,7 +54,12 @@ const externalLink = 'text-primary underline underline-offset-2';
  * Lives inside the event <form>: no nested form, buttons are type="button" and Enter in the key
  * field connects instead of saving the event.
  */
-export function OpaPingouAccountCard({ eventId }: OpaPingouAccountCardProps) {
+export function OpaPingouAccountCard({
+  eventId,
+  pendingKey = '',
+  onPendingKeyChange,
+  onAccountChange,
+}: OpaPingouAccountCardProps) {
   const { toast } = useToast();
   const [apiKey, setApiKey] = useState('');
   const [replacing, setReplacing] = useState(false);
@@ -79,6 +89,10 @@ export function OpaPingouAccountCard({ eventId }: OpaPingouAccountCardProps) {
 
   const account = data?.eventOpaPingouAccount;
   const connection = account?.connection || null;
+
+  useEffect(() => {
+    if (account) onAccountChange?.(Boolean(account.connection || account.legacy));
+  }, [account, onAccountChange]);
   const showForm = !connection || replacing;
   const reusable = (account?.reusable || []).filter((c) => c.id !== connection?.id);
 
@@ -141,6 +155,31 @@ export function OpaPingouAccountCard({ eventId }: OpaPingouAccountCardProps) {
     }
   };
 
+  const howTo = (
+    <details className="text-sm">
+      <summary className="cursor-pointer font-medium">Como gerar a chave</summary>
+      <ol className="mt-2 list-decimal space-y-1 pl-5 text-muted-foreground">
+        <li>
+          Entre no Opa Pingou e abra{' '}
+          <a href={OPAPINGOU_KEYS_URL} target="_blank" rel="noopener noreferrer" className={externalLink}>
+            Chaves de API
+            <ExternalLink className="ml-1 inline h-3 w-3" />
+          </a>{' '}
+          (no app, em Configurações).
+        </li>
+        <li>
+          Crie uma chave nova, de produção, com estas permissões:
+          <ul className="mt-1 list-disc pl-5">
+            {REQUIRED_SCOPES.map((s) => (
+              <li key={s.scope}>{s.label}</li>
+            ))}
+          </ul>
+        </li>
+        <li>Copie a chave (o Opa Pingou mostra uma vez só) e cole aqui.</li>
+      </ol>
+    </details>
+  );
+
   return (
     <div className="rounded-lg border p-4 space-y-4">
       <div className="space-y-1">
@@ -164,7 +203,30 @@ export function OpaPingouAccountCard({ eventId }: OpaPingouAccountCardProps) {
       </div>
 
       {!eventId ? (
-        <p className="text-sm">Salve o evento para conectar a conta Opa Pingou da comunidade.</p>
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <Label htmlFor="opapingou-api-key">Chave de API do Opa Pingou</Label>
+            <Input
+              id="opapingou-api-key"
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              data-1p-ignore
+              data-lpignore="true"
+              placeholder="opk_live_…"
+              value={pendingKey}
+              onChange={(e) => onPendingKeyChange?.(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.preventDefault();
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              Obrigatória só se o evento tiver lote pago. A conta é conectada logo depois que o evento
+              for criado; a chave fica guardada cifrada e não aparece de novo.
+            </p>
+          </div>
+          {howTo}
+        </div>
       ) : loadError ? (
         <p role="alert" className="text-sm text-red-500">
           Não foi possível carregar a conta Opa Pingou: {loadError.message}
@@ -250,28 +312,7 @@ export function OpaPingouAccountCard({ eventId }: OpaPingouAccountCardProps) {
                 </p>
               </div>
 
-              <details className="text-sm">
-                <summary className="cursor-pointer font-medium">Como gerar a chave</summary>
-                <ol className="mt-2 list-decimal space-y-1 pl-5 text-muted-foreground">
-                  <li>
-                    Entre no Opa Pingou e abra{' '}
-                    <a href={OPAPINGOU_KEYS_URL} target="_blank" rel="noopener noreferrer" className={externalLink}>
-                      Chaves de API
-                      <ExternalLink className="ml-1 inline h-3 w-3" />
-                    </a>{' '}
-                    (no app, em Configurações).
-                  </li>
-                  <li>
-                    Crie uma chave nova, de produção, com estas permissões:
-                    <ul className="mt-1 list-disc pl-5">
-                      {REQUIRED_SCOPES.map((s) => (
-                        <li key={s.scope}>{s.label}</li>
-                      ))}
-                    </ul>
-                  </li>
-                  <li>Copie a chave (o Opa Pingou mostra uma vez só) e cole aqui.</li>
-                </ol>
-              </details>
+              {howTo}
 
               {reusable.length > 0 && (
                 <div className="space-y-2">

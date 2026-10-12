@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { EventForm } from '@/components/admin/event-form';
 import { FadeIn } from '@/components/animations';
 import { useToast } from '@/hooks/use-toast';
-import { CREATE_EVENT, UPDATE_EVENT_SALE } from '@/lib/queries';
+import { CONNECT_EVENT_OPAPINGOU, CREATE_EVENT, UPDATE_EVENT_SALE } from '@/lib/queries';
+import { hasPaidBatch, isAccountRequiredError, opaPingouErrorMessage, ACCOUNT_REQUIRED_MESSAGE } from '@/lib/opapingou-account';
 import { CreateEventResponse, EventInput, UpdateEventSaleResponse } from '@/lib/types';
 import { reaisToCents } from '@/lib/money';
 import { usePaymentsV2 } from '@/hooks/use-payments-v2';
@@ -20,6 +21,7 @@ export default function NewEventPage() {
     useMutation<CreateEventResponse>(CREATE_EVENT);
   const [updateEventSale] =
     useMutation<UpdateEventSaleResponse>(UPDATE_EVENT_SALE);
+  const [connectOpaPingou] = useMutation(CONNECT_EVENT_OPAPINGOU);
 
   const handleSubmit = async (data: any) => {
     try {
@@ -44,6 +46,28 @@ export default function NewEventPage() {
       });
 
       const eventId = responseData?.createEvent?.id;
+
+      // REA-12: the key typed in the card is connected now, before the lots (a paid lot needs it).
+      let connectError: string | null = null;
+      if (eventId && data.opaPingouApiKey) {
+        try {
+          await connectOpaPingou({ variables: { eventId, apiKey: data.opaPingouApiKey } });
+        } catch (err) {
+          connectError = opaPingouErrorMessage(err);
+        }
+      }
+
+      if (connectError && hasPaidBatch(data.products)) {
+        toast({
+          variant: 'destructive',
+          title: 'Evento criado, sem a conta Opa Pingou',
+          description: `${connectError} Os lotes não foram salvos: abra o evento, conecte a conta e salve de novo.`,
+        });
+        return eventId;
+      }
+      if (connectError) {
+        toast({ variant: 'destructive', title: 'Conta Opa Pingou não conectada', description: connectError });
+      }
 
       // Save products & batches via the separate updateEventSale mutation
       if (eventId && data.products && data.products.length > 0) {
@@ -75,7 +99,9 @@ export default function NewEventPage() {
           toast({
             variant: 'destructive',
             title: 'Erro parcial',
-            description: 'Evento criado, mas houve um erro ao salvar os produtos/lotes.',
+            description: isAccountRequiredError(saleError)
+              ? `Evento criado, mas os lotes não foram salvos. ${ACCOUNT_REQUIRED_MESSAGE}`
+              : 'Evento criado, mas houve um erro ao salvar os produtos/lotes.',
           });
         }
       }

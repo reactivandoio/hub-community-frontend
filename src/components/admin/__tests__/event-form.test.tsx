@@ -116,3 +116,58 @@ describe('EventForm cover upload', () => {
     expect(onSaved).not.toHaveBeenCalled();
   });
 });
+
+describe('EventForm: lote pago exige conta Opa Pingou (REA-12)', () => {
+  const KEY = `opk_live_${'k'.repeat(43)}`;
+  const paidProducts = [
+    { id: 'p1', name: 'Ingresso', enabled: true, batches: [{ batch_number: 1, value: 25, enabled: true }] },
+  ];
+
+  const renderNew = (products: any[], onSubmit = vi.fn().mockResolvedValue('evt-1')) => {
+    render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <EventForm initialData={{ ...initialData, products }} onSubmit={onSubmit} />
+      </MockedProvider>
+    );
+    return onSubmit;
+  };
+
+  const openProductsTab = () =>
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Produtos & Lotes' }), { button: 0, ctrlKey: false });
+
+  it('evento novo com lote pago e sem chave: não salva e explica', async () => {
+    const onSubmit = renderNew(paidProducts);
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Evento/ }));
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Falta a conta Opa Pingou' }))
+    );
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('evento novo com lote pago e chave: salva levando a chave para conectar depois de criar', async () => {
+    const onSubmit = renderNew(paidProducts);
+    openProductsTab();
+    fireEvent.change(await screen.findByLabelText('Chave de API do Opa Pingou'), { target: { value: ` ${KEY} ` } });
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Evento/ }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0].opaPingouApiKey).toBe(KEY);
+  });
+
+  it('evento novo só com lote gratuito: salva sem chave', async () => {
+    const onSubmit = renderNew([{ id: 'p1', name: 'Grátis', enabled: true, batches: [{ batch_number: 1, value: 0, enabled: true }] }]);
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Evento/ }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0].opaPingouApiKey).toBeUndefined();
+  });
+
+  it('chave incompleta: não salva', async () => {
+    const onSubmit = renderNew([]);
+    openProductsTab();
+    fireEvent.change(await screen.findByLabelText('Chave de API do Opa Pingou'), { target: { value: 'opk_live_abc' } });
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Evento/ }));
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Chave do Opa Pingou incompleta' }))
+    );
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+});

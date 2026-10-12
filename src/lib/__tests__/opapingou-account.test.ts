@@ -56,3 +56,22 @@ describe('opaPingouErrorMessage', () => {
     expect(opaPingouErrorMessage(new Error('Failed to fetch'))).toMatch(/Tente de novo/);
   });
 });
+
+import { hasPaidBatch, isAccountRequiredError } from '../opapingou-account';
+
+describe('hasPaidBatch (valores do formulário, em reais)', () => {
+  it('lote ativo com valor em produto ativo', () => {
+    expect(hasPaidBatch([{ batches: [{ value: '50,90' }] }])).toBe(true);
+    expect(hasPaidBatch([{ batches: [{ value: 0 }, { value: '' }] }])).toBe(false);
+    expect(hasPaidBatch([{ batches: [{ value: 25, enabled: false }] }])).toBe(false);
+    expect(hasPaidBatch([{ enabled: false, batches: [{ value: 25 }] }])).toBe(false);
+    expect(hasPaidBatch(undefined)).toBe(false);
+  });
+});
+
+describe('isAccountRequiredError', () => {
+  it('reconhece o código do BFF', () => {
+    expect(isAccountRequiredError({ graphQLErrors: [{ extensions: { code: 'OPAPINGOU_ACCOUNT_REQUIRED' } }] })).toBe(true);
+    expect(isAccountRequiredError(new Error('x'))).toBe(false);
+  });
+});
