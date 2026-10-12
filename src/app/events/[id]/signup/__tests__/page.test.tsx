@@ -5,6 +5,9 @@ import EventSignupPage from '../page';
 
 const signupV2 = vi.fn();
 const signupLegacy = vi.fn();
+const signupGuest = vi.fn();
+let guestSupport: boolean | null = true;
+let paymentStatus: Record<string, unknown> | null = null;
 const previewCoupon = vi.fn();
 const validateCoupon = vi.fn();
 const routerPush = vi.fn();
@@ -44,6 +47,7 @@ vi.mock('@/contexts/auth-context', () => ({
 }));
 vi.mock('@/hooks/use-tracking', () => ({ useTracking: () => ({ track: vi.fn() }) }));
 vi.mock('@/hooks/use-payments-v2', () => ({ usePaymentsV2: () => paymentsV2 }));
+vi.mock('@/hooks/use-guest-signup-support', () => ({ useGuestSignupSupport: () => guestSupport }));
 vi.mock('@/components/signup-ticket-qr', () => ({ SignupTicketQr: () => null }));
 vi.mock('@/components/add-to-calendar-button', () => ({ AddToCalendarButton: () => null }));
 vi.mock('@/components/signup-pix-payment', () => ({
@@ -56,14 +60,18 @@ vi.mock('@apollo/client', async (importOriginal) => {
   const name = (doc: any) => doc?.definitions?.[0]?.name?.value;
   return {
     ...actual,
-    useQuery: (doc: any) =>
-      name(doc) === 'GetEventBySlugOrId'
-        ? { data: { eventBySlugOrId: event }, loading: false }
-        : { data: undefined, loading: false },
+    useQuery: (doc: any) => {
+      if (name(doc) === 'GetEventBySlugOrId') return { data: { eventBySlugOrId: event }, loading: false };
+      if (name(doc) === 'SignupPaymentStatus') return { data: { signupPaymentStatus: paymentStatus }, loading: false };
+      return { data: undefined, loading: false };
+    },
     useLazyQuery: (doc: any) =>
       name(doc) === 'PreviewCoupon' ? [previewCoupon, { loading: false }] : [validateCoupon, { loading: false }],
-    useMutation: (doc: any) =>
-      name(doc) === 'SignupToEventV2' ? [signupV2, { loading: false }] : [signupLegacy, { loading: false }],
+    useMutation: (doc: any) => {
+      if (name(doc) === 'SignupToEventV2') return [signupV2, { loading: false }];
+      if (name(doc) === 'SignupToEventGuest') return [signupGuest, { loading: false }];
+      return [signupLegacy, { loading: false }];
+    },
   };
 });
 
@@ -71,6 +79,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   paymentsV2 = true;
   isAuthenticated = true;
+  guestSupport = true;
+  paymentStatus = null;
   event.products[0].batches[0].half_price_eligible = false;
   window.localStorage.clear();
   window.history.replaceState(null, '', '/events/meetup/signup');
@@ -348,8 +358,9 @@ describe('EventSignupPage (REA-18 cupom pelo link)', () => {
     expect(screen.getByText('-R$ 5,00')).toBeInTheDocument();
   });
 
-  it('takes the coupon through the login: the redirect back carries the fragment', async () => {
+  it('takes the coupon through the login (older BFF): the redirect back carries the fragment', async () => {
     isAuthenticated = false;
+    guestSupport = false;
     openWithCoupon();
     render(<EventSignupPage />);
     await waitFor(() => expect(routerPush).toHaveBeenCalled());
@@ -358,5 +369,119 @@ describe('EventSignupPage (REA-18 cupom pelo link)', () => {
     expect(target.searchParams.get('redirect')).toBe('/events/meetup/signup#cupom=PROMO10');
     // And it is kept in the browser, for a login that comes back without the fragment.
     expect(window.localStorage.getItem('pending_coupon:meetup')).toContain('PROMO10');
+  });
+});
+
+describe('EventSignupPage (REA-22 inscrição sem login)', () => {
+  const fillGuestForm = async ({ cpf = '529.982.247-25' } = {}) => {
+    render(<EventSignupPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Continuar para pagamento' }));
+    fireEvent.change(screen.getByLabelText('Nome completo'), { target: { value: 'Ana Souza' } });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'ana@example.com' } });
+    fireEvent.change(screen.getByLabelText('WhatsApp'), { target: { value: '+55 62 99999-0000' } });
+    fireEvent.change(screen.getByLabelText('CPF'), { target: { value: cpf } });
+    fireEvent.click(screen.getByRole('button', { name: 'Inscrever-se' }));
+  };
+  const guestReturns = (signupToEvent: Record<string, unknown>) =>
+    signupGuest.mockResolvedValue({ data: { signupToEvent: { success: true, ...signupToEvent } } });
+
+  beforeEach(() => {
+    isAuthenticated = false;
+    // A successful guest signup keeps the double-submit lock (lib/signup-lock) for 30 s.
+    window.sessionStorage.clear();
+  });
+
+  it('deslogado com só lote pago: fica na inscrição (não vai para o login) e vê o lote', async () => {
+    render(<EventSignupPage />);
+    expect(await screen.findByText('1º Lote')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continuar para pagamento' })).toBeInTheDocument();
+    expect(routerPush).not.toHaveBeenCalled();
+  });
+
+  it('pessoa nova em lote pago: manda o CPF pela mutation nova e mostra o Pix na hora', async () => {
+    guestReturns({
+      outcome: 'NEW_ACCOUNT',
+      confirmation_sent_to: 'ana@example.com',
+      is_free: false,
+      signup_id: '42',
+      payment: { kind: 'PIX_QR', pix_br_code: 'abc', value: 5000 },
+    });
+    await fillGuestForm();
+    expect(await screen.findByText('Passo Opa Pingou 5000')).toBeInTheDocument();
+    expect(screen.getByTestId('guest-payment-note')).toHaveTextContent('ana@example.com');
+    expect(signupGuest.mock.calls[0][0].variables).toMatchObject({
+      eventId: 'meetup', batch_id: 'b1', cpf: '52998224725', email: 'ana@example.com', kind: 'PIX_QR',
+    });
+    expect(signupV2).not.toHaveBeenCalled();
+  });
+
+  it('pessoa nova ou conta existente em lote gratuito: confirmação, e-mail e aviso do certificado', async () => {
+    event.products[0].batches[0].value = 0;
+    try {
+      guestReturns({ outcome: 'EXISTING_ACCOUNT', confirmation_sent_to: 'ana@example.com', is_free: true, signup_id: '42', payment: null });
+      render(<EventSignupPage />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Confirmar Inscrição' }));
+      fireEvent.change(screen.getByLabelText('Nome completo'), { target: { value: 'Ana Souza' } });
+      fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'ana@example.com' } });
+      fireEvent.change(screen.getByLabelText('WhatsApp'), { target: { value: '+55 62 99999-0000' } });
+      fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '529.982.247-25' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Inscrever-se' }));
+      const notice = await screen.findByTestId('guest-notice');
+      expect(notice).toHaveTextContent('Enviamos a confirmação para ana@example.com');
+      expect(notice).toHaveTextContent('conclua seu cadastro');
+      expect(screen.getByText('Inscrição Confirmada! 🎉')).toBeInTheDocument();
+    } finally {
+      event.products[0].batches[0].value = 5000;
+    }
+  });
+
+  it('CPF de outra conta: só a máscara, sem Pix e sem ingresso', async () => {
+    guestReturns({
+      outcome: 'CPF_OWNER',
+      confirmation_sent_to: 'glad****@***ail.com',
+      message: 'Este CPF já tem cadastro. A inscrição foi feita nessa conta e o Pix para pagamento foi enviado para glad****@***ail.com.',
+      is_free: false,
+      signup_id: null,
+      payment: null,
+    });
+    await fillGuestForm();
+    expect(await screen.findByText('Inscrição feita na conta deste CPF')).toBeInTheDocument();
+    expect(screen.getByTestId('guest-notice')).toHaveTextContent('glad****@***ail.com');
+    expect(screen.queryByText(/Passo Opa Pingou/)).not.toBeInTheDocument();
+  });
+
+  it('CPF já inscrito: avisa que reenviou a confirmação', async () => {
+    guestReturns({
+      outcome: 'ALREADY_SIGNED_UP',
+      confirmation_sent_to: 'glad****@***ail.com',
+      message: 'Este CPF já tem inscrição neste evento. Enviamos de novo a confirmação para glad****@***ail.com.',
+      is_free: false,
+      payment: null,
+    });
+    await fillGuestForm();
+    expect(await screen.findByText('Este CPF já está inscrito')).toBeInTheDocument();
+    expect(screen.getByTestId('guest-notice')).toHaveTextContent('Enviamos de novo a confirmação para glad****@***ail.com');
+  });
+
+  it('erro do servidor (limite de tentativas) aparece e a pessoa pode tentar de novo', async () => {
+    signupGuest.mockResolvedValue({ data: { signupToEvent: { success: false, message: 'Muitas tentativas. Aguarde alguns minutos e tente de novo.' } } });
+    await fillGuestForm();
+    expect(await screen.findByText('Muitas tentativas. Aguarde alguns minutos e tente de novo.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Inscrever-se' })).toBeInTheDocument();
+  });
+
+  it('link do e-mail (?pagamento=): mostra o Pix daquela inscrição', async () => {
+    window.history.replaceState(null, '', '/events/meetup/signup?pagamento=42');
+    paymentStatus = { signup_id: '42', status: 'PEDING_PAYMENT', kind: 'PIX_QR', pix_br_code: 'abc', value: 5000 };
+    render(<EventSignupPage />);
+    expect(await screen.findByText('Passo Opa Pingou 5000')).toBeInTheDocument();
+    expect(screen.queryByText('Selecione seu ingresso')).not.toBeInTheDocument();
+  });
+
+  it('link do e-mail de um pagamento que não existe mais: oferece fazer a inscrição de novo', async () => {
+    window.history.replaceState(null, '', '/events/meetup/signup?pagamento=42');
+    paymentStatus = null;
+    render(<EventSignupPage />);
+    expect(await screen.findByText('Pagamento não encontrado')).toBeInTheDocument();
   });
 });
