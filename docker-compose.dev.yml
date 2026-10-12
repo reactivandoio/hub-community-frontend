@@ -1,0 +1,43 @@
+# Ambiente de desenvolvimento do frontend (REA-21). Use pelo Makefile: make dev, make test,
+# make build. O BFF usado vem do .env.dev (BFF_URL); veja .env.dev.example.
+name: hub-frontend-dev
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        NODE_VERSION: ${FRONTEND_NODE_VERSION:?use o Makefile (make dev), que lê o .nvmrc}
+    image: hub-frontend-dev
+    user: '${DEV_UID:-1000}:${DEV_GID:-1000}'
+    command: sh -c "pnpm install --frozen-lockfile && pnpm exec next dev --port 4010 --hostname 0.0.0.0"
+    env_file: .env.dev
+    environment:
+      # O navegador chama o BFF pela sua máquina; o servidor do Next (rotas /api) chama de
+      # dentro do container. Local: BFF do make dev do hub-community-bff, na porta 4001.
+      NEXT_PUBLIC_GRAPHQL_URL: ${BFF_URL:-http://localhost:4001/graphql}
+      GRAPHQL_URL: ${BFF_SERVER_URL:-http://host.docker.internal:4001/graphql}
+    ports:
+      - '${FRONTEND_PORT:-4010}:4010'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    volumes:
+      - .:/opt/app
+      # O .env real da máquina nunca entra no container: lá dentro o .env é o .env.dev.
+      - ./.env.dev:/opt/app/.env:ro
+      # Diretório git no mesmo caminho do host: num git worktree o .git é um arquivo que aponta
+      # para lá, e sem isso todo git dentro do container falha.
+      - ${FRONTEND_GIT_DIR:-./.git}:${FRONTEND_GIT_DIR:-/opt/app/.git}:ro
+      - frontend-node-modules:/opt/app/node_modules
+      - frontend-next:/opt/app/.next
+      - frontend-pnpm-store:/cache/pnpm
+
+# Nomes fixos: make dev aqui e make hub no frontend usam os mesmos volumes (banco, node_modules).
+volumes:
+  frontend-node-modules:
+    name: hub-frontend-dev-frontend-node-modules
+  frontend-next:
+    name: hub-frontend-dev-frontend-next
+  frontend-pnpm-store:
+    name: hub-frontend-dev-frontend-pnpm-store

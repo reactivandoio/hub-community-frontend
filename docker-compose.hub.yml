@@ -1,132 +1,15 @@
-services:
-  hub-db:
-    image: mysql:8.0
-    command: --default-authentication-plugin=mysql_native_password
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: ${HUB_DB_PASSWORD:-hubdev}
-      MYSQL_DATABASE: ${HUB_DB_NAME:-hub-community-db}
-    ports:
-      - '3306:3306'
-    volumes:
-      - hub-db-data:/var/lib/mysql
-      - ./docker/mysql-init:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-p${HUB_DB_PASSWORD:-hubdev}']
-      interval: 5s
-      timeout: 5s
-      retries: 20
+# Stack inteira do Hub Community em Docker (REA-21): MySQL + Strapi do Hub, MySQL + Eventando,
+# BFF e frontend, cada um com o compose de desenvolvimento do próprio repositório. Os quatro
+# repositórios ficam lado a lado (../hub-community-backend etc.). Use pelo Makefile: make hub.
+# Cada serviço lê o .env.dev do próprio repositório; eles se falam pelas portas da sua máquina.
+name: hub-community-dev
 
-  hub-backend:
-    build:
-      context: ../hub-community-backend
-      dockerfile: Dockerfile.dev
-    restart: always
-    env_file:
-      - path: ../hub-community-backend/.env
-        required: false
-    environment:
-      NODE_ENV: development
-      HOST: 0.0.0.0
-      PORT: 1340
-      DATABASE_CLIENT: mysql
-      DATABASE_HOST: hub-db
-      DATABASE_PORT: 3306
-      DATABASE_NAME: ${HUB_DB_NAME:-hub-community-db}
-      DATABASE_USERNAME: root
-      DATABASE_PASSWORD: ${HUB_DB_PASSWORD:-hubdev}
-      DATABASE_SSL: 'false'
-      FRONTEND_URL: http://localhost:4010
-    ports:
-      - '1340:1340'
-    volumes:
-      - ../hub-community-backend:/opt/app
-      - /opt/app/node_modules
-    depends_on:
-      hub-db:
-        condition: service_healthy
-
-  eventando-backend:
-    build:
-      context: ../eventando-manager
-      dockerfile: Dockerfile.dev
-    restart: always
-    env_file:
-      - path: ../eventando-manager/.env
-        required: false
-    environment:
-      NODE_ENV: development
-      HOST: 0.0.0.0
-      PORT: 1341
-      DATABASE_CLIENT: mysql2
-      DATABASE_HOST: hub-db
-      DATABASE_PORT: 3306
-      DATABASE_NAME: ${EVENTANDO_DB_NAME:-event-launch}
-      DATABASE_USERNAME: root
-      DATABASE_PASSWORD: ${HUB_DB_PASSWORD:-hubdev}
-      DATABASE_SSL: 'false'
-    ports:
-      - '1341:1341'
-    volumes:
-      - ../eventando-manager:/opt/app
-      - /opt/app/node_modules
-    depends_on:
-      hub-db:
-        condition: service_healthy
-
-  hub-bff:
-    build:
-      context: ../hub-community-bff
-      dockerfile: Dockerfile.dev
-    restart: always
-    env_file:
-      - path: ../hub-community-bff/.env
-        required: false
-      # Docker-only overrides (local Strapi token, Eventando URL/token). Gitignored.
-      - path: ../hub-community-bff/.env.docker
-        required: false
-    environment:
-      NODE_ENV: development
-      PORT: 4001
-      MANAGER_URL: http://hub-backend:1340
-      EVENTANDO_MANAGER_URL: http://eventando-backend:1341
-      FRONTEND_URL: http://localhost:4010
-      CHOKIDAR_USEPOLLING: 'true'
-    ports:
-      - '4001:4001'
-    volumes:
-      - ../hub-community-bff:/opt/app
-      - /opt/app/node_modules
-    depends_on:
-      - hub-backend
-      - eventando-backend
-
-  hub-frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    restart: always
-    env_file:
-      - path: ./.env
-        required: false
-    environment:
-      NODE_ENV: development
-      # Set FRONTEND_BFF_URL (e.g. https://bff.hubcommunity.io/graphql) to point
-      # the local frontend at another BFF; defaults to the local hub-bff.
-      NEXT_PUBLIC_GRAPHQL_URL: ${FRONTEND_BFF_URL:-http://localhost:4001/graphql}
-      # server-side (route handlers) reach the local BFF over the compose network
-      GRAPHQL_URL: ${FRONTEND_BFF_URL:-http://hub-bff:4001/graphql}
-      NEXT_PUBLIC_SITE_URL: http://localhost:4010
-      MANAGER_URL: http://hub-backend:1340
-      WATCHPACK_POLLING: 'true'
-    ports:
-      - '4010:4010'
-    volumes:
-      - .:/opt/app
-      - /opt/app/node_modules
-      - /opt/app/.next
-    depends_on:
-      - hub-bff
-
-volumes:
-  hub-db-data:
+include:
+  - path: ../hub-community-backend/docker-compose.dev.yml
+    env_file: ../hub-community-backend/.env.dev
+  - path: ../eventando-manager/docker-compose.dev.yml
+    env_file: ../eventando-manager/.env.dev
+  - path: ../hub-community-bff/docker-compose.dev.yml
+    env_file: ../hub-community-bff/.env.dev
+  - path: docker-compose.dev.yml
+    env_file: .env.dev

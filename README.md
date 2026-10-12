@@ -2,6 +2,32 @@
 
 A modern Next.js application for discovering and connecting with tech communities and events. Built with TypeScript, GraphQL, and a component-based architecture.
 
+## Desenvolvimento em Docker
+
+Só precisa do Docker (macOS ou Linux). A versão do Node fica no `.nvmrc`, a mesma do CI e da produção.
+
+```bash
+make dev     # sobe o frontend em http://localhost:4010, com recarga de código
+make test    # testes, como no CI
+make build   # build, como no CI
+make lint    # lint, como no CI (lá ele não bloqueia)
+make shell   # terminal dentro do container
+make down    # para; make reset também apaga os volumes (node_modules e .next)
+```
+
+Na primeira vez, o `make` cria o `.env.dev` a partir do `.env.dev.example` (o `.env.dev` fica fora
+do git). Dentro do container o `.env` é o `.env.dev`: o `.env` da máquina nunca é lido.
+
+O BFF usado vem do `.env.dev` (`BFF_URL`): por padrão o BFF local (`make dev` no
+hub-community-bff, porta 4001). Para usar o BFF de produção com a sua conta de verdade:
+`make dev BFF=prod` (ou `make dev-front-prod`, em segundo plano).
+
+Stack inteira (MySQL, Strapi do Hub, Eventando, BFF e frontend), com os quatro repositórios lado a
+lado na mesma pasta: `make hub`. Só a API (sem o frontend), em segundo plano: `make dev-api`;
+para tudo com `make dev-down`. Cada serviço usa o `.env.dev` do próprio repositório.
+
+O deploy de produção não usa nada disso: continua com `make update` (pm2) no servidor.
+
 ## 🚀 Quick Start
 
 ### Prerequisites

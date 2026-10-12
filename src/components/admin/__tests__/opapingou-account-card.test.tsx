@@ -58,10 +58,10 @@ describe('OpaPingouAccountCard', () => {
     expect(screen.getByRole('link', { name: 'Crie a sua no Opa Pingou' })).toHaveAttribute('href', 'https://opapingou.com.br/cadastro');
   });
 
-  it('evento ainda não salvo: pede para salvar, sem consultar', () => {
+  it('evento ainda não salvo: campo da chave sem consultar o BFF', () => {
     renderCard([], null);
-    expect(screen.getByText(/Salve o evento para conectar/)).toBeInTheDocument();
-    expect(screen.queryByLabelText('Chave de API do Opa Pingou')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Chave de API do Opa Pingou')).toHaveAttribute('type', 'password');
+    expect(screen.queryByRole('button', { name: 'Conectar' })).not.toBeInTheDocument();
   });
 
   it('sem conta: avisa que o pago não aceita inscrição e mostra o campo da chave', async () => {
@@ -160,5 +160,39 @@ describe('OpaPingouAccountCard', () => {
     expect(await screen.findByText('Remover a conta Opa Pingou deste evento?')).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('button', { name: 'Remover' }).at(-1)!);
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('pagamentos em aberto'));
+  });
+});
+
+describe('OpaPingouAccountCard: evento novo e estado da conta (REA-12)', () => {
+  it('evento novo: campo da chave sem consultar o BFF, avisando que só o pago exige', () => {
+    const onPendingKeyChange = vi.fn();
+    render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <OpaPingouAccountCard pendingKey="" onPendingKeyChange={onPendingKeyChange} />
+      </MockedProvider>,
+    );
+    expect(screen.getByText(/Obrigatória só se o evento tiver lote pago/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Chave de API do Opa Pingou'), { target: { value: 'opk_live_x' } });
+    expect(onPendingKeyChange).toHaveBeenCalledWith('opk_live_x');
+  });
+
+  it('informa se o evento salvo pode cobrar (conta ou legado)', async () => {
+    const onAccountChange = vi.fn();
+    render(
+      <MockedProvider mocks={[load(account({ legacy: true }))]} addTypename={false}>
+        <OpaPingouAccountCard eventId="ev1" onAccountChange={onAccountChange} />
+      </MockedProvider>,
+    );
+    await waitFor(() => expect(onAccountChange).toHaveBeenCalledWith(true));
+  });
+
+  it('sem conta nem legado: false', async () => {
+    const onAccountChange = vi.fn();
+    render(
+      <MockedProvider mocks={[load(account())]} addTypename={false}>
+        <OpaPingouAccountCard eventId="ev1" onAccountChange={onAccountChange} />
+      </MockedProvider>,
+    );
+    await waitFor(() => expect(onAccountChange).toHaveBeenCalledWith(false));
   });
 });
