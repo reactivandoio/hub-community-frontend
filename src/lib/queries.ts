@@ -800,6 +800,25 @@ export const GET_SPEAKERS = gql`
   }
 `;
 
+// Lean list for the speaker picker: paged through by fetchAllSpeakers.
+export const GET_SPEAKER_OPTIONS = gql`
+  query GetSpeakerOptions($sort: [SpeakerSort], $pagination: PaginationInput) {
+    speakers(sort: $sort, pagination: $pagination) {
+      data {
+        id
+        name
+        avatar
+      }
+      meta {
+        total
+        page
+        pageSize
+        pageCount
+      }
+    }
+  }
+`;
+
 export const CREATE_TALK = gql`
   mutation CreateTalk($data: TalkInput!) {
     createTalk(data: $data) {

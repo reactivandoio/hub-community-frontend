@@ -1,9 +1,9 @@
 'use client';
 
-import { useMutation, useQuery } from '@apollo/client';
+import { useApolloClient, useMutation } from '@apollo/client';
 import { Loader2, Mic, Plus, Search, Star, Trash2, X } from 'lucide-react';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { FadeIn } from '@/components/animations';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,8 @@ import {
   DELETE_SPEAKER,
   GET_SPEAKERS,
 } from '@/lib/queries';
-import type { SpeakersResponse } from '@/lib/types';
+import { fetchAllSpeakers, matchesSpeakerName } from '@/lib/speaker-options';
+import type { Speaker } from '@/lib/types';
 
 export default function SpeakersAdminPage() {
   const { toast } = useToast();
@@ -39,14 +40,27 @@ export default function SpeakersAdminPage() {
   const [newSpeakerName, setNewSpeakerName] = useState('');
   const [creating, setCreating] = useState(false);
 
-  const { data, loading, error, refetch } = useQuery<SpeakersResponse>(
-    GET_SPEAKERS,
-    {
-      variables: {
-        sort: [{ name: 'ASC' }],
-      },
+  // Every page of the list: the BFF returns 25 per page by default.
+  const client = useApolloClient();
+  const [speakers, setSpeakers] = useState<Speaker[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  const refetch = useCallback(async () => {
+    try {
+      setSpeakers(await fetchAllSpeakers(client, GET_SPEAKERS));
+      setError(null);
+    } catch (err) {
+      console.error('Error loading speakers:', err);
+      setError(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      setLoading(false);
     }
-  );
+  }, [client]);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
 
   const [deleteSpeaker] = useMutation(DELETE_SPEAKER);
   const [createSpeaker] = useMutation(CREATE_SPEAKER);
@@ -99,13 +113,9 @@ export default function SpeakersAdminPage() {
     }
   };
 
-  const speakers = data?.speakers?.data || [];
-
   // Filter speakers by search
   const filtered = search.trim()
-    ? speakers.filter((s) =>
-        s.name.toLowerCase().includes(search.toLowerCase())
-      )
+    ? speakers.filter((s) => matchesSpeakerName(s.name, search))
     : speakers;
 
   if (loading) {

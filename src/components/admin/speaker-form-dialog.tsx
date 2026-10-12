@@ -21,7 +21,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { useToast } from '@/hooks/use-toast';
-import { CREATE_SPEAKER, GET_SPEAKERS } from '@/lib/queries';
+import { CREATE_SPEAKER } from '@/lib/queries';
 import {
   speakerSchema,
   type SpeakerFormValues,
@@ -44,7 +44,12 @@ export function SpeakerFormDialog({ onSave, trigger }: SpeakerFormDialogProps) {
   const [createSpeaker, { loading }] = useMutation<CreateSpeakerResponse>(
     CREATE_SPEAKER,
     {
-      refetchQueries: [{ query: GET_SPEAKERS }],
+      // Drop every cached speaker list, whatever its variables: mounted lists
+      // fetch again, the others on their next use.
+      update: cache => {
+        cache.evict({ fieldName: 'speakers' });
+        cache.gc();
+      },
     }
   );
 
