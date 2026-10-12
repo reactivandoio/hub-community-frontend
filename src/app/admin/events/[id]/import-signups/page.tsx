@@ -349,7 +349,7 @@ export default function ImportSignupsPage() {
 
   if (eventLoading) {
     return (
-      <div className="container mx-auto py-20 flex flex-col items-center justify-center gap-4 min-h-[60vh]">
+      <div className="w-full py-20 flex flex-col items-center justify-center gap-4 min-h-[60vh]">
         <Loader2 className="w-10 h-10 animate-spin text-primary" />
         <p className="text-sm text-muted-foreground">Carregando evento...</p>
       </div>
@@ -358,7 +358,7 @@ export default function ImportSignupsPage() {
 
   return (
     <FadeIn direction="up" duration={0.3}>
-      <div className="container mx-auto py-8 px-4 max-w-5xl space-y-6">
+      <div className="w-full py-8 px-4 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Button

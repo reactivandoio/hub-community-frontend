@@ -120,7 +120,7 @@ export default function SpeakersAdminPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-20 flex items-center justify-center">
+      <div className="w-full py-20 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
@@ -128,7 +128,7 @@ export default function SpeakersAdminPage() {
 
   if (error) {
     return (
-      <div className="container mx-auto py-10 text-center text-red-500">
+      <div className="w-full py-10 text-center text-red-500">
         <p>Erro ao carregar palestrantes: {error.message}</p>
       </div>
     );
@@ -136,7 +136,7 @@ export default function SpeakersAdminPage() {
 
   return (
     <FadeIn direction="up" duration={0.3}>
-      <div className="container mx-auto py-10 px-4">
+      <div className="w-full py-10 px-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">

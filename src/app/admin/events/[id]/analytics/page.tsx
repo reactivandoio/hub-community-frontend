@@ -321,7 +321,7 @@ export default function EventAnalyticsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-20 flex flex-col items-center justify-center gap-4 min-h-[60vh]">
+      <div className="w-full py-20 flex flex-col items-center justify-center gap-4 min-h-[60vh]">
         <div className="relative">
           <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl animate-pulse" />
           <Loader2 className="w-10 h-10 animate-spin text-primary relative" />
@@ -335,7 +335,7 @@ export default function EventAnalyticsPage() {
 
   if (error) {
     return (
-      <div className="container mx-auto py-20 text-center space-y-4">
+      <div className="w-full py-20 text-center space-y-4">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-destructive/10 mb-4">
           <BarChart3 className="w-8 h-8 text-destructive" />
         </div>
@@ -355,7 +355,7 @@ export default function EventAnalyticsPage() {
 
   if (!analytics) {
     return (
-      <div className="container mx-auto py-20 text-center space-y-4">
+      <div className="w-full py-20 text-center space-y-4">
         <p className="text-muted-foreground">Evento não encontrado.</p>
         <Button variant="outline" onClick={() => router.back()}>
           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -389,7 +389,7 @@ export default function EventAnalyticsPage() {
 
   return (
     <FadeIn direction="up" duration={0.3}>
-      <div className="container mx-auto py-8 px-4 max-w-7xl space-y-8">
+      <div className="w-full py-8 px-4 space-y-8">
         {/* ─── Header ──────────────────────────────────────────── */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">

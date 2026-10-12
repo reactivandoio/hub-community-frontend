@@ -601,6 +601,8 @@ export function EventForm({
               />
             </div>
 
+            {/* Side by side on a wide screen, where the form takes the whole width. */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
             {/* Online Event Section */}
             <div className="space-y-4 rounded-lg border p-4">
               <div className="flex items-center justify-between">
@@ -685,9 +687,10 @@ export function EventForm({
                 />
               </div>
             </div>
+            </div>
 
-            {/* Cover Image Upload Section */}
-            <div className="space-y-4 rounded-lg border p-4">
+            {/* Cover Image Upload Section (capped: a cover from edge to edge would be huge) */}
+            <div className="space-y-4 rounded-lg border p-4 max-w-3xl">
               <Label className="text-base font-semibold flex items-center gap-2">
                 <ImagePlus className="h-4 w-4" />
                 Imagem de Capa
@@ -761,6 +764,7 @@ export function EventForm({
               )}
             </div>
 
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
             {/* Location Section */}
             <div className="space-y-4 rounded-lg border p-4">
               <div className="flex items-center justify-between">
@@ -850,6 +854,7 @@ export function EventForm({
                     ) : null;
                   })()}
               </div>
+            </div>
             </div>
 
             <FormField

@@ -110,7 +110,7 @@ export default function EventsAdminPage() {
 
   if (error) {
     return (
-      <div className="container mx-auto py-10 text-center text-red-500">
+      <div className="w-full py-10 text-center text-red-500">
         <p>Erro ao carregar eventos: {error.message}</p>
       </div>
     );
@@ -121,7 +121,7 @@ export default function EventsAdminPage() {
 
   return (
     <FadeIn direction="up" duration={0.3}>
-    <div className="container mx-auto py-10 px-4">
+    <div className="w-full py-10 px-4">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">

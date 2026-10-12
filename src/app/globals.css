@@ -34,6 +34,9 @@
 
     --radius: 0.5rem;
 
+    /* Admin: height shared by the top bar and the sidebar header (admin-shell.tsx) */
+    --admin-header-height: 3.5rem;
+
     /* Admin sidebar (components/ui/sidebar) */
     --sidebar-background: 210 40% 98%;
     --sidebar-foreground: 217 33% 17%;

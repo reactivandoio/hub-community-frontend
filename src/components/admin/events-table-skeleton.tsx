@@ -2,7 +2,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export function EventsTableSkeleton() {
   return (
-    <div className="container mx-auto py-10 px-4">
+    <div className="w-full py-10 px-4">
       <div className="flex justify-between items-center mb-8">
         <div>
           <Skeleton className="h-8 w-56 mb-2" />

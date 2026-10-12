@@ -65,7 +65,22 @@ describe('AdminShell: general sidebar', () => {
   it('shows the page beside the sidebar, under the top bar', () => {
     renderShell();
     expect(screen.getByText('conteúdo da página')).toBeInTheDocument();
-    expect(screen.getByRole('banner')).toHaveClass('sticky', 'top-0', 'h-14');
+    expect(screen.getByRole('banner')).toHaveClass('sticky', 'top-0');
+  });
+
+  it.each([
+    ['the general sidebar', '/admin/events'],
+    ['the event sidebar', '/admin/events/e1'],
+  ])('gives the header of %s the height and bottom line of the top bar', (_name, path) => {
+    pathname = path;
+    renderShell();
+    const row = ['h-[--admin-header-height]', 'border-b', 'border-border'];
+    expect(screen.getByRole('banner')).toHaveClass(...row);
+    expect(screen.getByTestId('sidebar-header')).toHaveClass(...row);
+    // The line goes from edge to edge: it is the header's own border, not an inset separator.
+    expect(document.querySelector('[data-sidebar="separator"]')).toBeNull();
+    // Only one row in the header; the event name comes below the line.
+    expect(within(screen.getByTestId('sidebar-header')).getAllByRole('link')).toHaveLength(1);
   });
 
   it('lists every module to an admin and marks the current one', () => {

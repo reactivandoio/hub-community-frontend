@@ -74,7 +74,7 @@ export default function VotingSessionsAdminPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-10 px-4">
+      <div className="w-full py-10 px-4">
         <div className="animate-pulse space-y-4">
           <div className="h-8 bg-muted rounded w-1/4"></div>
           <div className="h-64 bg-muted border rounded"></div>
@@ -85,7 +85,7 @@ export default function VotingSessionsAdminPage() {
 
   if (error) {
     return (
-      <div className="container mx-auto py-10 text-center text-red-500">
+      <div className="w-full py-10 text-center text-red-500">
         <p>Erro: {error}</p>
       </div>
     );
@@ -93,7 +93,7 @@ export default function VotingSessionsAdminPage() {
 
   return (
     <FadeIn direction="up" duration={0.3}>
-      <div className="container mx-auto py-10 px-4">
+      <div className="w-full py-10 px-4">
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Sessões de Votação</h1>

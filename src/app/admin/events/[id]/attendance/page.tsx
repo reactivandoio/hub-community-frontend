@@ -213,7 +213,7 @@ export default function AttendanceAdminPage() {
 
   if (eventLoading || (loading && !error)) {
     return (
-      <div className="container mx-auto py-10 px-4 flex items-center justify-center min-h-[50vh]">
+      <div className="w-full py-10 px-4 flex items-center justify-center min-h-[50vh]">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
@@ -224,7 +224,7 @@ export default function AttendanceAdminPage() {
 
   return (
     <FadeIn direction="up" duration={0.3}>
-      <div className="container mx-auto py-10 px-4 max-w-6xl">
+      <div className="w-full py-10 px-4">
         <div className="flex items-center space-x-4 mb-8">
           <Button variant="ghost" onClick={() => router.back()}>
             <ArrowLeft className="w-5 h-5 mr-2" />

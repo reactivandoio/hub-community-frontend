@@ -65,7 +65,6 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarRail,
-  SidebarSeparator,
   useSidebar,
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/contexts/auth-context';
@@ -102,6 +101,12 @@ const ICONS: Record<AdminNavIcon, LucideIcon> = {
   raffle: Dices,
   public: Globe,
 };
+
+/**
+ * The sidebar header and the top bar are one row: same height (`--admin-header-height`, in
+ * globals.css) and the same bottom border, so the two lines meet as a single one.
+ */
+export const HEADER_ROW = 'h-[--admin-header-height] shrink-0 border-b border-border';
 
 /** Remembered between pages and visits (desktop only; the phone drawer always starts closed). */
 export const SIDEBAR_STORAGE_KEY = 'admin_sidebar_open';
@@ -164,25 +169,17 @@ function AdminSidebar({
           <SheetDescription className="sr-only">Navegação do painel de administração.</SheetDescription>
         </>
       )}
-      <SidebarHeader>
+      <SidebarHeader data-testid="sidebar-header" className={cn(HEADER_ROW, 'justify-center py-0')}>
         <SidebarMenu>
           {eventId ? (
-            <>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Voltar para o admin">
-                  <GuardedLink href="/admin/events">
-                    <ArrowLeft aria-hidden="true" />
-                    <span>Voltar para o admin</span>
-                  </GuardedLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <li className="px-2 pt-1 group-data-[collapsible=icon]:hidden">
-                <p className="text-xs text-sidebar-foreground/70">Evento</p>
-                <p className="text-sm font-semibold leading-snug break-words" data-testid="sidebar-event-title">
-                  {event?.title || 'Carregando…'}
-                </p>
-              </li>
-            </>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Voltar para o admin">
+                <GuardedLink href="/admin/events">
+                  <ArrowLeft aria-hidden="true" />
+                  <span>Voltar para o admin</span>
+                </GuardedLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           ) : (
             <SidebarMenuItem>
               <SidebarMenuButton asChild size="lg" tooltip="Painel Admin">
@@ -202,7 +199,15 @@ function AdminSidebar({
           )}
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarSeparator />
+      {/* Below the header line, so the header keeps the height of the top bar. */}
+      {eventId && (
+        <div className="px-4 pt-3 group-data-[collapsible=icon]:hidden">
+          <p className="text-xs text-sidebar-foreground/70">Evento</p>
+          <p className="text-sm font-semibold leading-snug break-words" data-testid="sidebar-event-title">
+            {event?.title || 'Carregando…'}
+          </p>
+        </div>
+      )}
       <SidebarContent role="navigation" aria-label={eventId ? 'Menu do evento' : 'Menu do admin'}>
         {eventId ? (
           eventNavGroups({ id: eventId, slug: event?.slug, isAdmin: access.isAdmin, paymentsV2 }).map((group) => (
@@ -365,14 +370,21 @@ export function AdminShell({ children }: { children: ReactNode }) {
       <SidebarProvider open={open} onOpenChange={handleOpenChange}>
         <AdminSidebar pathname={pathname} eventId={eventId} event={event} />
         <SidebarInset className="min-w-0">
-          <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-4">
+          <header
+            className={cn(
+              HEADER_ROW,
+              'sticky top-0 z-20 flex items-center gap-2 bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-6 lg:px-8',
+            )}
+          >
             <MenuToggle />
             <span aria-hidden="true" className="h-4 w-px shrink-0 bg-border" />
             <AdminBreadcrumb pathname={pathname} eventTitle={event?.title} />
             <ModeToggle />
             <UserMenu />
           </header>
-          <div className="min-w-0 flex-1">{children}</div>
+          {/* The pages take the whole width beside the sidebar; they bring 16px of side padding
+              and this adds the rest (24px from md, 32px from lg), matching the top bar. */}
+          <div className="min-w-0 flex-1 md:px-2 lg:px-4">{children}</div>
         </SidebarInset>
       </SidebarProvider>
     </UnsavedGuardProvider>

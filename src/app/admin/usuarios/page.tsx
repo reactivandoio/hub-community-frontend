@@ -224,7 +224,7 @@ export default function UsersAdminPage() {
 
   return (
     <FadeIn direction="up" duration={0.3}>
-      <div className="container mx-auto px-4 pt-10 pb-12 space-y-10">
+      <div className="w-full px-4 pt-10 pb-12 space-y-10">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
             <Users className="h-7 w-7 text-primary" /> Usuários e Roles

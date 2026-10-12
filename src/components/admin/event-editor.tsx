@@ -206,7 +206,7 @@ export function EventEditor() {
 
   if (queryLoading) {
     return (
-      <div className="container mx-auto py-10 px-4 max-w-3xl">
+      <div className="w-full py-10 px-4">
         <div className="mb-8">
           <div className="h-8 w-48 bg-muted animate-pulse rounded mb-2" />
           <div className="h-4 w-72 bg-muted animate-pulse rounded" />
@@ -225,7 +225,7 @@ export function EventEditor() {
 
   if (error) {
     return (
-      <div className="container mx-auto py-10 text-center text-red-500">
+      <div className="w-full py-10 text-center text-red-500">
         <p>Erro ao carregar evento: {error.message}</p>
         <Button
           variant="outline"
@@ -240,7 +240,7 @@ export function EventEditor() {
 
   return (
     <FadeIn direction="up" duration={0.3}>
-    <div className="container mx-auto py-10 px-4 max-w-3xl">
+    <div className="w-full py-10 px-4">
       {/* Analytics, certificados, inscrições and the tools are items of the event's sidebar. */}
       <div className="mb-8">
         <p className="text-sm text-muted-foreground">Editar evento</p>

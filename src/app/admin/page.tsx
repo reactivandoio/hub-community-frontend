@@ -72,8 +72,8 @@ export default function AdminPage() {
   return (
     <div className="bg-background">
       {/* Header */}
-      <div className="border-b border-border/40 bg-card/30">
-        <div className="container mx-auto px-4 py-8">
+      <div>
+        <div className="w-full px-4 py-8">
           <FadeIn direction="up" duration={0.3}>
             <div className="max-w-3xl">
               <div className="flex items-center gap-3 mb-2">
@@ -99,14 +99,14 @@ export default function AdminPage() {
       </div>
 
       {/* Content */}
-      <div className="container mx-auto px-4 py-8">
+      <div className="w-full px-4 py-8">
         <FadeIn direction="up" duration={0.3} delay={0.05}>
           <h2 className="text-lg font-semibold text-foreground mb-6">
             Módulos
           </h2>
         </FadeIn>
 
-        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-5">
           {routes.map((route) => {
             const Icon = route.icon;
             return (
