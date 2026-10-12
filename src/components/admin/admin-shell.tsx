@@ -1,0 +1,380 @@
+'use client';
+
+import { useQuery } from '@apollo/client';
+import {
+  ArrowLeft,
+  Award,
+  BarChart3,
+  Building2,
+  Calendar,
+  ClipboardCheck,
+  Dices,
+  ExternalLink,
+  FileSpreadsheet,
+  Globe,
+  LayoutDashboard,
+  ListOrdered,
+  LogOut,
+  Mic,
+  PanelLeft,
+  Printer,
+  QrCode,
+  Settings2,
+  Shield,
+  Tag,
+  Ticket,
+  User,
+  Users,
+  Vote,
+  type LucideIcon,
+} from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
+
+import { useAdminAccess } from '@/components/admin/admin-guard';
+import { GuardedLink, UnsavedGuardProvider } from '@/components/admin/unsaved-guard';
+import { ModeToggle } from '@/components/mode-toggle';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { SheetDescription, SheetTitle } from '@/components/ui/sheet';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarSeparator,
+  useSidebar,
+} from '@/components/ui/sidebar';
+import { useAuth } from '@/contexts/auth-context';
+import { usePaymentsV2 } from '@/hooks/use-payments-v2';
+import {
+  adminBreadcrumbs,
+  eventIdFromPath,
+  eventNavGroups,
+  isNavItemActive,
+  mainNavItems,
+  type AdminNavIcon,
+  type AdminNavItem,
+} from '@/lib/admin-nav';
+import { GET_EVENT_ADMIN_NAV } from '@/lib/queries';
+import { cn } from '@/lib/utils';
+
+const ICONS: Record<AdminNavIcon, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  events: Calendar,
+  communities: Building2,
+  speakers: Mic,
+  voting: Vote,
+  users: Users,
+  general: Settings2,
+  schedule: ListOrdered,
+  products: Ticket,
+  coupons: Tag,
+  analytics: BarChart3,
+  signups: FileSpreadsheet,
+  attendance: ClipboardCheck,
+  certificates: Award,
+  checkin: QrCode,
+  badge: Printer,
+  raffle: Dices,
+  public: Globe,
+};
+
+/** Remembered between pages and visits (desktop only; the phone drawer always starts closed). */
+export const SIDEBAR_STORAGE_KEY = 'admin_sidebar_open';
+
+const readSavedOpen = () => {
+  try {
+    return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) !== 'false';
+  } catch {
+    return true;
+  }
+};
+
+function NavItem({ item, pathname }: { item: AdminNavItem; pathname: string }) {
+  const Icon = ICONS[item.icon];
+  const active = isNavItemActive(pathname, item);
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
+        {item.external ? (
+          <a href={item.href} target="_blank" rel="noopener noreferrer" aria-label={`${item.label} (abre em nova aba)`}>
+            <Icon aria-hidden="true" />
+            <span>{item.label}</span>
+            <ExternalLink aria-hidden="true" className="ml-auto !size-3 opacity-60 group-data-[collapsible=icon]:hidden" />
+          </a>
+        ) : (
+          <GuardedLink href={item.href} aria-current={active ? 'page' : undefined}>
+            <Icon aria-hidden="true" />
+            <span>{item.label}</span>
+          </GuardedLink>
+        )}
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
+function AdminSidebar({
+  pathname,
+  eventId,
+  event,
+}: {
+  pathname: string;
+  eventId: string | null;
+  event?: { slug?: string | null; title?: string | null } | null;
+}) {
+  const access = useAdminAccess();
+  const paymentsV2 = usePaymentsV2();
+  const { setOpenMobile, isMobile } = useSidebar();
+
+  // The phone drawer closes once a link was followed.
+  useEffect(() => {
+    setOpenMobile(false);
+  }, [pathname, setOpenMobile]);
+
+  return (
+    <Sidebar collapsible="icon">
+      {/* On the phone the sidebar is a dialog (drawer), which needs a name for screen readers. */}
+      {isMobile && (
+        <>
+          <SheetTitle className="sr-only">{eventId ? 'Menu do evento' : 'Menu do admin'}</SheetTitle>
+          <SheetDescription className="sr-only">Navegação do painel de administração.</SheetDescription>
+        </>
+      )}
+      <SidebarHeader>
+        <SidebarMenu>
+          {eventId ? (
+            <>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Voltar para o admin">
+                  <GuardedLink href="/admin/events">
+                    <ArrowLeft aria-hidden="true" />
+                    <span>Voltar para o admin</span>
+                  </GuardedLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <li className="px-2 pt-1 group-data-[collapsible=icon]:hidden">
+                <p className="text-xs text-sidebar-foreground/70">Evento</p>
+                <p className="text-sm font-semibold leading-snug break-words" data-testid="sidebar-event-title">
+                  {event?.title || 'Carregando…'}
+                </p>
+              </li>
+            </>
+          ) : (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild size="lg" tooltip="Painel Admin">
+                <GuardedLink href="/admin">
+                  <span className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Shield aria-hidden="true" className="size-4" />
+                  </span>
+                  <span className="flex flex-col leading-tight">
+                    <span className="font-semibold">Hub Community</span>
+                    <span className="text-xs text-sidebar-foreground/70">
+                      {access.isAdmin ? 'Admin' : 'Community Manager'}
+                    </span>
+                  </span>
+                </GuardedLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+        </SidebarMenu>
+      </SidebarHeader>
+      <SidebarSeparator />
+      <SidebarContent role="navigation" aria-label={eventId ? 'Menu do evento' : 'Menu do admin'}>
+        {eventId ? (
+          eventNavGroups({ id: eventId, slug: event?.slug, isAdmin: access.isAdmin, paymentsV2 }).map((group) => (
+            <SidebarGroup key={group.label}>
+              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {group.items.map((item) => (
+                    <NavItem key={item.href} item={item} pathname={pathname} />
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))
+        ) : (
+          <SidebarGroup>
+            <SidebarGroupLabel>Módulos</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {mainNavItems(access).map((item) => (
+                  <NavItem key={item.href} item={item} pathname={pathname} />
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+      </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Voltar para o site">
+              <GuardedLink href="/">
+                <Globe aria-hidden="true" />
+                <span>Voltar para o site</span>
+              </GuardedLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+      <SidebarRail aria-label="Recolher ou expandir o menu" title="Recolher ou expandir o menu" />
+    </Sidebar>
+  );
+}
+
+function MenuToggle() {
+  const { toggleSidebar, isMobile, open, openMobile } = useSidebar();
+  const expanded = isMobile ? openMobile : open;
+  const label = isMobile ? 'Abrir menu' : expanded ? 'Recolher menu' : 'Expandir menu';
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="h-8 w-8 shrink-0"
+      aria-label={label}
+      aria-expanded={expanded}
+      title={label}
+      onClick={toggleSidebar}
+    >
+      <PanelLeft aria-hidden="true" className="h-4 w-4" />
+    </Button>
+  );
+}
+
+function AdminBreadcrumb({ pathname, eventTitle }: { pathname: string; eventTitle?: string | null }) {
+  const crumbs = adminBreadcrumbs(pathname, { eventTitle });
+  return (
+    <Breadcrumb aria-label="Você está em" className="min-w-0 flex-1">
+      <BreadcrumbList className="flex-nowrap">
+        {crumbs.map((crumb, index) => {
+          const last = index === crumbs.length - 1;
+          // On a phone only the current page and its parent fit.
+          const hideOnPhone = index < crumbs.length - 2 ? 'hidden md:inline-flex' : '';
+          return (
+            <Fragment key={`${crumb.href}-${index}`}>
+              <BreadcrumbItem className={cn('min-w-0', hideOnPhone)}>
+                {last ? (
+                  <BreadcrumbPage className="truncate font-medium">{crumb.label}</BreadcrumbPage>
+                ) : (
+                  <BreadcrumbLink asChild className="truncate">
+                    <GuardedLink href={crumb.href}>{crumb.label}</GuardedLink>
+                  </BreadcrumbLink>
+                )}
+              </BreadcrumbItem>
+              {!last && <BreadcrumbSeparator className={hideOnPhone} />}
+            </Fragment>
+          );
+        })}
+      </BreadcrumbList>
+    </Breadcrumb>
+  );
+}
+
+function UserMenu() {
+  const { user, signOut } = useAuth();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" className="gap-2">
+          <User aria-hidden="true" className="h-4 w-4" />
+          <span className="hidden sm:inline-block max-w-40 truncate">
+            {user?.name || user?.username || 'Conta'}
+          </span>
+          <span className="sr-only sm:hidden">Conta</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem asChild>
+          <GuardedLink href="/profile" className="cursor-pointer">
+            <User className="mr-2 h-4 w-4" />
+            <span>Perfil</span>
+          </GuardedLink>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <GuardedLink href="/" className="cursor-pointer">
+            <Globe className="mr-2 h-4 w-4" />
+            <span>Voltar para o site</span>
+          </GuardedLink>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem className="text-red-500 focus:text-red-500 cursor-pointer" onClick={() => signOut()}>
+          <LogOut className="mr-2 h-4 w-4" />
+          <span>Sair</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/**
+ * The frame of every /admin page (REA-24): a collapsible sidebar (a drawer on the phone), a
+ * fixed-height top bar with the breadcrumb, and the page beside and below them. Inside one event
+ * the sidebar lists that event's sections. Rendered inside AdminGuard.
+ */
+export function AdminShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname() || '/admin';
+  const eventId = eventIdFromPath(pathname);
+
+  const [open, setOpen] = useState(true);
+  useEffect(() => {
+    setOpen(readSavedOpen());
+  }, []);
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    try {
+      window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(next));
+    } catch {
+      // Private mode: the choice lasts for this page only.
+    }
+  };
+
+  const { data } = useQuery<{ eventBySlugOrId: { slug?: string | null; title?: string | null } | null }>(
+    GET_EVENT_ADMIN_NAV,
+    { variables: { slugOrId: eventId }, skip: !eventId },
+  );
+  const event = eventId ? data?.eventBySlugOrId : null;
+
+  return (
+    <UnsavedGuardProvider>
+      <SidebarProvider open={open} onOpenChange={handleOpenChange}>
+        <AdminSidebar pathname={pathname} eventId={eventId} event={event} />
+        <SidebarInset className="min-w-0">
+          <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-4">
+            <MenuToggle />
+            <span aria-hidden="true" className="h-4 w-px shrink-0 bg-border" />
+            <AdminBreadcrumb pathname={pathname} eventTitle={event?.title} />
+            <ModeToggle />
+            <UserMenu />
+          </header>
+          <div className="min-w-0 flex-1">{children}</div>
+        </SidebarInset>
+      </SidebarProvider>
+    </UnsavedGuardProvider>
+  );
+}

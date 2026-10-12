@@ -453,7 +453,7 @@ export default function ImportSignupsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => router.push(`/admin/events/${id}#products`)}
+                        onClick={() => router.push(`/admin/events/${id}/produtos`)}
                         className="gap-1"
                       >
                         <Plus className="w-3.5 h-3.5" />
@@ -707,7 +707,7 @@ export default function ImportSignupsPage() {
                       </p>
                       <Button
                         variant="outline"
-                        onClick={() => router.push(`/admin/events/${id}#products`)}
+                        onClick={() => router.push(`/admin/events/${id}/produtos`)}
                         className="gap-2"
                       >
                         <Plus className="w-4 h-4" />

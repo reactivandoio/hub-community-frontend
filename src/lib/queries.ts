@@ -194,6 +194,18 @@ export const GET_LOCATIONS = gql`
   }
 `;
 
+// Just what the admin sidebar and breadcrumb show of an event (REA-24).
+export const GET_EVENT_ADMIN_NAV = gql`
+  query GetEventAdminNav($slugOrId: String!) {
+    eventBySlugOrId(slugOrId: $slugOrId) {
+      id
+      documentId
+      slug
+      title
+    }
+  }
+`;
+
 export const GET_EVENT_BY_SLUG_OR_ID = gql`
   query GetEventBySlugOrId($slugOrId: String!) {
     eventBySlugOrId(slugOrId: $slugOrId) {

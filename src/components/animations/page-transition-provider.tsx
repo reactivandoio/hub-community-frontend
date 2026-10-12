@@ -3,6 +3,8 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { usePathname } from 'next/navigation';
 
+import { isAdminPath } from '@/components/public-only';
+
 interface PageTransitionProviderProps {
   children: React.ReactNode;
 }
@@ -13,7 +15,9 @@ export function PageTransitionProvider({
   const pathname = usePathname();
   const shouldReduceMotion = useReducedMotion();
 
-  if (shouldReduceMotion) {
+  // The admin keeps its frame mounted between pages (sidebar, and the event form across its
+  // sections); a wrapper keyed by the path would remount all of it on every navigation.
+  if (shouldReduceMotion || isAdminPath(pathname)) {
     return <>{children}</>;
   }
 
