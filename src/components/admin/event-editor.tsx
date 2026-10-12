@@ -3,6 +3,7 @@
 import { EventForm } from '@/components/admin/event-form';
 import { useUnsavedChanges } from '@/components/admin/unsaved-guard';
 import { usePaymentsV2 } from '@/hooks/use-payments-v2';
+import { AdminPage, AdminPageError, AdminPageHeader, AdminPageLoading } from '@/components/admin/admin-page';
 import { FadeIn } from '@/components/animations';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -204,49 +205,24 @@ export function EventEditor() {
     }
   };
 
-  if (queryLoading) {
-    return (
-      <div className="container mx-auto py-10 px-4 max-w-3xl">
-        <div className="mb-8">
-          <div className="h-8 w-48 bg-muted animate-pulse rounded mb-2" />
-          <div className="h-4 w-72 bg-muted animate-pulse rounded" />
-        </div>
-        <div className="border rounded-lg p-6 bg-card space-y-4">
-          {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className="space-y-2">
-              <div className="h-4 w-24 bg-muted animate-pulse rounded" />
-              <div className="h-10 w-full bg-muted animate-pulse rounded" />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  if (queryLoading) return <AdminPageLoading label="Carregando evento" />;
 
   if (error) {
     return (
-      <div className="container mx-auto py-10 text-center text-red-500">
-        <p>Erro ao carregar evento: {error.message}</p>
-        <Button
-          variant="outline"
-          onClick={() => router.push('/admin/events')}
-          className="mt-4"
-        >
-          Voltar para lista
-        </Button>
-      </div>
+      <AdminPageError
+        title="Erro ao carregar evento"
+        message={error.message}
+        action={{ label: 'Voltar para os eventos', onClick: () => router.push('/admin/events') }}
+      />
     );
   }
 
   return (
     <FadeIn direction="up" duration={0.3}>
-    <div className="container mx-auto py-10 px-4 max-w-3xl">
-      {/* Analytics, certificados, inscrições and the tools are items of the event's sidebar. */}
-      <div className="mb-8">
-        <p className="text-sm text-muted-foreground">Editar evento</p>
-        <h1 className="text-3xl font-bold tracking-tight">{SECTION_TITLES[section].title}</h1>
-        <p className="text-muted-foreground mt-2">{SECTION_TITLES[section].text}</p>
-      </div>
+    <AdminPage>
+      {/* Analytics, certificados, inscrições and the tools are items of the event's sidebar;
+          "Salvar Evento" and "Cancelar" are in the top bar (declared by EventForm). */}
+      <AdminPageHeader title={SECTION_TITLES[section].title} description={SECTION_TITLES[section].text} />
 
       <div className="border rounded-lg p-6 bg-card">
         {initialData && (
@@ -260,7 +236,7 @@ export function EventEditor() {
           />
         )}
       </div>
-    </div>
+    </AdminPage>
     </FadeIn>
   );
 }

@@ -24,6 +24,7 @@ import * as XLSX from 'xlsx';
 import { detectColumn, tableFromMatrix, toSignupImportInput } from '@/lib/import-sheet';
 
 import { CpfMappingUpload } from '@/components/admin/cpf-mapping-upload';
+import { AdminPage, AdminPageHeader, AdminPageLoading } from '@/components/admin/admin-page';
 import { FadeIn } from '@/components/animations';
 import { Button } from '@/components/ui/button';
 import {
@@ -348,37 +349,26 @@ export default function ImportSignupsPage() {
   };
 
   if (eventLoading) {
-    return (
-      <div className="container mx-auto py-20 flex flex-col items-center justify-center gap-4 min-h-[60vh]">
-        <Loader2 className="w-10 h-10 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Carregando evento...</p>
-      </div>
-    );
+    return <AdminPageLoading label="Carregando evento" />;
   }
 
   return (
     <FadeIn direction="up" duration={0.3}>
-      <div className="container mx-auto py-8 px-4 max-w-5xl space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => mode === 'select' ? router.back() : setMode('select')}
-            className="shrink-0"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-              Gerenciar Inscrições
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
-              <Users className="w-3.5 h-3.5" />
-              {eventTitle}
-            </p>
-          </div>
-        </div>
+      <AdminPage>
+        {/* The way out of the page is the breadcrumb; inside a mode, "Outras opções" goes back
+            to the choice (it used to be the back arrow of the header). */}
+        <AdminPageHeader
+          title="Inscrições"
+          description="Importe inscrições por planilha ou cadastre manualmente."
+          actions={
+            mode !== 'select' ? (
+              <Button variant="outline" size="sm" onClick={() => setMode('select')}>
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Outras opções
+              </Button>
+            ) : null
+          }
+        />
 
         {/* ══════════════════════════════════════════════════ */}
         {/* Mode Select */}
@@ -996,7 +986,7 @@ export default function ImportSignupsPage() {
             )}
           </>
         )}
-      </div>
+      </AdminPage>
     </FadeIn>
   );
 }

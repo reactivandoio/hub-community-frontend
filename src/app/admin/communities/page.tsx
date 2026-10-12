@@ -19,6 +19,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
 
 import { useAdminAccess } from '@/components/admin/admin-guard';
+import { AdminPage, AdminPageError, AdminPageHeader, AdminPageLoading } from '@/components/admin/admin-page';
 import { FadeIn } from '@/components/animations';
 import { Button } from '@/components/ui/button';
 import {
@@ -200,44 +201,30 @@ function CommunitiesContent() {
       )
     : communities;
 
-  if (loading) {
-    return (
-      <div className="container mx-auto py-20 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  if (loading) return <AdminPageLoading label="Carregando comunidades" />;
 
   if (error) {
-    return (
-      <div className="container mx-auto py-10 text-center text-red-500">
-        <p>Erro ao carregar comunidades: {error.message}</p>
-      </div>
-    );
+    return <AdminPageError title="Erro ao carregar comunidades" message={error.message} />;
   }
 
   return (
     <FadeIn direction="up" duration={0.3}>
-      <div className="container mx-auto py-10 px-4">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              Gerenciar Comunidades
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              {communities.length} comunidade{communities.length !== 1 ? 's' : ''} cadastrada{communities.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-          {access.isAdmin && (
-            <Button onClick={() => setIsCreateOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nova Comunidade
-            </Button>
-          )}
-        </div>
+      <AdminPage>
+        <AdminPageHeader
+          title="Comunidades"
+          description={`${communities.length} comunidade${communities.length !== 1 ? 's' : ''} cadastrada${communities.length !== 1 ? 's' : ''}`}
+          actions={
+            access.isAdmin ? (
+              <Button size="sm" onClick={() => setIsCreateOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Nova Comunidade
+              </Button>
+            ) : null
+          }
+        />
 
         {/* Search */}
-        <div className="relative mb-6 max-w-md">
+        <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar comunidade..."
@@ -356,7 +343,7 @@ function CommunitiesContent() {
             </TableBody>
           </Table>
         </div>
-      </div>
+      </AdminPage>
 
       {/* Create Community Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -482,11 +469,7 @@ function CommunitiesContent() {
 
 export default function CommunitiesAdminPage() {
   return (
-    <Suspense fallback={
-      <div className="container mx-auto py-20 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    }>
+    <Suspense fallback={<AdminPageLoading label="Carregando comunidades" />}>
       <CommunitiesContent />
     </Suspense>
   );

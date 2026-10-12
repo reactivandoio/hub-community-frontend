@@ -2,11 +2,12 @@
 
 import { useQuery } from '@apollo/client';
 import { format } from 'date-fns';
-import { Check, Copy, Pencil, Plus, Tag } from 'lucide-react';
+import { Check, Copy, Pencil, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { type CouponBatchOption, CouponFormDialog } from '@/components/admin/coupon-form-dialog';
 import { Badge } from '@/components/ui/badge';
+import { AdminPageActions } from '@/components/admin/page-actions';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -87,21 +88,13 @@ export function CouponsTab({ eventId, eventSlug, products }: CouponsTabProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Tag className="h-4 w-4" />
-            Cupons
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Percentual ou valor fixo, com datas, limite de usos e lotes.
-          </p>
-        </div>
-        <Button onClick={() => openDialog(null)}>
+      {/* Title and description come from the page header; the action goes to the top bar. */}
+      <AdminPageActions>
+        <Button size="sm" onClick={() => openDialog(null)}>
           <Plus className="mr-2 h-4 w-4" />
           Novo cupom
         </Button>
-      </div>
+      </AdminPageActions>
 
       {justCreated && (
         <div

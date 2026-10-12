@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import { ChevronLeft, ChevronRight, History, Search, Users } from 'lucide-react';
 import { useState } from 'react';
 
+import { AdminPage, AdminPageHeader } from '@/components/admin/admin-page';
 import { FadeIn } from '@/components/animations';
 import {
   AlertDialog,
@@ -224,16 +225,11 @@ export default function UsersAdminPage() {
 
   return (
     <FadeIn direction="up" duration={0.3}>
-      <div className="container mx-auto px-4 pt-10 pb-12 space-y-10">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <Users className="h-7 w-7 text-primary" /> Usuários e Roles
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Admin vê e faz tudo e define as roles. Community Manager gerencia só as comunidades em que
-            está como organizador e os eventos delas. Os demais são usuários comuns.
-          </p>
-        </div>
+      <AdminPage>
+        <AdminPageHeader
+          title="Usuários e Roles"
+          description="Admin vê e faz tudo e define as roles. Community Manager gerencia só as comunidades em que está como organizador e os eventos delas. Os demais são usuários comuns."
+        />
 
         <section className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-3">
@@ -392,7 +388,7 @@ export default function UsersAdminPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
+      </AdminPage>
     </FadeIn>
   );
 }

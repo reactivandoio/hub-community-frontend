@@ -187,7 +187,7 @@ export function OpaPingouAccountCard({
           <KeyRound className="h-4 w-4" />
           Conta Opa Pingou do evento
         </p>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground max-w-3xl">
           O Opa Pingou é o parceiro oficial de pagamentos do Hub Community. Para vender ingressos,
           conecte a conta Opa Pingou da sua comunidade: o dinheiro dos lotes pagos cai direto na
           conta de vocês, por Pix ou link de pagamento. Lotes com valor zero continuam gratuitos;

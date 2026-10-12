@@ -4,9 +4,9 @@ import { useQuery } from '@apollo/client';
 import { useParams } from 'next/navigation';
 
 import { useAdminAccess } from '@/components/admin/admin-guard';
+import { AdminEmpty, AdminPage, AdminPageError, AdminPageHeader, AdminPageLoading } from '@/components/admin/admin-page';
 import { CouponsTab } from '@/components/admin/coupons-tab';
 import { FadeIn } from '@/components/animations';
-import { Skeleton } from '@/components/ui/skeleton';
 import { usePaymentsV2 } from '@/hooks/use-payments-v2';
 import { GET_EVENT_BY_SLUG_OR_ID } from '@/lib/queries';
 import { EventResponse } from '@/lib/types';
@@ -26,34 +26,25 @@ export default function EventCouponsPage() {
   });
   const event = data?.eventBySlugOrId;
 
-  let content: React.ReactNode;
-  if (!isAdmin) {
-    content = <p className="text-sm text-muted-foreground">Os cupons são gerenciados por um admin do Hub.</p>;
-  } else if (paymentsV2 === false) {
-    content = <p className="text-sm text-muted-foreground">Os cupons ainda não estão disponíveis neste servidor.</p>;
-  } else if (paymentsV2 === null || loading) {
-    content = (
-      <div className="space-y-3" role="status" aria-label="Carregando cupons">
-        <Skeleton className="h-9 w-40" />
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-12 w-full" />
-      </div>
-    );
-  } else if (error || !event) {
-    content = <p className="text-sm text-red-500">Não foi possível carregar o evento.</p>;
-  } else {
-    content = <CouponsTab eventId={event.id} eventSlug={event.slug || id} products={event.products || []} />;
+  if (isAdmin && (paymentsV2 === null || loading)) return <AdminPageLoading label="Carregando cupons" />;
+  if (available && (error || !event)) {
+    return <AdminPageError title="Não foi possível carregar o evento" message={error?.message} />;
   }
 
   return (
     <FadeIn direction="up" duration={0.3}>
-      <div className="container mx-auto py-10 px-4 max-w-3xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">Cupons</h1>
-          <p className="text-muted-foreground mt-2">Descontos do evento e o link pronto de cada cupom.</p>
-        </div>
-        <div className="border rounded-lg p-6 bg-card">{content}</div>
-      </div>
+      <AdminPage>
+        <AdminPageHeader title="Cupons" description="Percentual ou valor fixo, com datas, limite de usos e lotes." />
+        {!isAdmin ? (
+          <AdminEmpty>Os cupons são gerenciados por um admin do Hub.</AdminEmpty>
+        ) : !event ? (
+          <AdminEmpty>Os cupons ainda não estão disponíveis neste servidor.</AdminEmpty>
+        ) : (
+          <div className="border rounded-lg p-6 bg-card">
+            <CouponsTab eventId={event.id} eventSlug={event.slug || id} products={event.products || []} />
+          </div>
+        )}
+      </AdminPage>
     </FadeIn>
   );
 }

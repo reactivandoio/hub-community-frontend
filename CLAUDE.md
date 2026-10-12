@@ -83,8 +83,14 @@ src/
 - **Admin layout (REA-24)** — every `/admin` page is framed by `AdminShell`
   (`components/admin/admin-shell.tsx`, inside `AdminGuard` in `app/admin/layout.tsx`): collapsible
   sidebar (icons when collapsed, drawer on the phone, state in `localStorage` `admin_sidebar_open`),
-  a sticky `h-14` top bar with the breadcrumb, and the page below it. Pages must not add top padding
-  for a navbar nor `min-h-screen`. The public floating navigation and footer are hidden there
+  a sticky top bar with the breadcrumb, and the page below it. Pages must not add top padding
+  for a navbar nor `min-h-screen`. Every admin page uses `components/admin/admin-page.tsx`:
+  `AdminPage` (full width, no `container`/`max-w-*`), `AdminPageHeader` (title, description, and
+  `actions`), `AdminPageLoading` / `AdminPageError` / `AdminEmpty`. Page actions ("Novo…", "Salvar…")
+  are declared with `AdminPageActions` (`page-actions.tsx`) and shown in the top bar (a menu on the
+  phone); a submit button there needs `form="<form id>"`. No back arrow and no event name in the
+  page header: the breadcrumb and the sidebar have them. The signed-in user, theme and sign out are
+  in the sidebar footer. Top bar and sidebar header share `--admin-header-height` (`HEADER_ROW`). The public floating navigation and footer are hidden there
   (`PublicOnly`), and `PageTransitionProvider` does not key `/admin` by path (it would remount the frame).
   What the sidebar and breadcrumb show is in `lib/admin-nav.ts` (pure, tested): add a new admin page
   there. Inside `/admin/events/<id>` the sidebar switches to that event (`eventNavGroups`).

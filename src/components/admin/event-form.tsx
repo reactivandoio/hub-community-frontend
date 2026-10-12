@@ -4,6 +4,7 @@ import { CommunityFormDialog } from '@/components/admin/community-form-dialog';
 import { ImageCropDialog } from '@/components/admin/image-crop-dialog';
 import { LocationFormDialog } from '@/components/admin/location-form-dialog';
 import { OpaPingouAccountCard } from '@/components/admin/opapingou-account-card';
+import { AdminPageActions } from '@/components/admin/page-actions';
 import { ACCOUNT_REQUIRED_MESSAGE, hasPaidBatch, looksLikeOpaPingouKey } from '@/lib/opapingou-account';
 import { ProductFormDialog } from '@/components/admin/product-form-dialog';
 import { TalkFormDialog } from '@/components/admin/talk-form-dialog';
@@ -67,6 +68,8 @@ import type { EventFormSection } from '@/lib/admin-nav';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
+
+const EVENT_FORM_ID = 'event-form';
 
 interface EventFormProps {
   initialData?: CreateEventFormValues & { id?: string };
@@ -451,7 +454,7 @@ export function EventForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleFormSubmit, (errors) => {
+      <form id={EVENT_FORM_ID} onSubmit={form.handleSubmit(handleFormSubmit, (errors) => {
           // Auto-navigate to the tab that contains the first error
           const generalFields = ['title', 'slug', 'start_date', 'end_date', 'max_slots', 'description', 'location', 'communityId', 'is_online', 'call_link', 'unlisted', 'images'];
           const scheduleFields = ['talks'];
@@ -601,6 +604,8 @@ export function EventForm({
               />
             </div>
 
+            {/* Side by side on a wide screen, where the form takes the whole width. */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
             {/* Online Event Section */}
             <div className="space-y-4 rounded-lg border p-4">
               <div className="flex items-center justify-between">
@@ -685,9 +690,10 @@ export function EventForm({
                 />
               </div>
             </div>
+            </div>
 
-            {/* Cover Image Upload Section */}
-            <div className="space-y-4 rounded-lg border p-4">
+            {/* Cover Image Upload Section (capped: a cover from edge to edge would be huge) */}
+            <div className="space-y-4 rounded-lg border p-4 max-w-3xl">
               <Label className="text-base font-semibold flex items-center gap-2">
                 <ImagePlus className="h-4 w-4" />
                 Imagem de Capa
@@ -761,6 +767,7 @@ export function EventForm({
               )}
             </div>
 
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
             {/* Location Section */}
             <div className="space-y-4 rounded-lg border p-4">
               <div className="flex items-center justify-between">
@@ -850,6 +857,7 @@ export function EventForm({
                     ) : null;
                   })()}
               </div>
+            </div>
             </div>
 
             <FormField
@@ -1098,19 +1106,20 @@ export function EventForm({
           </TabsContent>
         </Tabs>
 
-        <div className="flex flex-wrap items-center justify-end gap-4">
+        {/* Page actions: shown in the admin top bar, always in view (hence `form=`). */}
+        <AdminPageActions>
           {dirty && isEditing && (
-            <p role="status" className="mr-auto text-sm text-amber-600 dark:text-amber-400">
+            <p role="status" className="text-sm text-amber-600 dark:text-amber-400 md:mr-1">
               Há alterações não salvas.
             </p>
           )}
-          <Button type="button" variant="outline" onClick={() => router.back()}>
+          <Button type="button" variant="outline" size="sm" onClick={() => router.back()}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={isLoading}>
+          <Button type="submit" size="sm" form={EVENT_FORM_ID} disabled={isLoading}>
             {isLoading ? 'Salvando...' : 'Salvar Evento'}
           </Button>
-        </div>
+        </AdminPageActions>
       </form>
 
       {/* Image Crop Dialog */}

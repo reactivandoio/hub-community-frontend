@@ -9,6 +9,7 @@ import { useState } from 'react';
 
 import { EventsTableSkeleton } from '@/components/admin/events-table-skeleton';
 import { useAdminAccess } from '@/components/admin/admin-guard';
+import { AdminPage, AdminPageError, AdminPageHeader } from '@/components/admin/admin-page';
 import { FadeIn } from '@/components/animations';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -109,11 +110,7 @@ export default function EventsAdminPage() {
   }
 
   if (error) {
-    return (
-      <div className="container mx-auto py-10 text-center text-red-500">
-        <p>Erro ao carregar eventos: {error.message}</p>
-      </div>
-    );
+    return <AdminPageError title="Erro ao carregar eventos" message={error.message} />;
   }
 
   // A community-manager sees only the events of the communities it organizes.
@@ -121,23 +118,19 @@ export default function EventsAdminPage() {
 
   return (
     <FadeIn direction="up" duration={0.3}>
-    <div className="container mx-auto py-10 px-4">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Gerenciar Eventos
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Crie, edite e gerencie os eventos da comunidade.
-          </p>
-        </div>
-        <Link href="/admin/events/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Evento
+    <AdminPage>
+      <AdminPageHeader
+        title="Eventos"
+        description="Crie, edite e gerencie os eventos da comunidade."
+        actions={
+          <Button size="sm" asChild>
+            <Link href="/admin/events/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Evento
+            </Link>
           </Button>
-        </Link>
-      </div>
+        }
+      />
 
       <div className="border rounded-md">
         <Table>
@@ -272,7 +265,7 @@ export default function EventsAdminPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </AdminPage>
     </FadeIn>
   );
 }

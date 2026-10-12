@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { VotingSessionForm } from '@/components/admin/voting-session-form';
+import { AdminPage, AdminPageHeader } from '@/components/admin/admin-page';
 import { FadeIn } from '@/components/animations';
 import { useToast } from '@/hooks/use-toast';
 import { VotingSessionInput } from '@/lib/types';
@@ -62,18 +63,16 @@ export default function NewVotingSessionPage() {
 
   return (
     <FadeIn direction="up" duration={0.3}>
-      <div className="container mx-auto py-10 px-4 max-w-3xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">Nova Sessão de Votação</h1>
-          <p className="text-muted-foreground mt-2">
-            Preencha os detalhes abaixo para criar uma nova sessão de votação.
-          </p>
-        </div>
+      <AdminPage>
+        <AdminPageHeader
+          title="Nova Sessão de Votação"
+          description="Preencha os detalhes abaixo para criar uma nova sessão de votação."
+        />
 
         <div className="border rounded-lg p-6 bg-card">
           <VotingSessionForm onSubmit={handleSubmit} isLoading={loading} />
         </div>
-      </div>
+      </AdminPage>
     </FadeIn>
   );
 }
