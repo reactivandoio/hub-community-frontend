@@ -2,7 +2,7 @@
 
 import { useQuery } from '@apollo/client';
 import { format } from 'date-fns';
-import { Pencil, Plus, Tag } from 'lucide-react';
+import { Check, Copy, Pencil, Plus, Tag } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { type CouponBatchOption, CouponFormDialog } from '@/components/admin/coupon-form-dialog';
@@ -16,12 +16,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useToast } from '@/hooks/use-toast';
 import { couponUsesLabel, couponValueLabel } from '@/lib/coupon';
+import { couponLink } from '@/lib/coupon-link';
 import { EVENT_COUPONS } from '@/lib/queries';
 import type { Coupon, Product } from '@/lib/types';
 
 interface CouponsTabProps {
   eventId: string;
+  /** Slug of the public event page, for the ready-made coupon link. */
+  eventSlug: string;
   products: Product[];
 }
 
@@ -35,13 +39,30 @@ function windowLabel(coupon: Coupon): string {
 }
 
 /** Admin "Cupons" tab of an event (REA-6): list, create and edit. */
-export function CouponsTab({ eventId, products }: CouponsTabProps) {
+export function CouponsTab({ eventId, eventSlug, products }: CouponsTabProps) {
+  const { toast } = useToast();
   const { data, loading, error, refetch } = useQuery<{ eventCoupons: Coupon[] }>(EVENT_COUPONS, {
     variables: { eventId },
     fetchPolicy: 'network-only',
   });
   const [editing, setEditing] = useState<Coupon | null>(null);
   const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [justCreated, setJustCreated] = useState<string | null>(null);
+
+  // REA-18: public event URL with the code in the fragment (#cupom=CODE).
+  const linkFor = (code: string) => couponLink(window.location.origin, eventSlug, code);
+
+  const copyLink = async (code: string) => {
+    const url = linkFor(code);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(code);
+      setTimeout(() => setCopied((current) => (current === code ? null : current)), 2000);
+    } catch {
+      toast({ variant: 'destructive', title: 'Não foi possível copiar', description: url });
+    }
+  };
 
   const batchOptions: CouponBatchOption[] = useMemo(
     () =>
@@ -81,6 +102,29 @@ export function CouponsTab({ eventId, products }: CouponsTabProps) {
           Novo cupom
         </Button>
       </div>
+
+      {justCreated && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3"
+        >
+          <div className="min-w-0 space-y-1">
+            <p className="text-sm font-medium">
+              Cupom <span className="font-mono">{justCreated}</span> criado. Quem abrir este link chega à
+              inscrição com o cupom aplicado:
+            </p>
+            <p className="break-all font-mono text-xs text-muted-foreground">{linkFor(justCreated)}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => copyLink(justCreated)}>
+            {copied === justCreated ? (
+              <Check className="mr-2 h-4 w-4 text-green-600" />
+            ) : (
+              <Copy className="mr-2 h-4 w-4" />
+            )}
+            {copied === justCreated ? 'Link copiado' : 'Copiar link'}
+          </Button>
+        </div>
+      )}
 
       {error ? (
         <p role="alert" className="text-sm text-red-500">
@@ -127,7 +171,20 @@ export function CouponsTab({ eventId, products }: CouponsTabProps) {
                       {coupon.enabled === false ? 'Inativo' : 'Ativo'}
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyLink(coupon.code)}
+                      aria-label={`Copiar link do cupom ${coupon.code}`}
+                    >
+                      {copied === coupon.code ? (
+                        <Check className="mr-2 h-4 w-4 text-green-600" />
+                      ) : (
+                        <Copy className="mr-2 h-4 w-4" />
+                      )}
+                      {copied === coupon.code ? 'Link copiado' : 'Copiar link'}
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -150,7 +207,10 @@ export function CouponsTab({ eventId, products }: CouponsTabProps) {
         eventId={eventId}
         batches={batchOptions}
         coupon={editing}
-        onSaved={() => refetch()}
+        onSaved={(created) => {
+          setJustCreated(created ?? null);
+          refetch();
+        }}
       />
     </div>
   );

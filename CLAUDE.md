@@ -57,6 +57,13 @@ src/
   (`/admin/events` and the voting-session picker do). The event's own page and signup flow are never
   filtered — the direct link is the point.
 
+- **Coupon link (REA-18)** — `/events/<slug>#cupom=CODE` fills the coupon in on signup. `lib/coupon-link.ts`
+  builds and parses the fragment (any other fragment is ignored) and keeps the code per event in
+  `localStorage` (`pending_coupon:<slug>`, 24 h) so it survives login and signup; `useCouponLink` reads
+  it on the event page and on `/events/<slug>/signup`, and every path that leads to the signup
+  (Participar, the login `redirect`) carries the fragment along. The link grants nothing: the signup
+  page sends the code to the server like a typed one. The admin copies the link in the Cupons tab.
+
 - **Rich text / descriptions (REA-14)** — descriptions (event, talk, speaker bio, community, comments)
   are markdown. `RichTextEditor` saves it as Strapi-style blocks, one `paragraph` per "\n\n" with the
   markdown inside; older records may be real Strapi blocks or plain strings. `lib/rich-text.ts`

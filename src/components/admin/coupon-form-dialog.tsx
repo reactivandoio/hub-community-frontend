@@ -42,7 +42,8 @@ interface CouponFormDialogProps {
   batches: CouponBatchOption[];
   /** Absent = new coupon. */
   coupon?: Coupon | null;
-  onSaved: () => void;
+  /** `created` holds the code of a coupon that was just created (absent on an edit). */
+  onSaved: (created?: string) => void;
 }
 
 function FieldError({ message }: { message?: string }) {
@@ -95,10 +96,11 @@ export function CouponFormDialog({
     try {
       if (coupon?.id) {
         await updateCoupon({ variables: { id: coupon.id, data } });
+        onSaved();
       } else {
         await createCoupon({ variables: { data } });
+        onSaved(data.code);
       }
-      onSaved();
       onOpenChange(false);
     } catch (err: any) {
       // The Eventando owns the rules (code unique per event, type and value locked

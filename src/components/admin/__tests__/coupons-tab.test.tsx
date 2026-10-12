@@ -1,6 +1,6 @@
 import { MockedProvider, type MockedResponse } from '@apollo/client/testing';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CouponsTab } from '../coupons-tab';
 import { CREATE_COUPON, EVENT_COUPONS, UPDATE_COUPON } from '@/lib/queries';
@@ -41,11 +41,33 @@ const listMock = (coupons: Coupon[]): MockedResponse => ({
 const renderTab = (mocks: MockedResponse[]) =>
   render(
     <MockedProvider mocks={mocks} addTypename={false}>
-      <CouponsTab eventId="ev1" products={products} />
+      <CouponsTab eventId="ev1" eventSlug="meetup" products={products} />
     </MockedProvider>,
   );
 
+const writeText = vi.fn();
+
+beforeEach(() => {
+  writeText.mockReset().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+});
+
 describe('CouponsTab', () => {
+  it('copies the ready-made link of a coupon and says so (REA-18)', async () => {
+    renderTab([listMock([coupon()])]);
+    fireEvent.click(await screen.findByRole('button', { name: 'Copiar link do cupom PROMO10' }));
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/events/meetup#cupom=PROMO10`);
+    expect(await screen.findByText('Link copiado')).toBeInTheDocument();
+  });
+
+  it('shows the link when the copy is refused by the browser', async () => {
+    writeText.mockRejectedValue(new Error('denied'));
+    renderTab([listMock([coupon()])]);
+    fireEvent.click(await screen.findByRole('button', { name: 'Copiar link do cupom PROMO10' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
+    expect(screen.queryByText('Link copiado')).not.toBeInTheDocument();
+  });
+
   it('lists coupons with value, uses against the limit, batches and status', async () => {
     renderTab([
       listMock([
@@ -106,8 +128,13 @@ describe('CouponsTab', () => {
     fireEvent.change(screen.getByLabelText('Desconto (R$)'), { target: { value: '15,50' } });
     fireEvent.click(screen.getByLabelText('Ingresso — Lote 1'));
     fireEvent.click(screen.getByRole('button', { name: 'Salvar cupom' }));
-    expect(await screen.findByText('VIP')).toBeInTheDocument();
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    // REA-18: the ready-made link shows up right after the creation.
+    const created$ = await screen.findByRole('status');
+    expect(created$).toHaveTextContent(`${window.location.origin}/events/meetup#cupom=VIP`);
+    fireEvent.click(within(created$).getByRole('button', { name: 'Copiar link' }));
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/events/meetup#cupom=VIP`);
+    expect(await screen.findByRole('cell', { name: 'VIP' })).toBeInTheDocument();
   });
 
   it('validates before calling the server', async () => {

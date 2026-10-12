@@ -10,6 +10,7 @@ import {
   ImagePlus,
   MapPin,
   Share2,
+  Tag,
   Users,
   Video,
   Wifi,
@@ -29,8 +30,10 @@ import { Button } from '@/components/ui/button';
 import { ExpandableRichText } from '@/components/ui/expandable-rich-text';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/auth-context';
+import { useCouponLink } from '@/hooks/use-coupon-link';
 import { usePageVisitTracker, useTracking } from '@/hooks/use-tracking';
 import { trackViewEventDetail } from '@/lib/analytics';
+import { couponHash } from '@/lib/coupon-link';
 import { richTextToMarkdown } from '@/lib/rich-text';
 import { GET_AGENDA_BY_EVENT_ID, GET_EVENT_BY_SLUG_OR_ID, IS_USER_SIGNED_UP } from '@/lib/queries';
 import { adjustToBrazilTimezone } from '@/utils/event';
@@ -53,6 +56,7 @@ export function EventDetails({ slugOrId }: EventDetailsProps) {
   }, [slugOrId]);
 
   const { track } = useTracking();
+  const { code: linkCoupon } = useCouponLink(slugOrId);
 
   // Use eventBySlugOrId query that searches both slug and id
   const { data, loading, error } = useQuery<{ eventBySlugOrId: any }>(
@@ -106,7 +110,8 @@ export function EventDetails({ slugOrId }: EventDetailsProps) {
       metadata: { route: `/events/${event?.slug || slugOrId}/signup` },
     });
     if (hasInternalRegistration) {
-      router.push(`/events/${event?.slug || slugOrId}/signup`);
+      // The coupon of a ready-made link goes along in the fragment (REA-18).
+      router.push(`/events/${event?.slug || slugOrId}/signup${couponHash(linkCoupon)}`);
     } else if (event?.subscription_link) {
       window.open(event.subscription_link, '_blank');
     }
@@ -510,15 +515,28 @@ export function EventDetails({ slugOrId }: EventDetailsProps) {
             </Button>
           </div>
         ) : (
-          <Button
-            size="lg"
-            className="rounded-full w-full font-semibold"
-            disabled={!hasInternalRegistration && !event.subscription_link}
-            onClick={handleParticipate}
-          >
-            <Calendar className="h-4 w-4 mr-2" />
-            Participar do Evento
-          </Button>
+          <>
+            {linkCoupon && hasInternalRegistration && (
+              <p
+                className="flex items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2 text-sm text-foreground"
+                data-testid="link-coupon-notice"
+              >
+                <Tag className="h-4 w-4 text-primary" />
+                <span>
+                  Cupom <strong className="font-mono">{linkCoupon}</strong> será aplicado na inscrição.
+                </span>
+              </p>
+            )}
+            <Button
+              size="lg"
+              className="rounded-full w-full font-semibold"
+              disabled={!hasInternalRegistration && !event.subscription_link}
+              onClick={handleParticipate}
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Participar do Evento
+            </Button>
+          </>
         )}
       </div>
 
