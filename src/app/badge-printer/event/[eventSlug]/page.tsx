@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/table';
 import { DEFAULT_BADGE_NAME, defaultBadgeLink, printBadge } from '@/lib/badge-print';
 import { formatCpf } from '@/lib/certificate';
+import { formatCents } from '@/lib/money';
 import { HalfPriceBadge } from '@/components/half-price-badge';
 import { useEventSignupsQuery } from '@/hooks/use-half-price-field';
 import { CHECKIN_SIGNUP, EVENT_BATCHES, EVENT_SIGNUPS, MANUAL_SIGNUP } from '@/lib/queries';
@@ -140,7 +141,7 @@ export default function EventBadgePrinterPage() {
         .flatMap((p) =>
           (p.batches || [])
             .filter((b) => b.enabled)
-            .map((b) => ({ id: String(b.id), label: `${p.name} — Lote ${b.batch_number}${b.value ? ` (R$ ${b.value})` : ' (gratuito)'}` })),
+            .map((b) => ({ id: String(b.id), label: `${p.name} — Lote ${b.batch_number}${b.value ? ` (${formatCents(b.value)})` : ' (gratuito)'}` })),
         ),
     [eventData],
   );

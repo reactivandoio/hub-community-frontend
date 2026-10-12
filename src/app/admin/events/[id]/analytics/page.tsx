@@ -41,6 +41,7 @@ import {
 
 import { FadeIn } from '@/components/animations';
 import { EventPaymentsCard } from '@/components/admin/event-payments-card';
+import { ProductsBreakdownCard } from '@/components/admin/products-breakdown-card';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -58,7 +59,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getApolloClient } from '@/lib/apollo-client';
-import { GET_EVENT_ANALYTICS, GET_EVENT_TRACKING_METRICS } from '@/lib/queries';
+import { EVENT_PAYMENTS, GET_EVENT_ANALYTICS, GET_EVENT_TRACKING_METRICS } from '@/lib/queries';
+import { formatCents } from '@/lib/money';
+import { EventPaymentRow, summarizePayments } from '@/lib/payment-status';
 import { EventAnalyticsResponse, SignupEntry } from '@/lib/types';
 import { ORIGIN_LABELS, absentCount, hourLabel, originSummary } from '@/lib/checkin-analytics';
 import { formatCpf } from '@/lib/cpf';
@@ -78,7 +81,6 @@ const COLORS = {
   slateDim: 'rgba(100, 116, 139, 0.15)',
 };
 
-const PIE_COLORS = ['#10B981', '#8B5CF6', '#F59E0B', '#3B82F6', '#EF4444', '#EC4899'];
 
 /* ─── Metric Card Component ─────────────────────────────────── */
 function MetricCard({
@@ -229,6 +231,14 @@ export default function EventAnalyticsPage() {
 
   const trackingMetrics = trackingData?.eventTrackingMetrics;
 
+  // What was actually paid (coupon and meia-entrada included), the same source as the
+  // Pagamentos card — not batch price times signups.
+  const { data: paymentsData } = useQuery<{ eventPayments: EventPaymentRow[] | null }>(
+    EVENT_PAYMENTS,
+    { variables: { slugOrId: id }, skip: !id, fetchPolicy: 'network-only' }
+  );
+  const paidRevenueCents = summarizePayments(paymentsData?.eventPayments || []).revenueCents;
+
   /* ─── CSV Download Handler ──────────────────────────────────── */
   // Must be declared before any early returns to respect Rules of Hooks
   const downloadParticipantsCsv = useCallback(async () => {
@@ -355,11 +365,6 @@ export default function EventAnalyticsPage() {
     );
   }
 
-  // Calculate total revenue
-  const totalRevenue = analytics.products_breakdown.reduce((sum, product) => {
-    return sum + product.batches.reduce((bSum, batch) => bSum + batch.revenue, 0);
-  }, 0);
-
   // Prepare pie data for free vs paid
   const signupDistribution = [
     { name: 'Gratuitas', value: analytics.free_signups, color: COLORS.primary },
@@ -469,11 +474,7 @@ export default function EventAnalyticsPage() {
             title="Inscrições Pagas"
             value={analytics.paid_signups}
             subtitle={
-              totalRevenue > 0
-                ? `R$ ${totalRevenue.toLocaleString('pt-BR', {
-                    minimumFractionDigits: 2,
-                  })} arrecadados`
-                : undefined
+              paidRevenueCents > 0 ? `${formatCents(paidRevenueCents)} arrecadados` : undefined
             }
             icon={DollarSign}
             color={COLORS.secondary}
@@ -857,172 +858,7 @@ export default function EventAnalyticsPage() {
         </div>
 
         {/* ─── Products Breakdown ──────────────────────────────── */}
-        {analytics.products_breakdown.length > 0 && (
-          <Card className="border-border/50">
-            <CardHeader>
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Ticket className="w-4 h-4 text-secondary" />
-                Produtos e Lotes
-              </CardTitle>
-              <CardDescription>
-                Vendas e receita por produto/lote
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {/* Bar chart for product comparison */}
-              {analytics.products_breakdown.length > 1 && (
-                <div className="h-[200px] w-full mb-6">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={analytics.products_breakdown.map((p) => ({
-                        name:
-                          p.product_name.length > 20
-                            ? p.product_name.slice(0, 20) + '…'
-                            : p.product_name,
-                        inscritos: p.total_signups,
-                      }))}
-                      margin={{ top: 5, right: 10, left: -10, bottom: 5 }}
-                    >
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="hsl(var(--border))"
-                        opacity={0.3}
-                      />
-                      <XAxis
-                        dataKey="name"
-                        tick={{
-                          fontSize: 11,
-                          fill: 'hsl(var(--muted-foreground))',
-                        }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        tick={{
-                          fontSize: 11,
-                          fill: 'hsl(var(--muted-foreground))',
-                        }}
-                        axisLine={false}
-                        tickLine={false}
-                        allowDecimals={false}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          borderRadius: '12px',
-                          border: '1px solid hsl(var(--border))',
-                          backgroundColor: 'hsl(var(--card))',
-                          fontSize: '12px',
-                        }}
-                      />
-                      <Bar
-                        dataKey="inscritos"
-                        fill={COLORS.secondary}
-                        radius={[6, 6, 0, 0]}
-                        maxBarSize={60}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
-              {/* Product details table */}
-              <div className="space-y-4">
-                {analytics.products_breakdown.map((product, pIndex) => (
-                  <div
-                    key={product.product_id}
-                    className="rounded-xl border border-border/50 overflow-hidden"
-                  >
-                    <div
-                      className="flex items-center justify-between px-4 py-3"
-                      style={{
-                        backgroundColor:
-                          PIE_COLORS[pIndex % PIE_COLORS.length] + '10',
-                      }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-2 h-8 rounded-full"
-                          style={{
-                            backgroundColor:
-                              PIE_COLORS[pIndex % PIE_COLORS.length],
-                          }}
-                        />
-                        <div>
-                          <p className="font-semibold text-sm">
-                            {product.product_name}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {product.total_signups} inscriç
-                            {product.total_signups === 1 ? 'ão' : 'ões'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {product.batches.length > 0 && (
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="hover:bg-transparent">
-                            <TableHead className="text-xs">Lote</TableHead>
-                            <TableHead className="text-xs">
-                              Valor Unitário
-                            </TableHead>
-                            <TableHead className="text-xs">
-                              Vendidos
-                            </TableHead>
-                            <TableHead className="text-xs">
-                              Capacidade
-                            </TableHead>
-                            <TableHead className="text-xs text-right">
-                              Receita
-                            </TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {product.batches.map((batch) => (
-                            <TableRow
-                              key={batch.batch_id}
-                              className="hover:bg-muted/30"
-                            >
-                              <TableCell className="font-medium text-sm">
-                                Lote {batch.batch_number}
-                              </TableCell>
-                              <TableCell className="text-sm">
-                                {batch.value > 0
-                                  ? `R$ ${batch.value.toLocaleString('pt-BR', {
-                                      minimumFractionDigits: 2,
-                                    })}`
-                                  : 'Gratuito'}
-                              </TableCell>
-                              <TableCell className="text-sm">
-                                <span className="font-semibold">
-                                  {batch.sold_quantity}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-sm">
-                                {batch.max_quantity || '∞'}
-                              </TableCell>
-                              <TableCell className="text-sm text-right font-medium">
-                                {batch.revenue > 0
-                                  ? `R$ ${batch.revenue.toLocaleString(
-                                      'pt-BR',
-                                      {
-                                        minimumFractionDigits: 2,
-                                      }
-                                    )}`
-                                  : '—'}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        <ProductsBreakdownCard products={analytics.products_breakdown} />
 
         {/* ─── All Signups ─────────────────────────────────────── */}
         {(analytics.all_signups?.length ?? 0) > 0 && (
