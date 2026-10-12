@@ -76,6 +76,8 @@ interface EventFormProps {
   /** Called after "Salvar Evento" saved the event, with its id. */
   onSaved?: (id: string) => void;
   isLoading?: boolean;
+  /** REA-6: the BFF has Opa Pingou; otherwise the provider select stays hidden. */
+  showPaymentProvider?: boolean;
 }
 
 // Mock locations - deprecated, now using GET_LOCATIONS
@@ -94,6 +96,7 @@ export function EventForm({
   onSubmit,
   onSaved,
   isLoading,
+  showPaymentProvider = false,
 }: EventFormProps) {
   const router = useRouter();
   const { toast: formToast } = useToast();
@@ -904,6 +907,7 @@ export function EventForm({
           </TabsContent>
 
           <TabsContent value="products" className="space-y-6 mt-6">
+            {showPaymentProvider && (
             <FormField
               control={form.control}
               name="payment_provider"
@@ -917,7 +921,7 @@ export function EventForm({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="opapingou">Opa Pingou (Pix)</SelectItem>
+                      <SelectItem value="opapingou">Opa Pingou (Pix ou link de pagamento)</SelectItem>
                       <SelectItem value="pixai">Pix Aí</SelectItem>
                     </SelectContent>
                   </Select>
@@ -929,6 +933,7 @@ export function EventForm({
                 </FormItem>
               )}
             />
+            )}
 
             <div className="space-y-4 rounded-lg border p-4">
               <div className="flex items-center justify-between">
