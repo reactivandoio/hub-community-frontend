@@ -1,11 +1,13 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AdminGuard, useAdminAccess } from '../admin-guard';
 
 const replace = vi.fn();
 let pathname = '/admin/events';
-let auth = { isAuthenticated: true, isHydrated: true };
+const signOut = vi.fn();
+const requestLogin = vi.fn();
+let auth: Record<string, unknown> = { isAuthenticated: true, isHydrated: true, signOut };
 let result: any = { data: undefined, loading: true, error: undefined, refetch: vi.fn() };
 let lastOptions: any = null;
 
@@ -14,6 +16,9 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace }),
 }));
 vi.mock('@/contexts/auth-context', () => ({ useAuth: () => auth }));
+vi.mock('@/contexts/login-prompt-context', () => ({
+  useLoginPrompt: () => ({ requestLogin, isOpen: false }),
+}));
 vi.mock('@apollo/client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@apollo/client')>();
   return {
@@ -49,25 +54,40 @@ const renderGuard = () =>
 beforeEach(() => {
   vi.clearAllMocks();
   pathname = '/admin/events';
-  auth = { isAuthenticated: true, isHydrated: true };
+  auth = { isAuthenticated: true, isHydrated: true, signOut };
   result = { data: undefined, loading: true, error: undefined, refetch: vi.fn() };
 });
 
 describe('AdminGuard', () => {
   it('waits for the saved session without asking the BFF or redirecting', () => {
-    auth = { isAuthenticated: false, isHydrated: false };
+    auth = { isAuthenticated: false, isHydrated: false, signOut };
     renderGuard();
     expect(screen.getByRole('status')).toBeInTheDocument();
     expect(lastOptions.skip).toBe(true);
     expect(replace).not.toHaveBeenCalled();
   });
 
-  it('sends whoever is not signed in to the login, back to the same page', async () => {
-    auth = { isAuthenticated: false, isHydrated: true };
-    window.history.pushState({}, '', '/admin/events?tab=1');
+  it('asks whoever is not signed in to log in on the same page (REA-25), without leaking content', () => {
+    auth = { isAuthenticated: false, isHydrated: true, signOut };
     renderGuard();
-    await waitFor(() =>
-      expect(replace).toHaveBeenCalledWith('/?login=true&redirect=%2Fadmin%2Fevents%3Ftab%3D1'));
+    expect(screen.getByRole('heading', { name: 'Entre para continuar' })).toBeInTheDocument();
+    expect(requestLogin).toHaveBeenCalledTimes(1);
+    expect(replace).not.toHaveBeenCalled();
+    expect(lastOptions.skip).toBe(true);
+    expect(screen.queryByText(/conteúdo/)).not.toBeInTheDocument();
+  });
+
+  it('keeps a button to open the login again after the modal is closed', () => {
+    auth = { isAuthenticated: false, isHydrated: true, signOut };
+    renderGuard();
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }));
+    expect(requestLogin).toHaveBeenCalledTimes(2);
+  });
+
+  it('drops a token the BFF no longer accepts and asks for the login', async () => {
+    result = { data: { adminAccess: null }, loading: false };
+    renderGuard();
+    await waitFor(() => expect(signOut).toHaveBeenCalled());
     expect(screen.queryByText(/conteúdo/)).not.toBeInTheDocument();
   });
 

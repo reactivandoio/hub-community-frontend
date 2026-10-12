@@ -3,13 +3,14 @@
 import { useQuery } from '@apollo/client';
 import { ArrowLeft, Calendar, LogIn } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { FadeIn } from '@/components/animations';
 import { ShareArtGenerator } from '@/components/share-art/share-art-generator';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/auth-context';
+import { useLoginPrompt } from '@/contexts/login-prompt-context';
 import { GET_EVENT_BY_SLUG_OR_ID, IS_USER_SIGNED_UP } from '@/lib/queries';
 
 function GeneratorSkeleton() {
@@ -38,7 +39,8 @@ function Notice({ title, children }: { title: string; children: ReactNode }) {
 
 /** `/events/[id]/arte` — only for a logged-in person signed up for the event. */
 export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isHydrated } = useAuth();
+  const { requestLogin } = useLoginPrompt();
   // The auth provider restores the session from localStorage in an effect; wait one commit so a
   // logged-in visitor does not see the "entre" notice flash.
   const [hydrated, setHydrated] = useState(false);
@@ -64,6 +66,17 @@ export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
   );
   const isSignedUp = Boolean(signupData?.isUserSignedUp?.is_signed_up);
 
+  // Signed out: the login opens over this page once (REA-25); the notice keeps a button.
+  const askLogin = () => requestLogin({ reason: 'Entre para gerar sua arte' });
+  const needsLogin = !!isHydrated && !eventLoading && !!event && !isAuthenticated;
+  const askedLogin = useRef(false);
+  useEffect(() => {
+    if (!needsLogin || askedLogin.current) return;
+    askedLogin.current = true;
+    askLogin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsLogin]);
+
   let content: ReactNode;
   if (!hydrated || eventLoading || (isAuthenticated && signupLoading)) {
     content = <GeneratorSkeleton />;
@@ -80,14 +93,10 @@ export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
           A arte &quot;me inscrevi&quot; é para quem está inscrito em{' '}
           <strong>{event.title}</strong>.
         </p>
-        <Link
-          href={`/?login=true&redirect=${encodeURIComponent(`${eventPath}/arte`)}`}
-        >
-          <Button className="rounded-full">
-            <LogIn className="mr-2 h-4 w-4" />
-            Entrar
-          </Button>
-        </Link>
+        <Button className="rounded-full" onClick={askLogin}>
+          <LogIn className="mr-2 h-4 w-4" />
+          Entrar
+        </Button>
       </Notice>
     );
   } else if (!isSignedUp) {

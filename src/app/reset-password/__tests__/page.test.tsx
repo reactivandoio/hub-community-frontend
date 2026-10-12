@@ -15,8 +15,16 @@ vi.mock('@/contexts/auth-context', () => ({
 
 let mockSearchParams = new URLSearchParams();
 
+const mockReplace = vi.fn();
+const mockRequestLogin = vi.fn();
+
 vi.mock('next/navigation', () => ({
   useSearchParams: () => mockSearchParams,
+  useRouter: () => ({ replace: mockReplace }),
+}));
+
+vi.mock('@/contexts/login-prompt-context', () => ({
+  useLoginPrompt: () => ({ requestLogin: mockRequestLogin, isOpen: false }),
 }));
 
 vi.mock('@/components/animations/fade-in', () => ({
@@ -121,8 +129,11 @@ describe('ResetPasswordPage — success', () => {
       'newpassword123'
     );
 
-    const loginLink = screen.getByRole('link', { name: /fazer login/i });
-    expect(loginLink).toHaveAttribute('href', '/?login=true');
+    // REA-25: the login opens on this page; without a kept page it stays here.
+    await user.click(screen.getByRole('button', { name: /fazer login/i }));
+    expect(mockRequestLogin).toHaveBeenCalledTimes(1);
+    mockRequestLogin.mock.calls[0][0].onSuccess();
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 });
 

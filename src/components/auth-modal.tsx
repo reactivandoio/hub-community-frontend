@@ -2,7 +2,6 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ApolloError } from '@apollo/client';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -34,6 +33,7 @@ import {
   type SignInFormValues,
   type SignUpFormValues,
 } from '@/lib/schemas';
+import { currentPath, saveLoginReturn } from '@/lib/login-prompt';
 import { Eye, EyeOff, Loader2, Lock, Mail, Phone, User } from 'lucide-react';
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -83,13 +83,21 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 interface AuthModalProps {
   isOpen: boolean;
+  /** Closed without signing in (Esc, the X, a click outside). */
   onClose: () => void;
-  redirectUrl?: string | null;
+  /** Signed in: the modal closes and the page carries on with the session, no navigation. */
+  onSignedIn: () => void;
+  /** Why the login is asked for, under the title. */
+  reason?: string;
 }
 
-export function AuthModal({ isOpen, onClose, redirectUrl }: AuthModalProps) {
+/**
+ * The login modal, opened over the current page by the LoginPrompt provider (REA-25); pages
+ * ask for it with useLoginPrompt, never by rendering it. Each way to get in (password today)
+ * is a tab, so new methods (Google, code by e-mail) come in as new tabs.
+ */
+export function AuthModal({ isOpen, onClose, onSignedIn, reason }: AuthModalProps) {
   const { signIn, signUp, forwardPassword, isLoading } = useAuth();
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState('signin');
 
   // Password visibility
@@ -122,13 +130,10 @@ export function AuthModal({ isOpen, onClose, redirectUrl }: AuthModalProps) {
     try {
       await signIn(data);
       toast.success('Bem-vindo(a) de volta!');
-      setTimeout(() => {
-        onClose();
-        signInForm.reset();
-        if (redirectUrl) {
-          router.push(redirectUrl);
-        }
-      }, 1000);
+      signInForm.reset();
+      setShowSignInPassword(false);
+      setActiveTab('signin');
+      onSignedIn();
     } catch (error) {
       const message = getErrorMessage(error, 'Erro ao fazer login. Verifique suas credenciais.');
       toast.error(message);
@@ -139,6 +144,8 @@ export function AuthModal({ isOpen, onClose, redirectUrl }: AuthModalProps) {
   const handleSignUp = async (data: SignUpFormValues) => {
     try {
       await signUp(data);
+      // The confirmation link brings the person back to this page after the login.
+      saveLoginReturn(currentPath());
       setConfirmationEmail(data.email);
       setShowEmailConfirmation(true);
       toast.success('Conta criada com sucesso!');
@@ -152,6 +159,8 @@ export function AuthModal({ isOpen, onClose, redirectUrl }: AuthModalProps) {
   const handlePasswordReset = async (data: ResetPasswordFormValues) => {
     try {
       await forwardPassword(data.email);
+      // The new-password page sends the person back here after the login.
+      saveLoginReturn(currentPath());
       toast.success('Email de recuperação enviado!');
       setTimeout(() => {
         resetForm.reset();
@@ -181,7 +190,7 @@ export function AuthModal({ isOpen, onClose, redirectUrl }: AuthModalProps) {
         <DialogHeader>
           <DialogTitle>Entrar na sua conta</DialogTitle>
           <DialogDescription>
-            Faça login, cadastre-se ou recupere sua senha
+            {reason || 'Faça login, cadastre-se ou recupere sua senha'}
           </DialogDescription>
         </DialogHeader>
 

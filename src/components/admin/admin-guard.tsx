@@ -3,12 +3,13 @@
 import { useQuery } from '@apollo/client';
 import { ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { createContext, useContext, useEffect, type ReactNode } from 'react';
 
+import { LoginRequired } from '@/components/login-required';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/auth-context';
-import { adminGate, isAdminOnlyPath, loginHref, type AdminAccess } from '@/lib/admin-access';
+import { adminGate, isAdminOnlyPath, type AdminAccess } from '@/lib/admin-access';
 import { ADMIN_ACCESS } from '@/lib/queries';
 
 const AdminAccessContext = createContext<AdminAccess | null>(null);
@@ -81,8 +82,7 @@ export function AdminGuard({
   children: ReactNode;
   requireAdmin?: boolean;
 }) {
-  const { isAuthenticated, isHydrated } = useAuth();
-  const router = useRouter();
+  const { isAuthenticated, isHydrated, signOut } = useAuth();
   const pathname = usePathname() || '/admin';
 
   const { data, loading, error, refetch } = useQuery<{ adminAccess: AdminAccess | null }>(
@@ -97,17 +97,26 @@ export function AdminGuard({
     error: !!error,
     access: data?.adminAccess,
     requireAdmin: requireAdmin || isAdminOnlyPath(pathname),
-    path: pathname,
   });
 
+  // A saved token the BFF no longer accepts (expired, revoked): drop it and ask for a login.
+  const tokenRejected = gate.status === 'login' && isAuthenticated;
   useEffect(() => {
-    if (gate.status !== 'login') return;
-    // Back to the same page after the login, query string included (read here rather than
-    // with useSearchParams, which would need a Suspense boundary in every layout).
-    router.replace(loginHref(`${window.location.pathname}${window.location.search}`));
-  }, [gate.status, router]);
+    if (tokenRejected) signOut();
+  }, [tokenRejected, signOut]);
 
   switch (gate.status) {
+    case 'login':
+      // Same URL, modal over it (REA-25); nothing of the admin is fetched before the session.
+      return tokenRejected ? (
+        <Checking />
+      ) : (
+        <LoginRequired
+          title="Entre para continuar"
+          description="Esta área é para quem organiza comunidades e eventos no Hub. Entre com a sua conta para continuar."
+          reason="Entre para acessar a área de organização"
+        />
+      );
     case 'allowed':
       return <AdminAccessContext.Provider value={gate.access}>{children}</AdminAccessContext.Provider>;
     case 'forbidden':

@@ -3,10 +3,9 @@
 import { Calendar, Home, Info, LogIn, LogOut, Menu, Users, CalendarDays, User, X } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { Suspense } from 'react';
 
-import { AuthModal } from '@/components/auth-modal';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/auth-context';
+import { useLoginPrompt } from '@/contexts/login-prompt-context';
 
 const ADMIN_EMAILS = [
   'gleidson10daniel@hotmail.com',
@@ -29,18 +29,11 @@ const ADMIN_EMAILS = [
 ];
 
 function NavigationContent() {
-  const searchParams = useSearchParams();
   const pathname = usePathname();
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const { isAuthenticated, user, signOut } = useAuth();
-
-  useEffect(() => {
-    if (searchParams.get('login') === 'true') {
-      setIsAuthModalOpen(true);
-    }
-  }, [searchParams]);
-
-  const redirectUrl = searchParams.get('redirect');
+  // Old ?login=true&redirect= links are handled by the LoginPrompt provider (REA-25).
+  const { requestLogin } = useLoginPrompt();
+  const openLogin = () => requestLogin();
 
   const handleSignOut = () => {
     signOut();
@@ -153,7 +146,7 @@ function NavigationContent() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <Button size="sm" onClick={() => setIsAuthModalOpen(true)}>
+                <Button size="sm" onClick={openLogin}>
                   Entrar
                 </Button>
               )}
@@ -215,7 +208,9 @@ function NavigationContent() {
             </Link>
           ) : (
             <button
-              onClick={() => setIsAuthModalOpen(true)}
+              type="button"
+              onClick={openLogin}
+              aria-label="Entrar"
               className="flex items-center justify-center w-10 h-10 rounded-xl transition-colors text-muted-foreground"
             >
               <LogIn className="h-6 w-6" />
@@ -223,13 +218,6 @@ function NavigationContent() {
           )}
         </div>
       </nav>
-
-      {/* Auth Modal */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        redirectUrl={redirectUrl}
-      />
     </>
   );
 }

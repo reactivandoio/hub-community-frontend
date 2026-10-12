@@ -18,12 +18,11 @@ import {
   Loader2,
   AlertCircle,
   ClipboardCheck,
-  LogIn,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { CREATE_ATTENDANCE, GET_EVENT_BY_SLUG_OR_ID } from '@/lib/queries';
 import { CreateAttendanceResponse } from '@/lib/types';
-import { AuthModal } from '@/components/auth-modal';
+import { LoginRequired } from '@/components/login-required';
 import Link from 'next/link';
 
 // CPF mask: 999.999.999-99
@@ -70,7 +69,7 @@ export default function AttendanceFormPage() {
   const params = useParams();
   const router = useRouter();
   const slug = params?.slug as string;
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isHydrated } = useAuth();
 
   const { data: eventData, loading: eventLoading } = useQuery(
     GET_EVENT_BY_SLUG_OR_ID,
@@ -239,31 +238,27 @@ export default function AttendanceFormPage() {
     );
   }
 
-  // Not authenticated — show login modal on top of the page
+  // Not authenticated — the login opens over the page, on the same URL (REA-25)
   if (!isAuthenticated) {
+    if (!isHydrated) {
+      return (
+        <div className="min-h-[80vh] flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      );
+    }
     return (
-      <div className="container max-w-2xl mx-auto py-20 px-4 min-h-[80vh] flex items-center justify-center">
-        <AuthModal
-          isOpen={true}
-          onClose={() => {}}
-        />
-        <Card className="w-full text-center shadow-lg border-primary/10">
-          <CardContent className="pt-10 pb-8 flex flex-col items-center">
-            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6">
-              <LogIn className="w-10 h-10 text-primary" />
-            </div>
-            <h2 className="text-2xl font-bold mb-3">Login Necessário</h2>
-            <p className="text-muted-foreground mb-6 max-w-md">
-              Você precisa estar logado para assinar a lista de presença do
-              evento{' '}
-              <span className="font-semibold text-foreground">
-                {eventData.eventBySlugOrId.title}
-              </span>
-              .
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <LoginRequired
+        className="min-h-[80vh]"
+        title="Login necessário"
+        reason="Entre para assinar a lista de presença"
+        description={
+          <>
+            Você precisa estar logado para assinar a lista de presença do evento{' '}
+            <span className="font-semibold text-foreground">{eventData.eventBySlugOrId.title}</span>.
+          </>
+        }
+      />
     );
   }
 

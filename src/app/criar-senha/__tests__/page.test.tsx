@@ -11,8 +11,16 @@ vi.mock('@/contexts/auth-context', () => ({
 
 let mockSearchParams = new URLSearchParams();
 
+const mockReplace = vi.fn();
+const mockRequestLogin = vi.fn();
+
 vi.mock('next/navigation', () => ({
   useSearchParams: () => mockSearchParams,
+  useRouter: () => ({ replace: mockReplace }),
+}));
+
+vi.mock('@/contexts/login-prompt-context', () => ({
+  useLoginPrompt: () => ({ requestLogin: mockRequestLogin, isOpen: false }),
 }));
 
 vi.mock('@/components/animations/fade-in', () => ({
@@ -51,10 +59,12 @@ describe('CreatePasswordPage', () => {
       expect(screen.getByText('Senha criada com sucesso!')).toBeInTheDocument();
     });
     expect(mockResetPassword).toHaveBeenCalledWith('tok', 'newpassword123', 'newpassword123');
-    expect(screen.getByRole('link', { name: /fazer login/i })).toHaveAttribute(
-      'href',
-      '/?login=true',
-    );
+    // REA-25: the login opens on this page, then back to where the person was.
+    window.localStorage.setItem('login_return_to', JSON.stringify({ path: '/events/meetup', savedAt: Date.now() }));
+    await user.click(screen.getByRole('button', { name: /fazer login/i }));
+    expect(mockRequestLogin).toHaveBeenCalledTimes(1);
+    mockRequestLogin.mock.calls[0][0].onSuccess();
+    expect(mockReplace).toHaveBeenCalledWith('/events/meetup');
   });
 
   it('explains an expired or used link', async () => {
