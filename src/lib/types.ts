@@ -593,9 +593,11 @@ export interface VotingSessionResponse {
 export interface BatchAnalytics {
   batch_id: string;
   batch_number: number;
+  /** Cents, like `Batch.value` (REA-6). */
   value: number;
   max_quantity: number;
   sold_quantity: number;
+  /** Cents. */
   revenue: number;
 }
 

@@ -51,6 +51,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
+import { formatCents } from '@/lib/money';
 import { GET_EVENT_BY_SLUG_OR_ID, IMPORT_SIGNUPS, MANUAL_SIGNUP } from '@/lib/queries';
 import { EventResponse, ImportSignupsResponse, ManualSignupResponse } from '@/lib/types';
 
@@ -469,7 +470,7 @@ export default function ImportSignupsPage() {
                           <SelectItem key={batch.id} value={batch.id}>
                             {batch.product.name} — {batch.batch_number}º Lote
                             {!batch.product.can_be_listed ? ' (Oculto)' : ''}
-                            {batch.value > 0 ? ` — R$ ${(batch.value / 100).toFixed(2)}` : ' — Gratuito'}
+                            {batch.value > 0 ? ` — ${formatCents(batch.value)}` : ' — Gratuito'}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -739,7 +740,7 @@ export default function ImportSignupsPage() {
                               </div>
                               <p className="text-sm text-muted-foreground mt-0.5">
                                 {batch.batch_number}º Lote
-                                {batch.value > 0 ? ` — R$ ${(batch.value / 100).toFixed(2)}` : ' — Gratuito'}
+                                {batch.value > 0 ? ` — ${formatCents(batch.value)}` : ' — Gratuito'}
                               </p>
                             </div>
                             <div
