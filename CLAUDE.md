@@ -57,6 +57,13 @@ src/
   (`/admin/events` and the voting-session picker do). The event's own page and signup flow are never
   filtered — the direct link is the point.
 
+- **Coupon link (REA-18)** — `/events/<slug>#cupom=CODE` fills the coupon in on signup. `lib/coupon-link.ts`
+  builds and parses the fragment (any other fragment is ignored) and keeps the code per event in
+  `localStorage` (`pending_coupon:<slug>`, 24 h) so it survives login and signup; `useCouponLink` reads
+  it on the event page and on `/events/<slug>/signup`, and every path that leads to the signup
+  (Participar, the login `redirect`) carries the fragment along. The link grants nothing: the signup
+  page sends the code to the server like a typed one. The admin copies the link in the Cupons tab.
+
 - **Admin access (REA-10)** — `/admin`, `/badge-printer`, `/checkin` and `/sorteio` have a layout with
   `AdminGuard` (`components/admin/admin-guard.tsx`): signed in (else `/?login=true&redirect=…`) with the
   `admin` or `community-manager` role, read from the BFF `adminAccess` query. Admin-only paths

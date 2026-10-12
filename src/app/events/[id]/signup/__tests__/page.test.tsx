@@ -7,7 +7,9 @@ const signupV2 = vi.fn();
 const signupLegacy = vi.fn();
 const previewCoupon = vi.fn();
 const validateCoupon = vi.fn();
+const routerPush = vi.fn();
 let paymentsV2: boolean | null = true;
+let isAuthenticated = true;
 
 const event = {
   id: 'ev1',
@@ -28,13 +30,15 @@ const event = {
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: 'meetup' }),
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: routerPush }),
 }));
 vi.mock('next/image', () => ({ default: () => null }));
 vi.mock('@/contexts/auth-context', () => ({
   useAuth: () => ({
-    user: { email: 'ana@example.com', username: 'ana', name: 'Ana', phone: '+55 11 99999-0000' },
-    isAuthenticated: true,
+    user: isAuthenticated
+      ? { email: 'ana@example.com', username: 'ana', name: 'Ana', phone: '+55 11 99999-0000' }
+      : null,
+    isAuthenticated,
     updatePhone: vi.fn(),
   }),
 }));
@@ -66,7 +70,10 @@ vi.mock('@apollo/client', async (importOriginal) => {
 beforeEach(() => {
   vi.clearAllMocks();
   paymentsV2 = true;
+  isAuthenticated = true;
   event.products[0].batches[0].half_price_eligible = false;
+  window.localStorage.clear();
+  window.history.replaceState(null, '', '/events/meetup/signup');
 });
 
 const goToConfirm = async () => {
@@ -232,5 +239,124 @@ describe('EventSignupPage (REA-16 meia-entrada)', () => {
     fireEvent.click(box);
     await waitFor(() => expect(screen.queryByText('-R$ 25,00')).not.toBeInTheDocument());
     expect(previewCoupon).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('EventSignupPage (REA-18 cupom pelo link)', () => {
+  const openWithCoupon = (hash = '#cupom=promo10') =>
+    window.history.replaceState(null, '', `/events/meetup/signup${hash}`);
+
+  it('fills the coupon of the link in, applies it and shows the server price', async () => {
+    openWithCoupon();
+    previewCoupon.mockResolvedValue(preview('coupon', 4500, 'Cupom aplicado.'));
+    signupV2.mockResolvedValue({ data: { signupToEvent: { success: true, is_free: false, signup_id: '7', payment: { value: 4500 } } } });
+    render(<EventSignupPage />);
+    await waitFor(() =>
+      expect(previewCoupon).toHaveBeenCalledWith({
+        variables: { eventSlug: 'meetup', batchId: 'b1', code: 'PROMO10', isStudent: false },
+      }),
+    );
+    expect(await screen.findByTestId('applied-coupon')).toHaveTextContent('Cupom PROMO10 aplicado pelo link.');
+    expect(screen.getByPlaceholderText('Digite seu cupom')).toHaveValue('PROMO10');
+    expect(screen.getByText('Desconto do cupom')).toBeInTheDocument();
+    expect(screen.getByText('-R$ 5,00')).toBeInTheDocument();
+    expect(screen.getAllByText('R$ 45,00').length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar para pagamento' }));
+    fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '529.982.247-25' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar Inscrição' }));
+    await waitFor(() => expect(signupV2).toHaveBeenCalled());
+    expect(signupV2.mock.calls[0][0].variables).toMatchObject({ coupon_code: 'PROMO10' });
+    // Used: the next visit to this event starts without it.
+    expect(window.localStorage.getItem('pending_coupon:meetup')).toBeNull();
+  });
+
+  it('applies the coupon kept before the login, without the fragment', async () => {
+    window.localStorage.setItem('pending_coupon:meetup', JSON.stringify({ code: 'PROMO10', savedAt: Date.now() }));
+    previewCoupon.mockResolvedValue(preview('coupon', 4500, 'Cupom aplicado.'));
+    render(<EventSignupPage />);
+    expect(await screen.findByTestId('applied-coupon')).toHaveTextContent('PROMO10');
+  });
+
+  it('a refused coupon shows the server message and does not block the signup', async () => {
+    openWithCoupon('#cupom=VENCIDO');
+    previewCoupon.mockResolvedValue({
+      data: { previewCoupon: { valid: false, message: 'Cupom expirado.', discount_kind: null, final_value: null, original_value: 5000, min_charge_applied: false } },
+    });
+    signupV2.mockResolvedValue({ data: { signupToEvent: { success: true, is_free: false, signup_id: '7', payment: { value: 5000 } } } });
+    render(<EventSignupPage />);
+    expect(await screen.findByText('Cupom expirado.')).toBeInTheDocument();
+    expect(screen.getByText('Você pode seguir com a inscrição sem o desconto.')).toBeInTheDocument();
+    expect(screen.queryByTestId('applied-coupon')).not.toBeInTheDocument();
+    expect(screen.getAllByText('R$ 50,00').length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar para pagamento' }));
+    fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '529.982.247-25' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar Inscrição' }));
+    expect(await screen.findByText('Passo Opa Pingou 5000')).toBeInTheDocument();
+    expect(signupV2.mock.calls[0][0].variables).not.toHaveProperty('coupon_code');
+  });
+
+  it('a server error on the coupon does not block the signup either', async () => {
+    openWithCoupon();
+    previewCoupon.mockRejectedValue(new Error('network'));
+    render(<EventSignupPage />);
+    expect(await screen.findByText('Erro ao validar cupom.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continuar para pagamento' })).toBeEnabled();
+  });
+
+  it('removes the coupon: full price again, and the link is forgotten', async () => {
+    openWithCoupon();
+    previewCoupon.mockResolvedValue(preview('coupon', 4500, 'Cupom aplicado.'));
+    render(<EventSignupPage />);
+    await screen.findByTestId('applied-coupon');
+    fireEvent.click(screen.getByRole('button', { name: 'Remover' }));
+    await waitFor(() => expect(screen.queryByTestId('applied-coupon')).not.toBeInTheDocument());
+    expect(screen.queryByText('Desconto do cupom')).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Digite seu cupom')).toHaveValue('');
+    expect(window.location.hash).toBe('');
+    expect(window.localStorage.getItem('pending_coupon:meetup')).toBeNull();
+    expect(previewCoupon).toHaveBeenCalledTimes(1);
+  });
+
+  it('a coupon typed by hand can be removed too', async () => {
+    previewCoupon.mockResolvedValue(preview('coupon', 4500, 'Cupom aplicado.'));
+    render(<EventSignupPage />);
+    fireEvent.change(await screen.findByPlaceholderText('Digite seu cupom'), { target: { value: 'promo' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }));
+    expect(await screen.findByTestId('applied-coupon')).toHaveTextContent('Cupom PROMO aplicado.');
+    fireEvent.click(screen.getByRole('button', { name: 'Remover' }));
+    await waitFor(() => expect(screen.queryByText('Desconto do cupom')).not.toBeInTheDocument());
+  });
+
+  it('ignores another fragment', async () => {
+    openWithCoupon('#products');
+    render(<EventSignupPage />);
+    await screen.findByRole('button', { name: 'Continuar para pagamento' });
+    expect(previewCoupon).not.toHaveBeenCalled();
+    expect(screen.getByPlaceholderText('Digite seu cupom')).toHaveValue('');
+    expect(window.location.hash).toBe('#products');
+  });
+
+  it('works with the old BFF too (percentage from validateCoupon)', async () => {
+    paymentsV2 = false;
+    openWithCoupon();
+    validateCoupon.mockResolvedValue({ data: { validateCoupon: { valid: true, discount_percentage: 10, message: 'Cupom válido.' } } });
+    render(<EventSignupPage />);
+    expect(await screen.findByTestId('applied-coupon')).toHaveTextContent('PROMO10');
+    expect(validateCoupon).toHaveBeenCalledWith({ variables: { eventSlug: 'meetup', code: 'PROMO10' } });
+    expect(screen.getByText('-R$ 5,00')).toBeInTheDocument();
+  });
+
+  it('takes the coupon through the login: the redirect back carries the fragment', async () => {
+    isAuthenticated = false;
+    openWithCoupon();
+    render(<EventSignupPage />);
+    await waitFor(() => expect(routerPush).toHaveBeenCalled());
+    const target = new URL(routerPush.mock.calls[0][0], 'https://hubcommunity.io');
+    expect(target.searchParams.get('login')).toBe('true');
+    expect(target.searchParams.get('redirect')).toBe('/events/meetup/signup#cupom=PROMO10');
+    // And it is kept in the browser, for a login that comes back without the fragment.
+    expect(window.localStorage.getItem('pending_coupon:meetup')).toContain('PROMO10');
   });
 });

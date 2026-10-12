@@ -39,8 +39,10 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/auth-context';
+import { useCouponLink } from '@/hooks/use-coupon-link';
 import { useTracking } from '@/hooks/use-tracking';
 import { usePaymentsV2 } from '@/hooks/use-payments-v2';
+import { clearPendingCoupon, pendingCouponHash } from '@/lib/coupon-link';
 import {
   GET_EVENT_BY_SLUG_OR_ID,
   PREVIEW_COUPON,
@@ -117,6 +119,10 @@ export default function EventSignupPage() {
   const [paymentAttempt, setPaymentAttempt] = useState(0);
   const [linkUnavailable, setLinkUnavailable] = useState(false);
   const lastSignupVars = useRef<Record<string, unknown> | null>(null);
+  // REA-18: coupon of a ready-made link (#cupom=CODE). It only fills the field in;
+  // the server still validates and prices it.
+  const { code: linkCoupon, clear: clearLinkCoupon } = useCouponLink(slugOrId);
+  const [couponFromLink, setCouponFromLink] = useState(false);
 
   // Inline signup form (for unauthenticated users)
   const inlineForm = useForm<InlineSignupValues>({
@@ -182,7 +188,8 @@ export default function EventSignupPage() {
 
   useEffect(() => {
     if (onlyPaidForGuest) {
-      const currentPath = `/events/${slugOrId}/signup`;
+      // The coupon of the link comes back with the redirect (REA-18).
+      const currentPath = `/events/${slugOrId}/signup${pendingCouponHash(slugOrId)}`;
       router.push(`/?login=true&redirect=${encodeURIComponent(currentPath)}`);
     }
   }, [onlyPaidForGuest, router, slugOrId]);
@@ -277,15 +284,15 @@ export default function EventSignupPage() {
   };
 
   // Handle coupon validation
-  const handleValidateCoupon = async () => {
-    if (!couponCode.trim()) return;
+  const applyCoupon = async (code: string) => {
+    if (!code) return;
     if (paymentsV2) {
-      await refreshPrice(couponCode.trim(), halfPrice);
+      await refreshPrice(code, halfPrice);
       return;
     }
     try {
       const { data } = await validateCoupon({
-        variables: { eventSlug: slugOrId, code: couponCode.trim() },
+        variables: { eventSlug: slugOrId, code },
       });
       const result = data?.validateCoupon;
       if (result?.valid) {
@@ -297,6 +304,37 @@ export default function EventSignupPage() {
       }
     } catch {
       setCouponMessage('Erro ao validar cupom.');
+    }
+  };
+
+  const handleValidateCoupon = () => applyCoupon(couponCode.trim());
+
+  // Ready-made link (REA-18): the code fills the field and goes to the server for
+  // the chosen batch, again on every batch change. A refusal only shows the
+  // server's message; the signup goes on without the discount.
+  useEffect(() => {
+    if (!linkCoupon || paymentsV2 === null || !selectedBatch || selectedBatch.value <= 0) return;
+    setCouponCode(linkCoupon);
+    setCouponFromLink(true);
+    void applyCoupon(linkCoupon);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkCoupon, paymentsV2, selectedBatch?.id]);
+
+  // Typing another code, or removing it, lets go of the coupon of the link.
+  const forgetLinkCoupon = () => {
+    if (!couponFromLink) return;
+    setCouponFromLink(false);
+    clearLinkCoupon();
+  };
+
+  const removeCoupon = () => {
+    forgetLinkCoupon();
+    setCouponCode('');
+    setCouponDiscount(null);
+    setCouponMessage('');
+    if (appliedCoupon) {
+      setAppliedCoupon('');
+      void refreshPrice('', halfPrice);
     }
   };
 
@@ -386,6 +424,7 @@ export default function EventSignupPage() {
 
       if (result?.success) {
         setSignupResult(result);
+        clearPendingCoupon(slugOrId);
         track({
           eventType: 'signup_complete',
           eventDocumentId: event?.documentId,
@@ -479,6 +518,7 @@ export default function EventSignupPage() {
       if (result?.success) {
         succeeded = true;
         setSignupResult(result);
+        clearPendingCoupon(slugOrId);
         setIsNewAccount(true);
         track({
           eventType: 'signup_complete',
@@ -697,7 +737,7 @@ export default function EventSignupPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      const currentPath = `/events/${slugOrId}/signup`;
+                      const currentPath = `/events/${slugOrId}/signup${pendingCouponHash(slugOrId)}`;
                       router.push(`/?login=true&redirect=${encodeURIComponent(currentPath)}`);
                     }}
                     className="text-sm text-primary hover:underline font-medium"
@@ -803,6 +843,7 @@ export default function EventSignupPage() {
                           placeholder="Digite seu cupom"
                           value={couponCode}
                           onChange={(e) => {
+                            forgetLinkCoupon();
                             setCouponCode(e.target.value.toUpperCase());
                             setCouponDiscount(null);
                             setCouponMessage('');
@@ -835,6 +876,26 @@ export default function EventSignupPage() {
                         >
                           {couponMessage}
                         </p>
+                      )}
+                      {couponFromLink && !couponApplied && couponMessage && !validatingCoupon && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Você pode seguir com a inscrição sem o desconto.
+                        </p>
+                      )}
+                      {couponApplied && (
+                        <div
+                          className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-green-600/30 bg-green-500/10 px-3 py-2"
+                          data-testid="applied-coupon"
+                        >
+                          <p className="text-sm text-foreground">
+                            Cupom{' '}
+                            <strong className="font-mono">{paymentsV2 ? appliedCoupon : couponCode}</strong>{' '}
+                            {couponFromLink ? 'aplicado pelo link.' : 'aplicado.'}
+                          </p>
+                          <Button variant="ghost" size="sm" onClick={removeCoupon}>
+                            Remover
+                          </Button>
+                        </div>
                       )}
                     </div>
                   )}

@@ -285,6 +285,7 @@ export default function EditEventPage() {
             <div className="border rounded-lg p-6 bg-card">
               <CouponsTab
                 eventId={data.eventBySlugOrId.id}
+                eventSlug={eventSlug}
                 products={data.eventBySlugOrId.products || []}
               />
             </div>
