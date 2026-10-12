@@ -6,7 +6,7 @@
  * - admin: everything, including users and roles.
  * - community-manager: /admin, check-in, badge printing and the raffle, scoped to the
  *   communities it organizes and their events.
- * - anyone else: no access. Not signed in: sent to the login, then back.
+ * - anyone else: no access. Not signed in: the login modal opens on the same page (REA-25).
  */
 
 export type AdminRoleType = 'authenticated' | 'community-manager' | 'admin';
@@ -34,17 +34,10 @@ export const isAdminOnlyPath = (pathname: string | null | undefined) =>
 
 export type AdminGateState =
   | { status: 'checking' }
-  | { status: 'login'; href: string }
+  | { status: 'login' }
   | { status: 'error' }
   | { status: 'forbidden' }
   | { status: 'allowed'; access: AdminAccess };
-
-/** Where to send someone who is not signed in: the login modal, then back to `path`. */
-export const loginHref = (path: string) => {
-  // Only paths of this site come back (no //host or scheme).
-  const safe = path.startsWith('/') && !path.startsWith('//') ? path : '/admin';
-  return `/?login=true&redirect=${encodeURIComponent(safe)}`;
-};
 
 export const adminGate = ({
   isHydrated,
@@ -53,7 +46,6 @@ export const adminGate = ({
   error,
   access,
   requireAdmin,
-  path,
 }: {
   isHydrated: boolean;
   isAuthenticated: boolean;
@@ -61,14 +53,13 @@ export const adminGate = ({
   error: boolean;
   access: AdminAccess | null | undefined;
   requireAdmin: boolean;
-  path: string;
 }): AdminGateState => {
   if (!isHydrated) return { status: 'checking' };
-  if (!isAuthenticated) return { status: 'login', href: loginHref(path) };
+  if (!isAuthenticated) return { status: 'login' };
   if (loading && !access) return { status: 'checking' };
   if (error && !access) return { status: 'error' };
   // A token the BFF does not accept (expired, revoked) comes back as null: sign in again.
-  if (!access) return { status: 'login', href: loginHref(path) };
+  if (!access) return { status: 'login' };
   if (!access.canAccessAdmin) return { status: 'forbidden' };
   if (requireAdmin && !access.isAdmin) return { status: 'forbidden' };
   return { status: 'allowed', access };

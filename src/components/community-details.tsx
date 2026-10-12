@@ -14,16 +14,15 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState } from 'react';
 
 import { FadeIn } from '@/components/animations';
-import { AuthModal } from '@/components/auth-modal';
 import { CommunityDetailsSkeleton } from '@/components/community-details-skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ExpandableRichText } from '@/components/ui/expandable-rich-text';
 import { useAuth } from '@/contexts/auth-context';
+import { useLoginPrompt } from '@/contexts/login-prompt-context';
 import { GET_COMMUNITY_BY_SLUG_OR_ID, GET_EVENTS } from '@/lib/queries';
 import { CommunityResponse, Event, EventsResponse } from '@/lib/types';
 
@@ -40,7 +39,7 @@ interface CommunityDetailsProps {
 
 export function CommunityDetails({ slugOrId }: CommunityDetailsProps) {
   const { isAuthenticated } = useAuth();
-  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const { requestLogin } = useLoginPrompt();
 
   const { data, loading, error } = useQuery<CommunityResponse>(
     GET_COMMUNITY_BY_SLUG_OR_ID,
@@ -110,7 +109,9 @@ export function CommunityDetails({ slugOrId }: CommunityDetailsProps) {
 
   const handleJoinClick = () => {
     if (!isAuthenticated) {
-      setAuthModalOpen(true);
+      // After the login the person is one click from the community link (a popup opened
+      // without a click would be blocked).
+      requestLogin({ reason: 'Entre para participar da comunidade' });
       return;
     }
     if (
@@ -332,11 +333,6 @@ export function CommunityDetails({ slugOrId }: CommunityDetailsProps) {
           )}
         </div>
       </div>
-
-      <AuthModal
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-      />
     </FadeIn>
   );
 }

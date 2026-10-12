@@ -11,6 +11,7 @@ let paymentStatus: Record<string, unknown> | null = null;
 const previewCoupon = vi.fn();
 const validateCoupon = vi.fn();
 const routerPush = vi.fn();
+const requestLogin = vi.fn();
 let paymentsV2: boolean | null = true;
 let isAuthenticated = true;
 
@@ -36,6 +37,9 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPush }),
 }));
 vi.mock('next/image', () => ({ default: () => null }));
+vi.mock('@/contexts/login-prompt-context', () => ({
+  useLoginPrompt: () => ({ requestLogin, isOpen: false }),
+}));
 vi.mock('@/contexts/auth-context', () => ({
   useAuth: () => ({
     user: isAuthenticated
@@ -358,17 +362,21 @@ describe('EventSignupPage (REA-18 cupom pelo link)', () => {
     expect(screen.getByText('-R$ 5,00')).toBeInTheDocument();
   });
 
-  it('takes the coupon through the login (older BFF): the redirect back carries the fragment', async () => {
+  it('asks for the login on the page itself (older BFF, REA-25): no redirect, coupon kept', async () => {
     isAuthenticated = false;
     guestSupport = false;
     openWithCoupon();
     render(<EventSignupPage />);
-    await waitFor(() => expect(routerPush).toHaveBeenCalled());
-    const target = new URL(routerPush.mock.calls[0][0], 'https://hubcommunity.io');
-    expect(target.searchParams.get('login')).toBe('true');
-    expect(target.searchParams.get('redirect')).toBe('/events/meetup/signup#cupom=PROMO10');
-    // And it is kept in the browser, for a login that comes back without the fragment.
+    expect(await screen.findByRole('heading', { name: 'Entre para se inscrever' })).toBeInTheDocument();
+    expect(requestLogin).toHaveBeenCalledTimes(1);
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe('/events/meetup/signup');
+    expect(window.location.hash.toUpperCase()).toBe('#CUPOM=PROMO10');
+    // Kept in the browser too, for a signup that goes through the e-mail.
     expect(window.localStorage.getItem('pending_coupon:meetup')).toContain('PROMO10');
+    // Closed without signing in: a button opens it again.
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }));
+    expect(requestLogin).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -395,6 +403,14 @@ describe('EventSignupPage (REA-22 inscrição sem login)', () => {
     render(<EventSignupPage />);
     expect(await screen.findByText('1º Lote')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Continuar para pagamento' })).toBeInTheDocument();
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(requestLogin).not.toHaveBeenCalled();
+  });
+
+  it('"Já tenho conta" abre o login na própria inscrição (REA-25)', async () => {
+    render(<EventSignupPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Já tenho conta' }));
+    expect(requestLogin).toHaveBeenCalledTimes(1);
     expect(routerPush).not.toHaveBeenCalled();
   });
 

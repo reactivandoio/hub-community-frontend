@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { ExpandableRichText } from '@/components/ui/expandable-rich-text';
 import { useAuth } from '@/contexts/auth-context';
+import { useLoginPrompt } from '@/contexts/login-prompt-context';
 import { trackViewTalkDetail } from '@/lib/analytics';
 import { GET_TALK_BY_ID } from '@/lib/queries';
 import { TalkResponse } from '@/lib/types';
@@ -73,6 +74,7 @@ export function TalkDetails({ talkId }: TalkDetailsProps) {
     variables: { talkId },
   });
   const { isAuthenticated } = useAuth();
+  const { requestLogin } = useLoginPrompt();
   const commentsRef = useRef<{ refetch: () => void } | null>(null);
 
   // Track talk detail view
@@ -399,6 +401,9 @@ export function TalkDetails({ talkId }: TalkDetailsProps) {
                   palestra.
                 </p>
               </div>
+              <Button onClick={() => requestLogin({ reason: 'Entre para comentar nesta palestra' })}>
+                Entrar para comentar
+              </Button>
             </div>
           )}
         </div>

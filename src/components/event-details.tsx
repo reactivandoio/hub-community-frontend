@@ -30,6 +30,7 @@ import { Button } from '@/components/ui/button';
 import { ExpandableRichText } from '@/components/ui/expandable-rich-text';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/auth-context';
+import { useLoginPrompt } from '@/contexts/login-prompt-context';
 import { useCouponLink } from '@/hooks/use-coupon-link';
 import { usePageVisitTracker, useTracking } from '@/hooks/use-tracking';
 import { trackViewEventDetail } from '@/lib/analytics';
@@ -44,6 +45,7 @@ interface EventDetailsProps {
 
 export function EventDetails({ slugOrId }: EventDetailsProps) {
   const { isAuthenticated, user } = useAuth();
+  const { requestLogin } = useLoginPrompt();
   const router = useRouter();
   const [optimisticAgendaTalks, setOptimisticAgendaTalks] = useState<
     Set<string>
@@ -456,11 +458,16 @@ export function EventDetails({ slugOrId }: EventDetailsProps) {
 
             const handleCertificateClick = () => {
               if (certificateDisabled) return;
-              if (!isAuthenticated) {
-                router.push(`/?login=true&redirect=${encodeURIComponent(`/events/${event.slug || slugOrId}`)}`);
-              } else {
-                router.push(`/certificado?event=${event.documentId}`);
+              const openCertificate = () => router.push(`/certificado?event=${event.documentId}`);
+              if (isAuthenticated) {
+                openCertificate();
+                return;
               }
+              // Login over the event page; the certificate opens after it once the event is over.
+              requestLogin({
+                reason: 'Entre para solicitar seu certificado',
+                onSuccess: eventHasPassed ? openCertificate : undefined,
+              });
             };
 
             return (

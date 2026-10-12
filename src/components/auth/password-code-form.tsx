@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Lock, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 
@@ -18,6 +18,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/auth-context';
+import { useLoginPrompt } from '@/contexts/login-prompt-context';
+import { takeLoginReturn } from '@/lib/login-prompt';
 
 export interface PasswordCodeCopy {
   title: string;
@@ -65,6 +67,17 @@ function PasswordCodeContent({ copy }: { copy: PasswordCodeCopy }) {
   const searchParams = useSearchParams();
   const code = searchParams.get('code');
   const { resetPassword } = useAuth();
+  const { requestLogin } = useLoginPrompt();
+  const router = useRouter();
+
+  // Login over this page; then back to where the person asked for the new password (REA-25).
+  const handleLogin = () =>
+    requestLogin({
+      onSuccess: () => {
+        const back = takeLoginReturn();
+        if (back) router.replace(back);
+      },
+    });
 
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
@@ -144,8 +157,8 @@ function PasswordCodeContent({ copy }: { copy: PasswordCodeCopy }) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button asChild className="w-full">
-                <Link href="/?login=true">Fazer Login</Link>
+              <Button className="w-full" onClick={handleLogin}>
+                Fazer Login
               </Button>
             </CardContent>
           </Card>

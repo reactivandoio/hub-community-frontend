@@ -73,12 +73,21 @@ src/
   "Pré-visualizar" all go through it — don't render descriptions any other way.
 
 - **Admin access (REA-10)** — `/admin`, `/badge-printer`, `/checkin` and `/sorteio` have a layout with
-  `AdminGuard` (`components/admin/admin-guard.tsx`): signed in (else `/?login=true&redirect=…`) with the
+  `AdminGuard` (`components/admin/admin-guard.tsx`): signed in (else "Entre para continuar" + login modal on the same URL, REA-25) with the
   `admin` or `community-manager` role, read from the BFF `adminAccess` query. Admin-only paths
   (`ADMIN_ONLY_PATHS` in `lib/admin-access.ts`: usuários, palestrantes, votações) refuse a
   community-manager, and lists are scoped with `visibleEvents` / `visibleCommunities`. Pages read the
   access with `useAdminAccess()`. This only shapes the UI: the BFF checks the role on every operation.
   There is no admin password anymore. `AuthState.isHydrated` tells when the saved session was read.
+
+- **Login in place (REA-25)** — never send someone to the home page to log in. `useLoginPrompt().requestLogin({ reason, onSuccess })`
+  (`contexts/login-prompt-context.tsx`) opens the one `AuthModal` over the current page; `useWithLogin()(action)` runs an
+  action now or after the login (the action must not re-check the session). A page that needs a session renders
+  `<LoginRequired>` (`components/login-required.tsx`) once `isHydrated` and signed out — it opens the modal once and keeps
+  a button — and fetches nothing protected before the session. Old `?login=true&redirect=/x` links still work: the
+  provider goes to `/x` and opens the modal there. Signup and "Recuperar" keep the page (`lib/login-prompt.ts`,
+  `login_return_to`, 24 h) so `/email-confirmed` and the new-password pages send the person back after the login.
+  New login methods (Google, code by e-mail) go in as tabs of `AuthModal`.
 
 - **Admin layout (REA-24)** — every `/admin` page is framed by `AdminShell`
   (`components/admin/admin-shell.tsx`, inside `AdminGuard` in `app/admin/layout.tsx`): collapsible
@@ -101,7 +110,7 @@ src/
   asks before leaving unsaved changes registered with `useUnsavedChanges`.
 
 ### Provider Hierarchy (layout.tsx)
-FirebaseProvider → ApolloProvider → AuthProvider → LogoutModalWrapper → AgendaProvider → FilterProvider → ThemeProvider → children
+FirebaseProvider → ApolloProvider → AuthProvider → LoginPromptProvider → LogoutModalWrapper → AgendaProvider → FilterProvider → ThemeProvider → children
 
 ## Conventions
 

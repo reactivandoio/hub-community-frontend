@@ -28,6 +28,7 @@ import { AddToCalendarButton } from '@/components/add-to-calendar-button';
 import { SignupTicketQr } from '@/components/signup-ticket-qr';
 import { SignupPixPayment } from '@/components/signup-pix-payment';
 import { GuestPaymentResume } from '@/components/guest-payment-resume';
+import { LoginRequired } from '@/components/login-required';
 import { FadeIn } from '@/components/animations';
 import { Button } from '@/components/ui/button';
 import {
@@ -40,11 +41,12 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/auth-context';
+import { useLoginPrompt } from '@/contexts/login-prompt-context';
 import { useCouponLink } from '@/hooks/use-coupon-link';
 import { useTracking } from '@/hooks/use-tracking';
 import { usePaymentsV2 } from '@/hooks/use-payments-v2';
 import { useGuestSignupSupport } from '@/hooks/use-guest-signup-support';
-import { clearPendingCoupon, pendingCouponHash } from '@/lib/coupon-link';
+import { clearPendingCoupon } from '@/lib/coupon-link';
 import {
   GET_EVENT_BY_SLUG_OR_ID,
   PREVIEW_COUPON,
@@ -99,6 +101,7 @@ export default function EventSignupPage() {
   const params = useParams();
   const router = useRouter();
   const { user, isAuthenticated, updatePhone } = useAuth();
+  const { requestLogin } = useLoginPrompt();
   const { track } = useTracking();
   const slugOrId = params.id as string;
 
@@ -199,21 +202,13 @@ export default function EventSignupPage() {
   }, [allAvailableProducts, isAuthenticated, guestSupport]);
 
   // If the event has no free batches and the user is not authenticated, the
-  // inline flow can't help them — fall back to the original login redirect.
+  // inline flow can't help them (older BFF) — ask for the login right here (REA-25).
   const onlyPaidForGuest =
     !loading &&
     !isAuthenticated &&
     guestSupport === false &&
     allAvailableProducts.length > 0 &&
     availableProducts.length === 0;
-
-  useEffect(() => {
-    if (onlyPaidForGuest) {
-      // The coupon of the link comes back with the redirect (REA-18).
-      const currentPath = `/events/${slugOrId}/signup${pendingCouponHash(slugOrId)}`;
-      router.push(`/?login=true&redirect=${encodeURIComponent(currentPath)}`);
-    }
-  }, [onlyPaidForGuest, router, slugOrId]);
 
   // Auto-select when there's only one product with one batch
   useEffect(() => {
@@ -590,13 +585,20 @@ export default function EventSignupPage() {
     );
   }
 
-  // If the event only has paid batches and the user isn't logged in, we
-  // already kicked off a redirect in a useEffect above — show a spinner
-  // while the navigation completes rather than flashing inline UI.
+  // Only paid batches and no session (older BFF): the login opens over this page, which
+  // carries on after it with the coupon of the link still applied (REA-18, it stays mounted).
   if (onlyPaidForGuest) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background">
+        <LoginRequired
+          title="Entre para se inscrever"
+          description={
+            <>
+              A inscrição em <strong className="text-foreground">{event.title}</strong> precisa da
+              sua conta. Entre ou cadastre-se e você continua aqui.
+            </>
+          }
+        />
       </div>
     );
   }
@@ -766,10 +768,7 @@ export default function EventSignupPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      const currentPath = `/events/${slugOrId}/signup${pendingCouponHash(slugOrId)}`;
-                      router.push(`/?login=true&redirect=${encodeURIComponent(currentPath)}`);
-                    }}
+                    onClick={() => requestLogin({ reason: 'Entre para se inscrever com a sua conta' })}
                     className="text-sm text-primary hover:underline font-medium"
                   >
                     Já tenho conta

@@ -4,17 +4,16 @@ import { useMutation, useQuery } from '@apollo/client';
 import { Calendar, Clock, MapPin, Plus, Users } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import React, { useState } from 'react';
+import React from 'react';
 
 import { StaggerContainer, StaggerItem } from '@/components/animations';
-import { AuthModal } from '@/components/auth-modal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ExpandableRichText } from '@/components/ui/expandable-rich-text';
 import { useAgenda } from '@/contexts/agenda-context';
-import { useAuth } from '@/contexts/auth-context';
 import { useFilters } from '@/contexts/filter-context';
+import { useWithLogin } from '@/contexts/login-prompt-context';
 import { CREATE_AGENDA, GET_EVENTS } from '@/lib/queries';
 import { Event, EventsResponse } from '@/lib/types';
 import { adjustToBrazilTimezone } from '@/utils/event';
@@ -26,8 +25,7 @@ export function EventsSection({
 }) {
   const { debouncedSearchTerm } = useFilters();
   const { agendas, refetchAgendas } = useAgenda();
-  const { isAuthenticated } = useAuth();
-  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const withLogin = useWithLogin();
 
   const [createAgendaMutation] = useMutation(CREATE_AGENDA);
 
@@ -76,26 +74,26 @@ export function EventsSection({
   };
 
   // Helper function to handle agenda creation
-  const handleCreateAgenda = async (event: Event) => {
-    if (!isAuthenticated) {
-      setAuthModalOpen(true);
-    } else {
-      try {
-        await createAgendaMutation({
-          variables: {
-            input: {
-              event: event.documentId,
-              is_public: false,
-            },
+  const createAgenda = async (event: Event) => {
+    try {
+      await createAgendaMutation({
+        variables: {
+          input: {
+            event: event.documentId,
+            is_public: false,
           },
-        });
-        // Refresh agendas after creation
-        await refetchAgendas();
-      } catch (error) {
-        console.error('Error creating agenda:', error);
-      }
+        },
+      });
+      // Refresh agendas after creation
+      await refetchAgendas();
+    } catch (error) {
+      console.error('Error creating agenda:', error);
     }
   };
+
+  // Signed out: the login opens over the list and the event goes to the agenda after it.
+  const handleCreateAgenda = (event: Event) =>
+    withLogin(() => createAgenda(event), 'Entre para salvar o evento na sua agenda');
 
   if (error) {
     return (
@@ -209,11 +207,6 @@ export function EventsSection({
           </Link>
         </StaggerItem>
       ))}
-
-      <AuthModal
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-      />
     </StaggerContainer>
   );
 }

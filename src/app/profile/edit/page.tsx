@@ -25,6 +25,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import { FadeIn } from '@/components/animations';
+import { LoginRequired } from '@/components/login-required';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,7 +55,7 @@ async function uploadFile(file: File): Promise<string> {
 }
 
 export default function EditProfilePage() {
-  const { user, isAuthenticated, isLoading: authLoading, syncUser } = useAuth();
+  const { user, isAuthenticated, isHydrated, isLoading: authLoading, syncUser } = useAuth();
   const router = useRouter();
 
   const [saving, setSaving] = useState(false);
@@ -102,12 +103,6 @@ export default function EditProfilePage() {
       setInstagram(u.instagram || '');
     }
   }, [freshData]);
-
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push('/');
-    }
-  }, [isAuthenticated, authLoading, router]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -202,7 +197,8 @@ export default function EditProfilePage() {
     );
   }
 
-  if (!isAuthenticated) return null;
+  // Signed out: the login opens over this page, on the same URL (REA-25).
+  if (!isAuthenticated) return isHydrated ? <LoginRequired title="Entre para editar seu perfil" /> : null;
 
   // Hidden file inputs
   const fileInputs = (

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { completeProfileHref, registrationIncomplete } from '../registration-incomplete';
+import { registrationIncomplete } from '../registration-incomplete';
 
 describe('registrationIncomplete (REA-22)', () => {
   it('lê o código do BFF e o que falta', () => {
@@ -15,8 +15,5 @@ describe('registrationIncomplete (REA-22)', () => {
     expect(registrationIncomplete({ graphQLErrors: [{ extensions: { code: 'BAD_USER_INPUT' } }] })).toBeNull();
     expect(registrationIncomplete(new Error('x'))).toBeNull();
     expect(registrationIncomplete(undefined)).toBeNull();
-  });
-  it('o login volta para a página do certificado', () => {
-    expect(completeProfileHref('/certificado?event=meetup')).toBe('/?login=true&redirect=%2Fcertificado%3Fevent%3Dmeetup');
   });
 });

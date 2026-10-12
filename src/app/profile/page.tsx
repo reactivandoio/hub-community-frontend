@@ -27,6 +27,7 @@ import { FadeIn } from '@/components/animations';
 import { InstallAppRow } from '@/components/install-banner';
 import { ProfileSkeleton } from '@/components/profile-skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { LoginRequired } from '@/components/login-required';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,7 +36,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { GET_USER_BY_USERNAME } from '@/lib/queries';
 
 export default function ProfilePage() {
-  const { user, isAuthenticated, signOut, isLoading, updatePhone, syncUser } = useAuth();
+  const { user, isAuthenticated, isHydrated, signOut, isLoading, updatePhone, syncUser } = useAuth();
   const { agendas, isLoading: agendasLoading } = useAgenda();
   const { theme, setTheme } = useTheme();
   const router = useRouter();
@@ -64,13 +65,10 @@ export default function ProfilePage() {
     }
   }, [freshUserData]);
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/');
-    }
-  }, [isAuthenticated, isLoading, router]);
-
+  // Leaving on purpose: no "entre para continuar" on the way to the home page.
+  const [signingOut, setSigningOut] = useState(false);
   const handleSignOut = () => {
+    setSigningOut(true);
     signOut();
     router.push('/');
   };
@@ -105,7 +103,9 @@ export default function ProfilePage() {
   }
 
   if (!isAuthenticated) {
-    return null;
+    // Signed out: the login opens over this page, on the same URL (REA-25).
+    if (!isHydrated || signingOut) return null;
+    return <LoginRequired title="Entre para ver seu perfil" />;
   }
 
   const getInitials = (name: string) => {

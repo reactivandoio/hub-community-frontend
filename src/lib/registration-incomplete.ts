@@ -25,8 +25,3 @@ export function registrationIncomplete(err: unknown): RegistrationIncomplete | n
     missing: Array.isArray(ext.missing) ? (ext.missing as string[]) : null,
   };
 }
-
-/** Login that comes back to the same certificate page; the profile dialog opens after it. */
-export function completeProfileHref(certificatePath: string): string {
-  return `/?login=true&redirect=${encodeURIComponent(certificatePath)}`;
-}

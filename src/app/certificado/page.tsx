@@ -20,8 +20,8 @@ import type {
 } from '@/lib/types';
 import { formatCpf, isValidCpf, normalizeIdentifier } from '@/lib/certificate';
 import { useAuth } from '@/contexts/auth-context';
+import { useLoginPrompt } from '@/contexts/login-prompt-context';
 import {
-  completeProfileHref,
   registrationIncomplete,
   type RegistrationIncomplete,
 } from '@/lib/registration-incomplete';
@@ -87,6 +87,9 @@ function CertificadoContent() {
   // REA-22: the registration must be finished before the certificate.
   const [incomplete, setIncomplete] = useState<RegistrationIncomplete | null>(null);
   const { isAuthenticated } = useAuth();
+  // REA-25: the login opens over this page, the profile dialog right after it, and the CPF
+  // typed here stays for the next try.
+  const { requestLogin } = useLoginPrompt();
   const showError = (err: unknown) => {
     setError(errorMessage(err));
     setIncomplete(registrationIncomplete(err));
@@ -238,9 +241,13 @@ function CertificadoContent() {
                       ? 'Depois de criar sua senha pelo link do e-mail, entre na sua conta: vamos pedir o que faltar no perfil.'
                       : 'Entre na sua conta: vamos pedir o que faltar no perfil e você volta para cá.'}
                   </p>
-                  <Link href={completeProfileHref(`/certificado?event=${encodeURIComponent(eventParam)}`)}>
-                    <Button size="sm" className="rounded-full">Entrar e completar meu cadastro</Button>
-                  </Link>
+                  <Button
+                    size="sm"
+                    className="rounded-full"
+                    onClick={() => requestLogin({ reason: 'Entre para completar seu cadastro e receber o certificado' })}
+                  >
+                    Entrar e completar meu cadastro
+                  </Button>
                 </>
               )}
             </div>

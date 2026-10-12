@@ -1,23 +1,37 @@
 'use client';
 
 import { CheckCircle, LogIn } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect } from 'react';
 
-import { AuthModal } from '@/components/auth-modal';
 import { FadeIn } from '@/components/animations';
 import { Button } from '@/components/ui/button';
+import { useLoginPrompt } from '@/contexts/login-prompt-context';
+import { takeLoginReturn } from '@/lib/login-prompt';
 
 function EmailConfirmedContent() {
   const searchParams = useSearchParams();
   const isAlreadyConfirmed = searchParams.get('already') === 'true';
-  const [showAuth, setShowAuth] = useState(false);
+  const router = useRouter();
+  const { requestLogin } = useLoginPrompt();
+
+  // After the login, back to the page where the account was created (REA-25), if kept.
+  const openLogin = useCallback(
+    () =>
+      requestLogin({
+        onSuccess: () => {
+          const back = takeLoginReturn();
+          if (back) router.replace(back);
+        },
+      }),
+    [requestLogin, router],
+  );
 
   useEffect(() => {
     // Auto-open login modal after a short delay
-    const timer = setTimeout(() => setShowAuth(true), 1500);
+    const timer = setTimeout(openLogin, 1500);
     return () => clearTimeout(timer);
-  }, []);
+  }, [openLogin]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
@@ -49,7 +63,7 @@ function EmailConfirmedContent() {
 
           {/* Login Button */}
           <Button
-            onClick={() => setShowAuth(true)}
+            onClick={openLogin}
             className="w-full rounded-xl h-12 text-base font-medium"
             size="lg"
           >
@@ -58,12 +72,6 @@ function EmailConfirmedContent() {
           </Button>
         </div>
       </FadeIn>
-
-      {/* Auth Modal */}
-      <AuthModal
-        isOpen={showAuth}
-        onClose={() => setShowAuth(false)}
-      />
     </div>
   );
 }

@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   adminGate,
   isAdminOnlyPath,
-  loginHref,
   visibleCommunities,
   visibleEvents,
   type AdminAccess,
@@ -19,7 +18,7 @@ const MANAGER: AdminAccess = {
 };
 const MEMBER: AdminAccess = { role: 'authenticated', isAdmin: false, isCommunityManager: false, canAccessAdmin: false, communities: [] };
 
-const base = { isHydrated: true, isAuthenticated: true, loading: false, error: false, requireAdmin: false, path: '/admin/events' };
+const base = { isHydrated: true, isAuthenticated: true, loading: false, error: false, requireAdmin: false };
 
 describe('adminGate', () => {
   it('waits for the saved session and for the role', () => {
@@ -27,9 +26,8 @@ describe('adminGate', () => {
     expect(adminGate({ ...base, loading: true, access: undefined }).status).toBe('checking');
   });
 
-  it('sends whoever is not signed in to the login and back', () => {
-    expect(adminGate({ ...base, isAuthenticated: false, access: undefined }))
-      .toEqual({ status: 'login', href: '/?login=true&redirect=%2Fadmin%2Fevents' });
+  it('asks whoever is not signed in to log in (on the same page)', () => {
+    expect(adminGate({ ...base, isAuthenticated: false, access: undefined })).toEqual({ status: 'login' });
   });
 
   it('asks to sign in again when the BFF does not accept the token', () => {
@@ -48,14 +46,6 @@ describe('adminGate', () => {
 
   it('reports a failure to check', () => {
     expect(adminGate({ ...base, error: true, access: undefined }).status).toBe('error');
-  });
-});
-
-describe('loginHref', () => {
-  it('only returns to paths of this site', () => {
-    expect(loginHref('//evil.example/x')).toBe('/?login=true&redirect=%2Fadmin');
-    expect(loginHref('https://evil.example')).toBe('/?login=true&redirect=%2Fadmin');
-    expect(loginHref('/checkin/meetup?x=1')).toBe('/?login=true&redirect=%2Fcheckin%2Fmeetup%3Fx%3D1');
   });
 });
 

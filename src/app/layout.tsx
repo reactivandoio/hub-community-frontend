@@ -18,6 +18,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { AgendaProvider } from '@/contexts/agenda-context';
 import { AuthProvider } from '@/contexts/auth-context';
 import { FilterProvider } from '@/contexts/filter-context';
+import { LoginPromptProvider } from '@/contexts/login-prompt-context';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -55,33 +56,35 @@ export default function RootLayout({
         <FirebaseProvider>
           <ApolloProviderWrapper>
             <AuthProvider>
-              <LogoutModalWrapper />
-              <CompleteProfileModal />
-              <AgendaProvider>
-                <FilterProvider>
-                  <ThemeProvider
-                    attribute="class"
-                    defaultTheme="dark"
-                    enableSystem
-                    disableTransitionOnChange
-                  >
-                    <PublicOnly>
-                      <Navigation />
-                    </PublicOnly>
-                    <RouteErrorBoundary>
-                      <PageTransitionProvider>
-                        {children}
-                      </PageTransitionProvider>
-                    </RouteErrorBoundary>
-                    <Toaster />
-                    <SonnerToaster richColors position="top-right" />
-                    <PublicOnly>
-                      <Footer />
-                    </PublicOnly>
-                    <CookieConsentBanner />
-                  </ThemeProvider>
-                </FilterProvider>
-              </AgendaProvider>
+              <LoginPromptProvider>
+                <LogoutModalWrapper />
+                <CompleteProfileModal />
+                <AgendaProvider>
+                  <FilterProvider>
+                    <ThemeProvider
+                      attribute="class"
+                      defaultTheme="dark"
+                      enableSystem
+                      disableTransitionOnChange
+                    >
+                      <PublicOnly>
+                        <Navigation />
+                      </PublicOnly>
+                      <RouteErrorBoundary>
+                        <PageTransitionProvider>
+                          {children}
+                        </PageTransitionProvider>
+                      </RouteErrorBoundary>
+                      <Toaster />
+                      <SonnerToaster richColors position="top-right" />
+                      <PublicOnly>
+                        <Footer />
+                      </PublicOnly>
+                      <CookieConsentBanner />
+                    </ThemeProvider>
+                  </FilterProvider>
+                </AgendaProvider>
+              </LoginPromptProvider>
             </AuthProvider>
           </ApolloProviderWrapper>
         </FirebaseProvider>
