@@ -219,6 +219,21 @@ cobrança) com `node --test` (o repositório não tem runner; sem dependência n
 - Analytics do evento: card "Pagamentos" (pagos, pendentes, expirados, cancelados, total
   recebido) via `eventPayments`; não aparece em evento gratuito nem se a query falhar.
 
+**Liberação pelo servidor (REA-9, 2026-10-11).** Tudo o que é novo no frontend depende de uma
+sonda: `signupPaymentStatus(signupId: "0")` (`src/lib/server-support.ts`,
+`src/hooks/use-payments-v2.ts`). BFF que não conhece o campo (erro de validação do GraphQL) ou que
+não responde = servidor antigo: preço do lote salvo como digitado, sem seletor de provedor, sem aba
+Cupons, sem CPF e com o `signupToEvent` e o `validateCoupon` de hoje. Com a sonda respondendo, o
+admin passa a converter reais ↔ centavos e a inscrição usa `SignupToEventV2` (`cpf`, `kind`) e
+`previewCoupon`. Assim o frontend pode subir antes ou depois do Eventando e do BFF.
+
+Detalhes de contrato acertados entre os três agentes (2026-10-11): `cpf` e `kind` são argumentos do
+`signupToEvent`; trocar o `kind` numa inscrição pendente é nova tentativa; link indisponível
+responde "Link indisponível, pague por Pix."; `eventCoupons`/`CouponInput.event` aceitam o id do
+Hub; `Coupon.batches` é `[Batch] { id batch_number }` e `CouponInput.batches` é `[String]`; erros de
+cupom (código repetido, tipo/valor travados) chegam com a mensagem do Eventando. O CPF só vira
+obrigatório no Eventando sem cupom quando `SIGNUP_REQUIRE_CPF=true`; o frontend sempre pede e valida.
+
 ### 3.4 Cupom de desconto (regras do Pedro, 2026-10-10)
 
 Reaproveita o `api::coupon` do Eventando, o `validateCoupon` e o CRUD do BFF e o campo de cupom
