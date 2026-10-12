@@ -1,9 +1,10 @@
 'use client';
 
-import { ArrowRight, Building2, Calendar, Mic, Shield, Users, Vote } from 'lucide-react';
+import { ArrowRight, Building2, Calendar, Mic, Users, Vote } from 'lucide-react';
 import Link from 'next/link';
 
 import { useAdminAccess } from '@/components/admin/admin-guard';
+import { AdminPage, AdminPageHeader } from '@/components/admin/admin-page';
 import { FadeIn, StaggerContainer, StaggerItem } from '@/components/animations';
 import { isAdminOnlyPath } from '@/lib/admin-access';
 
@@ -62,7 +63,7 @@ const adminRoutes = [
   },
 ];
 
-export default function AdminPage() {
+export default function AdminDashboardPage() {
   const access = useAdminAccess();
   const routes = access.isAdmin
     ? adminRoutes
@@ -70,38 +71,26 @@ export default function AdminPage() {
 
   // Admin dashboard
   return (
-    <div className="bg-background">
-      {/* Header */}
-      <div>
-        <div className="w-full px-4 py-8">
-          <FadeIn direction="up" duration={0.3}>
-            <div className="max-w-3xl">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Shield className="h-5 w-5 text-primary" />
-                </div>
-                <h1 className="text-3xl font-bold text-foreground">
-                  Painel Admin
-                </h1>
-              </div>
-              <p className="text-muted-foreground ml-[52px]">
-                {access.isAdmin
-                  ? 'Gerencie eventos, palestrantes, comunidades, votações e usuários'
-                  : `Gerencie as suas comunidades e os eventos delas${
-                      access.communities.length
-                        ? `: ${access.communities.map((c) => c.title).filter(Boolean).join(', ')}`
-                        : ''
-                    }`}
-              </p>
-            </div>
-          </FadeIn>
-        </div>
-      </div>
+    <AdminPage>
+      <FadeIn direction="up" duration={0.3}>
+        <AdminPageHeader
+          title="Painel Admin"
+          description={
+            access.isAdmin
+              ? 'Gerencie eventos, palestrantes, comunidades, votações e usuários'
+              : `Gerencie as suas comunidades e os eventos delas${
+                  access.communities.length
+                    ? `: ${access.communities.map((c) => c.title).filter(Boolean).join(', ')}`
+                    : ''
+                }`
+          }
+        />
+      </FadeIn>
 
       {/* Content */}
-      <div className="w-full px-4 py-8">
+      <div>
         <FadeIn direction="up" duration={0.3} delay={0.05}>
-          <h2 className="text-lg font-semibold text-foreground mb-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4">
             Módulos
           </h2>
         </FadeIn>
@@ -142,6 +131,6 @@ export default function AdminPage() {
           })}
         </StaggerContainer>
       </div>
-    </div>
+    </AdminPage>
   );
 }

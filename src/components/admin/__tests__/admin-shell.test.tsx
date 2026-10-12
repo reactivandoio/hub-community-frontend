@@ -2,9 +2,12 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AdminShell, SIDEBAR_STORAGE_KEY } from '../admin-shell';
+import { AdminPageActions } from '../page-actions';
 import { useUnsavedChanges } from '../unsaved-guard';
 
 const push = vi.fn();
+const signOut = vi.fn();
+const setTheme = vi.fn();
 let pathname = '/admin';
 let isAdmin = true;
 let isMobile = false;
@@ -26,8 +29,9 @@ vi.mock('next/link', () => ({
 vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => isMobile }));
 vi.mock('@/hooks/use-payments-v2', () => ({ usePaymentsV2: () => paymentsV2 }));
 vi.mock('@/contexts/auth-context', () => ({
-  useAuth: () => ({ user: { name: 'Pedro' }, signOut: vi.fn() }),
+  useAuth: () => ({ user: { name: 'Pedro', email: 'pedro@example.com' }, signOut }),
 }));
+vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: 'dark', setTheme }) }));
 vi.mock('@/components/admin/admin-guard', () => ({
   useAdminAccess: () => ({ isAdmin, isCommunityManager: !isAdmin, canAccessAdmin: true, role: 'x', communities: [] }),
 }));
@@ -104,6 +108,116 @@ describe('AdminShell: general sidebar', () => {
     renderShell();
     expect(lastQueryOptions.skip).toBe(true);
     expect(screen.queryByRole('navigation', { name: 'Menu do evento' })).not.toBeInTheDocument();
+  });
+});
+
+describe('AdminShell: page actions in the top bar', () => {
+  function PageWithActions({ onSave = vi.fn() }: { onSave?: () => void }) {
+    return (
+      <div data-testid="page-content">
+        <p>conteúdo</p>
+        <AdminPageActions>
+          <button type="button" onClick={onSave}>
+            Salvar
+          </button>
+        </AdminPageActions>
+      </div>
+    );
+  }
+
+  it('shows what the page declares in the top bar, not in the content', () => {
+    const onSave = vi.fn();
+    renderShell(<PageWithActions onSave={onSave} />);
+    const button = screen.getByRole('button', { name: 'Salvar' });
+    expect(screen.getByRole('banner')).toContainElement(button);
+    expect(screen.getByTestId('page-content')).not.toContainElement(button);
+    // Still the page's own button: its handler runs.
+    fireEvent.click(button);
+    expect(onSave).toHaveBeenCalled();
+  });
+
+  it('a submit button up there still submits the form of the page', () => {
+    const onSubmit = vi.fn((event: React.FormEvent) => event.preventDefault());
+    renderShell(
+      <form id="f1" onSubmit={onSubmit}>
+        <AdminPageActions>
+          <button type="submit" form="f1">
+            Salvar Evento
+          </button>
+        </AdminPageActions>
+      </form>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar Evento' }));
+    expect(onSubmit).toHaveBeenCalled();
+  });
+
+  it('has no actions area or menu button on a page without actions', () => {
+    renderShell();
+    expect(screen.queryByRole('button', { name: 'Ações da página' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('admin-page-actions')).toHaveClass('hidden', 'md:hidden');
+  });
+
+  it('on the phone keeps them in a menu opened from the top bar', () => {
+    renderShell(<PageWithActions />);
+    const slot = screen.getByTestId('admin-page-actions');
+    const toggle = screen.getByRole('button', { name: 'Ações da página' });
+    // Below md the slot is the menu: closed until asked for (from md up it is always shown).
+    expect(toggle).toHaveClass('md:hidden');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(slot).toHaveClass('hidden', 'md:flex');
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(slot).not.toHaveClass('hidden');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('renders in place outside the admin shell', () => {
+    render(<PageWithActions />);
+    expect(screen.getByTestId('page-content')).toContainElement(screen.getByRole('button', { name: 'Salvar' }));
+  });
+});
+
+describe('AdminShell: signed-in user at the foot of the sidebar', () => {
+  const openMenu = () => {
+    const trigger = screen.getByRole('button', { name: 'Conta de Pedro' });
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    return screen.getByRole('menu');
+  };
+
+  it('shows who is signed in in the sidebar, and nothing of it in the top bar', () => {
+    renderShell();
+    const trigger = screen.getByRole('button', { name: 'Conta de Pedro' });
+    expect(trigger).toHaveTextContent('Pedro');
+    expect(trigger).toHaveTextContent('pedro@example.com');
+    expect(screen.getByRole('banner')).not.toContainElement(trigger);
+    expect(within(screen.getByRole('banner')).queryByText('Alternar tema')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('banner')).queryByText('Pedro')).not.toBeInTheDocument();
+  });
+
+  it('opens the profile menu with profile, theme, the way back to the site and sign out', () => {
+    renderShell();
+    const menu = openMenu();
+    expect(within(menu).getByRole('menuitem', { name: 'Perfil' })).toHaveAttribute('href', '/profile');
+    expect(within(menu).getByRole('menuitem', { name: /Usar tema (claro|escuro)/ })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: 'Voltar para o site' })).toHaveAttribute('href', '/');
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Sair' }));
+    expect(signOut).toHaveBeenCalled();
+  });
+
+  it('switches the theme from the menu', () => {
+    renderShell();
+    fireEvent.click(within(openMenu()).getByRole('menuitem', { name: 'Usar tema claro' }));
+    expect(setTheme).toHaveBeenCalledWith('light');
+  });
+
+  it('keeps the user (the avatar and its menu) when the sidebar is collapsed', () => {
+    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, 'false');
+    renderShell();
+    expect(screen.getByRole('button', { name: 'Expandir menu' })).toBeInTheDocument();
+    expect(within(openMenu()).getByRole('menuitem', { name: 'Sair' })).toBeInTheDocument();
   });
 });
 

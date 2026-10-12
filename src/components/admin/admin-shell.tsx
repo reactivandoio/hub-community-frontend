@@ -7,6 +7,7 @@ import {
   BarChart3,
   Building2,
   Calendar,
+  ChevronsUpDown,
   ClipboardCheck,
   Dices,
   ExternalLink,
@@ -16,11 +17,13 @@ import {
   ListOrdered,
   LogOut,
   Mic,
+  Moon,
   PanelLeft,
   Printer,
   QrCode,
   Settings2,
   Shield,
+  Sun,
   Tag,
   Ticket,
   User,
@@ -29,11 +32,12 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 
 import { useAdminAccess } from '@/components/admin/admin-guard';
+import { PageActionsProvider, PageActionsSlot } from '@/components/admin/page-actions';
 import { GuardedLink, UnsavedGuardProvider } from '@/components/admin/unsaved-guard';
-import { ModeToggle } from '@/components/mode-toggle';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -47,6 +51,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -78,6 +83,7 @@ import {
   type AdminNavIcon,
   type AdminNavItem,
 } from '@/lib/admin-nav';
+import { roleLabel } from '@/lib/admin-access';
 import { GET_EVENT_ADMIN_NAV } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
@@ -235,17 +241,8 @@ function AdminSidebar({
           </SidebarGroup>
         )}
       </SidebarContent>
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Voltar para o site">
-              <GuardedLink href="/">
-                <Globe aria-hidden="true" />
-                <span>Voltar para o site</span>
-              </GuardedLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+      <SidebarFooter className="border-t border-border">
+        <SidebarUser />
       </SidebarFooter>
       <SidebarRail aria-label="Recolher ou expandir o menu" title="Recolher ou expandir o menu" />
     </Sidebar>
@@ -301,39 +298,89 @@ function AdminBreadcrumb({ pathname, eventTitle }: { pathname: string; eventTitl
   );
 }
 
-function UserMenu() {
+/**
+ * Who is signed in, at the foot of the sidebar (only the avatar when it is collapsed). Its menu
+ * has the profile, the theme, the way back to the public site and the sign out.
+ */
+function SidebarUser() {
   const { user, signOut } = useAuth();
+  const access = useAdminAccess();
+  const { isMobile, state } = useSidebar();
+  const { resolvedTheme, setTheme } = useTheme();
+  const dark = resolvedTheme === 'dark';
+
+  const name = user?.name || user?.username || 'Conta';
+  const role = roleLabel(access.role);
+  const initial = name.trim().charAt(0).toUpperCase() || '?';
+  const avatar = (
+    <span
+      aria-hidden="true"
+      className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary"
+    >
+      {initial}
+    </span>
+  );
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-2">
-          <User aria-hidden="true" className="h-4 w-4" />
-          <span className="hidden sm:inline-block max-w-40 truncate">
-            {user?.name || user?.username || 'Conta'}
-          </span>
-          <span className="sr-only sm:hidden">Conta</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem asChild>
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton size="lg" aria-label={`Conta de ${name}`} tooltip={name}>
+              {avatar}
+              <span className="flex min-w-0 flex-col leading-tight">
+                <span className="truncate font-medium">{name}</span>
+                <span className="truncate text-xs text-sidebar-foreground/70">{user?.email || role}</span>
+              </span>
+              <ChevronsUpDown aria-hidden="true" className="ml-auto" />
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="w-64"
+            align="end"
+            side={isMobile || state === 'expanded' ? 'top' : 'right'}
+          >
+            <DropdownMenuLabel className="flex items-center gap-2 font-normal">
+              {avatar}
+              <span className="flex min-w-0 flex-col leading-tight">
+                <span className="truncate font-medium">{name}</span>
+                {user?.email && <span className="truncate text-xs text-muted-foreground">{user.email}</span>}
+                <span className="truncate text-xs text-muted-foreground">{role}</span>
+              </span>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
           <GuardedLink href="/profile" className="cursor-pointer">
             <User className="mr-2 h-4 w-4" />
             <span>Perfil</span>
           </GuardedLink>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <GuardedLink href="/" className="cursor-pointer">
-            <Globe className="mr-2 h-4 w-4" />
-            <span>Voltar para o site</span>
-          </GuardedLink>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-red-500 focus:text-red-500 cursor-pointer" onClick={() => signOut()}>
-          <LogOut className="mr-2 h-4 w-4" />
-          <span>Sair</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              // The menu stays open: the change is seen at once.
+              onSelect={(event) => {
+                event.preventDefault();
+                setTheme(dark ? 'light' : 'dark');
+              }}
+            >
+              {dark ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+              <span>{dark ? 'Usar tema claro' : 'Usar tema escuro'}</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <GuardedLink href="/" className="cursor-pointer">
+                <Globe className="mr-2 h-4 w-4" />
+                <span>Voltar para o site</span>
+              </GuardedLink>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-red-500 focus:text-red-500 cursor-pointer" onClick={() => signOut()}>
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Sair</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    </SidebarMenu>
   );
 }
 
@@ -367,6 +414,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
   return (
     <UnsavedGuardProvider>
+      <PageActionsProvider>
       <SidebarProvider open={open} onOpenChange={handleOpenChange}>
         <AdminSidebar pathname={pathname} eventId={eventId} event={event} />
         <SidebarInset className="min-w-0">
@@ -379,14 +427,15 @@ export function AdminShell({ children }: { children: ReactNode }) {
             <MenuToggle />
             <span aria-hidden="true" className="h-4 w-px shrink-0 bg-border" />
             <AdminBreadcrumb pathname={pathname} eventTitle={event?.title} />
-            <ModeToggle />
-            <UserMenu />
+            {/* What each page declares with <AdminPageActions>. */}
+            <PageActionsSlot pathname={pathname} />
           </header>
           {/* The pages take the whole width beside the sidebar; they bring 16px of side padding
               and this adds the rest (24px from md, 32px from lg), matching the top bar. */}
           <div className="min-w-0 flex-1 md:px-2 lg:px-4">{children}</div>
         </SidebarInset>
       </SidebarProvider>
+      </PageActionsProvider>
     </UnsavedGuardProvider>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { AdminPage, AdminPageHeader, AdminPageLoading } from '@/components/admin/admin-page';
 import { FadeIn } from '@/components/animations';
 import { Button } from '@/components/ui/button';
 import {
@@ -212,35 +213,22 @@ export default function AttendanceAdminPage() {
   };
 
   if (eventLoading || (loading && !error)) {
-    return (
-      <div className="w-full py-10 px-4 flex items-center justify-center min-h-[50vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
+    return <AdminPageLoading label="Carregando a lista de presença" />;
   }
 
-  const eventTitle = eventData?.eventBySlugOrId?.title || 'Evento';
   const eventSlug = eventData?.eventBySlugOrId?.slug;
 
   return (
     <FadeIn direction="up" duration={0.3}>
-      <div className="w-full py-10 px-4">
-        <div className="flex items-center space-x-4 mb-8">
-          <Button variant="ghost" onClick={() => router.back()}>
-            <ArrowLeft className="w-5 h-5 mr-2" />
-            Voltar
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              Lista de Presença
-            </h1>
-            <p className="text-muted-foreground mt-1">{eventTitle}</p>
-          </div>
-        </div>
+      <AdminPage>
+        <AdminPageHeader
+          title="Lista de Presença"
+          description="Quem assinou a presença pelo formulário do evento."
+        />
 
         {/* Form Link Card */}
         {eventSlug && (
-          <Card className="mb-6">
+          <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Link do Formulário</CardTitle>
               <CardDescription>
@@ -425,7 +413,7 @@ export default function AttendanceAdminPage() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </AdminPage>
     </FadeIn>
   );
 }

@@ -6,6 +6,7 @@ import { ptBR } from 'date-fns/locale';
 import { ExternalLink, Pencil, Plus, Trash2, Trophy } from 'lucide-react';
 import Link from 'next/link';
 
+import { AdminPage, AdminPageError, AdminPageHeader, AdminPageLoading } from '@/components/admin/admin-page';
 import { FadeIn } from '@/components/animations';
 import { Button } from '@/components/ui/button';
 import {
@@ -72,42 +73,27 @@ export default function VotingSessionsAdminPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="w-full py-10 px-4">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-muted rounded w-1/4"></div>
-          <div className="h-64 bg-muted border rounded"></div>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <AdminPageLoading label="Carregando sessões de votação" />;
 
   if (error) {
-    return (
-      <div className="w-full py-10 text-center text-red-500">
-        <p>Erro: {error}</p>
-      </div>
-    );
+    return <AdminPageError title="Erro ao carregar as sessões de votação" message={error} />;
   }
 
   return (
     <FadeIn direction="up" duration={0.3}>
-      <div className="w-full py-10 px-4">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Sessões de Votação</h1>
-            <p className="text-muted-foreground mt-2">
-              Crie, edite e gerencie as sessões de votação.
-            </p>
-          </div>
-          <Link href="/admin/voting-sessions/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Nova Sessão
+      <AdminPage>
+        <AdminPageHeader
+          title="Sessões de Votação"
+          description="Crie, edite e gerencie as sessões de votação."
+          actions={
+            <Button size="sm" asChild>
+              <Link href="/admin/voting-sessions/new">
+                <Plus className="mr-2 h-4 w-4" />
+                Nova Sessão
+              </Link>
             </Button>
-          </Link>
-        </div>
+          }
+        />
 
         <div className="border rounded-md bg-card">
           <Table>
@@ -192,7 +178,7 @@ export default function VotingSessionsAdminPage() {
             </TableBody>
           </Table>
         </div>
-      </div>
+      </AdminPage>
     </FadeIn>
   );
 }

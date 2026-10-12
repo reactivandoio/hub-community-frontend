@@ -39,6 +39,7 @@ import {
   Bar,
 } from 'recharts';
 
+import { AdminPage, AdminPageError, AdminPageHeader, AdminPageLoading } from '@/components/admin/admin-page';
 import { FadeIn } from '@/components/animations';
 import { EventPaymentsCard } from '@/components/admin/event-payments-card';
 import { ProductsBreakdownCard } from '@/components/admin/products-breakdown-card';
@@ -319,49 +320,20 @@ export default function EventAnalyticsPage() {
     }
   }, [id]);
 
-  if (loading) {
-    return (
-      <div className="w-full py-20 flex flex-col items-center justify-center gap-4 min-h-[60vh]">
-        <div className="relative">
-          <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl animate-pulse" />
-          <Loader2 className="w-10 h-10 animate-spin text-primary relative" />
-        </div>
-        <p className="text-sm text-muted-foreground animate-pulse">
-          Carregando analytics...
-        </p>
-      </div>
-    );
-  }
+  if (loading) return <AdminPageLoading label="Carregando analytics" />;
 
   if (error) {
-    return (
-      <div className="w-full py-20 text-center space-y-4">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-destructive/10 mb-4">
-          <BarChart3 className="w-8 h-8 text-destructive" />
-        </div>
-        <h2 className="text-xl font-semibold">Erro ao carregar analytics</h2>
-        <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          {error.message}
-        </p>
-        <Button variant="outline" onClick={() => router.back()} className="mt-4">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Voltar
-        </Button>
-      </div>
-    );
+    return <AdminPageError title="Erro ao carregar analytics" message={error.message} />;
   }
 
   const analytics = data?.eventAnalytics;
 
   if (!analytics) {
     return (
-      <div className="w-full py-20 text-center space-y-4">
-        <p className="text-muted-foreground">Evento não encontrado.</p>
-        <Button variant="outline" onClick={() => router.back()}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Voltar
-        </Button>
-      </div>
+      <AdminPageError
+        title="Evento não encontrado"
+        action={{ label: 'Voltar para os eventos', onClick: () => router.push('/admin/events') }}
+      />
     );
   }
 
@@ -389,34 +361,14 @@ export default function EventAnalyticsPage() {
 
   return (
     <FadeIn direction="up" duration={0.3}>
-      <div className="w-full py-8 px-4 space-y-8">
+      <AdminPage>
         {/* ─── Header ──────────────────────────────────────────── */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => router.back()}
-              className="shrink-0"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-                {analytics.event_title}
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
-                <BarChart3 className="w-3.5 h-3.5" />
-                Analytics do Evento
-                {analytics.event_slug && (
-                  <span className="text-xs opacity-60">
-                    /{analytics.event_slug}
-                  </span>
-                )}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
+        {/* The event title and the way back are in the breadcrumb and the sidebar (REA-24). */}
+        <AdminPageHeader
+          title="Analytics"
+          description={analytics.event_slug ? `/${analytics.event_slug}` : 'Inscrições, vendas e acessos do evento.'}
+          actions={
+            <>
             <Button
               variant="outline"
               size="sm"
@@ -437,8 +389,9 @@ export default function EventAnalyticsPage() {
               <ExternalLink className="w-3.5 h-3.5" />
               Ver Evento
             </Button>
-          </div>
-        </div>
+            </>
+          }
+        />
 
         {/* ─── KPI Cards ───────────────────────────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -969,7 +922,7 @@ export default function EventAnalyticsPage() {
             </CardContent>
           </Card>
         )}
-      </div>
+      </AdminPage>
     </FadeIn>
   );
 }
