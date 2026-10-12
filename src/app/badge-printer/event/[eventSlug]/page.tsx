@@ -38,6 +38,8 @@ import {
 } from '@/components/ui/table';
 import { DEFAULT_BADGE_NAME, defaultBadgeLink, printBadge } from '@/lib/badge-print';
 import { formatCpf } from '@/lib/certificate';
+import { HalfPriceBadge } from '@/components/half-price-badge';
+import { useEventSignupsQuery } from '@/hooks/use-half-price-field';
 import { CHECKIN_SIGNUP, EVENT_BATCHES, EVENT_SIGNUPS, MANUAL_SIGNUP } from '@/lib/queries';
 import type {
   CheckinResponse,
@@ -115,9 +117,10 @@ export default function EventBadgePrinterPage() {
     });
   };
 
-  const { data, loading, error, refetch } = useQuery<EventSignupsResponse>(EVENT_SIGNUPS, {
+  const signupsQuery = useEventSignupsQuery();
+  const { data, loading, error, refetch } = useQuery<EventSignupsResponse>(signupsQuery ?? EVENT_SIGNUPS, {
     variables: { eventSlug },
-    skip: !eventSlug,
+    skip: !eventSlug || !signupsQuery,
     fetchPolicy: 'network-only',
     pollInterval: 60_000,
   });
@@ -397,7 +400,10 @@ export default function EventBadgePrinterPage() {
                   <TableBody>
                     {filtered.map((s) => (
                       <TableRow key={s.id} className={s.checked_in ? 'bg-muted/50 text-muted-foreground' : ''}>
-                        <TableCell className="font-medium">{s.name}</TableCell>
+                        <TableCell className="font-medium">
+                          {s.name}
+                          {s.half_price && <HalfPriceBadge className="ml-2" />}
+                        </TableCell>
                         <TableCell className="hidden sm:table-cell">{s.email || '—'}</TableCell>
                         <TableCell className="hidden sm:table-cell">{s.product_name || '—'}</TableCell>
                         <TableCell>

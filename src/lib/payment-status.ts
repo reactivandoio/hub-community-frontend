@@ -110,6 +110,13 @@ export function discountLabel(kind: string | null | undefined): string | null {
   return null;
 }
 
+/** Coupon and half price chosen together: which one the server kept (half price wins a tie). */
+export function halfPriceWinner(kind: string | null | undefined): string | null {
+  if (kind === 'student') return 'Vale a meia-entrada: o desconto dela é maior ou igual ao do cupom, que não será usado.';
+  if (kind === 'coupon') return 'Vale o cupom: o desconto dele é maior que o da meia-entrada.';
+  return null;
+}
+
 /** Shown when the server raised a tiny discounted price to the provider's minimum. */
 export function minChargeNotice(cents: number | null | undefined): string {
   return `O valor foi ajustado para o mínimo de cobrança: ${formatCents(cents)}.`;

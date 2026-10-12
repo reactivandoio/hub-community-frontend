@@ -960,6 +960,34 @@ export const EVENT_SIGNUPS = gql`
   }
 `;
 
+// REA-16: the same list with who paid half price, asked only once the BFF has the
+// field (see hooks/use-half-price-field.ts).
+export const EVENT_SIGNUPS_HALF_PRICE = gql`
+  query EventSignupsHalfPrice($eventSlug: String!, $search: String) {
+    eventSignups(eventSlug: $eventSlug, search: $search) {
+      id
+      name
+      email
+      phone_number
+      checked_in
+      checked_in_at
+      product_name
+      half_price
+    }
+  }
+`;
+
+// Which fields the BFF's EventSignup has (introspection is on in production).
+export const EVENT_SIGNUP_FIELDS = gql`
+  query EventSignupFields {
+    __type(name: "EventSignup") {
+      fields {
+        name
+      }
+    }
+  }
+`;
+
 export const CHECKIN_SIGNUP = gql`
   mutation CheckinSignup($eventSlug: String!, $signupId: String!) {
     checkinSignup(eventSlug: $eventSlug, signupId: $signupId) {

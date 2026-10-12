@@ -14,6 +14,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { HalfPriceBadge } from '@/components/half-price-badge';
+import { useEventSignupsQuery } from '@/hooks/use-half-price-field';
 import { CHECKIN_SIGNUP, EVENT_SIGNUPS } from '@/lib/queries';
 import {
   CheckinSignupResponse,
@@ -34,8 +36,9 @@ export default function CheckinPage() {
   const [hasSearched, setHasSearched] = useState(false);
 
   // GraphQL operations
+  const signupsQuery = useEventSignupsQuery();
   const [fetchSignups, { loading: loadingSignups }] = useLazyQuery<EventSignupsResponse>(
-    EVENT_SIGNUPS,
+    signupsQuery ?? EVENT_SIGNUPS,
     {
       fetchPolicy: 'network-only',
       onCompleted: (data) => {
@@ -65,6 +68,7 @@ export default function CheckinPage() {
 
   // Fetch signups when debounced search changes (min 2 chars)
   useEffect(() => {
+    if (!signupsQuery) return;
     if (debouncedSearch.trim().length >= 2) {
       setHasSearched(true);
       fetchSignups({
@@ -76,7 +80,7 @@ export default function CheckinPage() {
         setHasSearched(false);
       }
     }
-  }, [debouncedSearch, eventSlug, fetchSignups]);
+  }, [debouncedSearch, eventSlug, fetchSignups, signupsQuery]);
 
   // Handle check-in
   const handleCheckin = useCallback(
@@ -221,6 +225,7 @@ export default function CheckinPage() {
                           {signup.product_name}
                         </p>
                       )}
+                      {signup.half_price && <HalfPriceBadge className="mt-1" />}
                     </div>
 
                     {/* Action */}
