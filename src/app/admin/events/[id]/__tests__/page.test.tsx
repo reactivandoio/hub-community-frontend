@@ -6,6 +6,7 @@ import EditEventPage from '../page';
 const updateEvent = vi.fn();
 const updateEventSale = vi.fn();
 let paymentsV2: boolean | null = true;
+let isAdmin = true;
 let lastInitial: any = null;
 
 const event = {
@@ -33,6 +34,9 @@ vi.mock('next/navigation', () => ({
 }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock('@/hooks/use-payments-v2', () => ({ usePaymentsV2: () => paymentsV2 }));
+vi.mock('@/components/admin/admin-guard', () => ({
+  useAdminAccess: () => ({ isAdmin, isCommunityManager: !isAdmin, canAccessAdmin: true, role: isAdmin ? 'admin' : 'community-manager', communities: [] }),
+}));
 vi.mock('@/components/admin/coupons-tab', () => ({ CouponsTab: () => <div>Lista de cupons</div> }));
 // Matched by operation name (importing @/lib/queries in the factory deadlocks).
 vi.mock('@apollo/client', async (importOriginal) => {
@@ -58,6 +62,7 @@ vi.mock('@/components/admin/event-form', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  isAdmin = true;
   lastInitial = null;
   updateEvent.mockResolvedValue({ data: { updateEvent: { id: 'ev1' } } });
   updateEventSale.mockResolvedValue({ data: { updateEventSale: { id: 'ev1' } } });
@@ -83,6 +88,20 @@ describe('EditEventPage (REA-6 gating)', () => {
     render(<EditEventPage />);
     fireEvent.click(await screen.findByText('Salvar Evento'));
     expect(lastInitial.products[0].batches[0].value).toBe(5090);
+    expect(lastInitial.showPaymentProvider).toBeFalsy();
+    await waitFor(() => expect(updateEventSale).toHaveBeenCalled());
+    const data = updateEventSale.mock.calls[0][0].variables.data;
+    expect(data.products[0].batches[0].value).toBe(5090);
+    expect(data).not.toHaveProperty('payment_provider');
+    expect(screen.queryByRole('tab', { name: 'Cupons' })).not.toBeInTheDocument();
+  });
+
+  it('community-manager: edits the event in reais, without provider nor Cupons tab (admin only)', async () => {
+    paymentsV2 = true;
+    isAdmin = false;
+    render(<EditEventPage />);
+    fireEvent.click(await screen.findByText('Salvar Evento'));
+    expect(lastInitial.products[0].batches[0].value).toBe(50.9);
     expect(lastInitial.showPaymentProvider).toBeFalsy();
     await waitFor(() => expect(updateEventSale).toHaveBeenCalled());
     const data = updateEventSale.mock.calls[0][0].variables.data;

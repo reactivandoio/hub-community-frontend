@@ -230,6 +230,8 @@ export interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   showLogoutModal: boolean;
+  /** True once the session saved in localStorage was read (logged in or not). */
+  isHydrated?: boolean;
 }
 
 export interface AuthContextType extends AuthState {

@@ -22,6 +22,10 @@ case "$1 $2" in
   "repo view") echo "acme/app" ;;
   "api -X") echo "{}" ;;
   "secret set") cat > "$GH_LOG/secret-$3" ;;
+  "api repos/"*) printf '%b' "${FAKE_REMOVED:-}" ;;
+  "secret list") printf '%b' "${FAKE_SECRETS:-}" ;;
+  "secret delete") echo "$3" >> "$GH_LOG/deleted" ;;
+  "workflow run") echo "$*" >> "$GH_LOG/workflow" ;;
 esac
 SH
 cat > "$WORK/bin/make" <<'SH'
@@ -118,6 +122,36 @@ check "apply: mantém só os 5 backups mais novos" '[ "$(ls "$S"/.env.bak-* | wc
 setup_srv
 OUT=$(FAKE_MAKE_EXIT=2 bash "$SWAP" apply "$S" .env 2>&1); RC=$?
 check "apply com make falhando: sai com erro e diz como voltar" '[ $RC -ne 0 ] && printf "%s" "$OUT" | grep -q "Para voltar"'
+
+# Variáveis aposentadas (.github/env-removed): saem do servidor sem abortar o apply.
+printf '# comentário\nSO_SERVIDOR\n' > "$WORK/env-removed"
+export ENV_REMOVED_FILE="$WORK/env-removed"
+setup_srv
+printf 'A=1\nB="outro"\n' > "$S/.env.next"
+OUT=$(bash "$SWAP" compare "$S" .env 2>&1)
+check "compare: mostra a aposentada" 'printf "%s" "$OUT" | grep -q "aposentada SO_SERVIDOR" && printf "%s" "$OUT" | grep -q "0 faltando"'
+setup_srv
+printf 'A=1\nB="outro"\n' > "$S/.env.next"
+OUT=$(bash "$SWAP" apply "$S" .env 2>&1); RC=$?
+check "apply com aposentada: troca e a variável sai do servidor" '[ $RC -eq 0 ] && ! grep -q SO_SERVIDOR "$S/.env" && grep -q SO_SERVIDOR "$S"/.env.bak-* && printf "%s" "$OUT" | grep -q "removida do servidor (aposentada): SO_SERVIDOR"'
+setup_srv
+printf 'A=1\n' > "$S/.env.next"
+OUT=$(bash "$SWAP" apply "$S" .env 2>&1); RC=$?
+check "apply: aposentada não libera as outras faltando" '[ $RC -ne 0 ] && printf "%s" "$OUT" | grep -q "  B" && ! printf "%s" "$OUT" | grep -q "  SO_SERVIDOR"'
+unset ENV_REMOVED_FILE
+check "repo: NEXT_PUBLIC_ADMIN_PASSWORD está aposentada" 'grep -qx "NEXT_PUBLIC_ADMIN_PASSWORD" "$ROOT/.github/env-removed"'
+
+# ---------- env-remove-from-github.sh ----------
+rm_repo() { local d="$WORK/rm-$1"; rm -rf "$d"; mkdir -p "$d/gh"; cp "$ROOT/env-remove-from-github.sh" "$d/"; echo "$d"; }
+R=$(rm_repo a)
+OUT=$(GH_LOG="$R/gh" FAKE_REMOVED='X_OLD\n' FAKE_SECRETS='X_OLD\nKEEP\n' bash "$R/env-remove-from-github.sh" X_OLD 2>&1); RC=$?
+check "remove: apaga só o secret pedido e dispara o deploy de env" '[ $RC -eq 0 ] && [ "$(cat "$R/gh/deleted")" = X_OLD ] && grep -q "workflow run deploy-env.yml -R acme/app --ref main -f mode=apply" "$R/gh/workflow"'
+R=$(rm_repo b)
+OUT=$(GH_LOG="$R/gh" FAKE_REMOVED='X_OLD\n' FAKE_SECRETS='KEEP\n' bash "$R/env-remove-from-github.sh" KEEP 2>&1); RC=$?
+check "remove: recusa nome fora de .github/env-removed" '[ $RC -ne 0 ] && [ ! -e "$R/gh/deleted" ] && [ ! -e "$R/gh/workflow" ]'
+R=$(rm_repo c)
+OUT=$(GH_LOG="$R/gh" FAKE_REMOVED='X_OLD\n' FAKE_SECRETS='' bash "$R/env-remove-from-github.sh" --sem-deploy X_OLD 2>&1); RC=$?
+check "remove: secret ausente e --sem-deploy" '[ $RC -eq 0 ] && printf "%s" "$OUT" | grep -q "já não existia" && [ ! -e "$R/gh/workflow" ]'
 
 # ---------- passo "Montar o .env" do workflow ----------
 STEP=$(ruby -ryaml -e 'puts YAML.load_file(ARGV[0])["jobs"]["deploy"]["steps"].find { |s| s["name"].start_with?("Montar") }["run"]' "$ROOT/.github/workflows/deploy-env.yml")

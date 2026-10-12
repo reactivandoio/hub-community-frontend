@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import { EventsTableSkeleton } from '@/components/admin/events-table-skeleton';
+import { useAdminAccess } from '@/components/admin/admin-guard';
 import { FadeIn } from '@/components/animations';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -30,6 +31,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
+import { visibleEvents } from '@/lib/admin-access';
 import { bulkEmailToast } from '@/lib/bulk-email';
 import { DELETE_EVENT, GET_EVENTS, SEND_IMPORTED_SIGNUP_CONFIRMATIONS } from '@/lib/queries';
 import {
@@ -46,6 +48,7 @@ interface EmailTarget {
 
 export default function EventsAdminPage() {
   const { toast } = useToast();
+  const access = useAdminAccess();
   const { data, loading, error, refetch } = useQuery<EventsResponse>(
     GET_EVENTS,
     {
@@ -113,7 +116,8 @@ export default function EventsAdminPage() {
     );
   }
 
-  const events = data?.events?.data || [];
+  // A community-manager sees only the events of the communities it organizes.
+  const events = visibleEvents(access, data?.events?.data || []);
 
   return (
     <FadeIn direction="up" duration={0.3}>

@@ -1,0 +1,4 @@
+# Variáveis aposentadas: podem continuar no .env do servidor sem estar nos secrets do GitHub.
+# O deploy (env-swap.sh apply) não aborta por elas e o .env novo sai sem elas.
+# Um nome por linha. Depois do merge, apague o secret com ./env-remove-from-github.sh NOME.
+NEXT_PUBLIC_ADMIN_PASSWORD

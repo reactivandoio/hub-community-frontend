@@ -1,5 +1,6 @@
 'use client';
 
+import { useAdminAccess } from '@/components/admin/admin-guard';
 import { CouponsTab } from '@/components/admin/coupons-tab';
 import { EventForm } from '@/components/admin/event-form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -55,13 +56,15 @@ export default function EditEventPage() {
   // REA-6 only runs against a BFF that has it: before that, prices stay as typed
   // (the old backend's unit), and the provider select and the Cupons tab stay hidden.
   const paymentsV2 = usePaymentsV2();
+  // Payment provider and coupons are admin only on the BFF; a community-manager edits the rest.
+  const { isAdmin } = useAdminAccess();
 
   // Separate query: if it fails the form still loads (the select just shows the default).
   const { data: paymentData } = useQuery<{
     eventPaymentSettings: { payment_provider: PaymentProvider | null } | null;
   }>(EVENT_PAYMENT_SETTINGS, {
     variables: { eventId: data?.eventBySlugOrId?.id },
-    skip: !data?.eventBySlugOrId?.id || !paymentsV2,
+    skip: !data?.eventBySlugOrId?.id || !paymentsV2 || !isAdmin,
     fetchPolicy: 'network-only',
   });
   const paymentProvider: PaymentProvider =
@@ -278,7 +281,7 @@ export default function EditEventPage() {
         </div>
       </div>
 
-      {paymentsV2 && data?.eventBySlugOrId?.id ? (
+      {paymentsV2 && isAdmin && data?.eventBySlugOrId?.id ? (
         <Tabs defaultValue="event" className="w-full">
           <TabsList className="mb-4">
             <TabsTrigger value="event">Evento</TabsTrigger>

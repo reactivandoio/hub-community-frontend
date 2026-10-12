@@ -7,7 +7,11 @@ import EventsAdminPage from '../page';
 
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
 
-const event = (id: string, title: string, unlisted: boolean) => ({
+const ADMIN = { role: 'admin', isAdmin: true, isCommunityManager: false, canAccessAdmin: true, communities: [] };
+let access: any = ADMIN;
+vi.mock('@/components/admin/admin-guard', () => ({ useAdminAccess: () => access }));
+
+const event = (id: string, title: string, unlisted: boolean, communities: { id: string }[] = []) => ({
   __typename: 'Event',
   id,
   documentId: id,
@@ -18,7 +22,7 @@ const event = (id: string, title: string, unlisted: boolean) => ({
   end_date: '2026-10-01T18:00:00.000Z',
   images: [],
   unlisted,
-  communities: [],
+  communities,
   talks: [],
   location: null,
 });
@@ -41,6 +45,31 @@ const listMock: MockedResponse = {
 };
 
 describe('EventsAdminPage', () => {
+  it('shows a community-manager only the events of its communities', async () => {
+    access = { ...ADMIN, role: 'community-manager', isAdmin: false, isCommunityManager: true, communities: [{ id: 'c-1' }] };
+    const mock: MockedResponse = {
+      ...listMock,
+      result: {
+        data: {
+          events: {
+            data: [event('e1', 'Meu Meetup', false, [{ id: 'c-1' }]), event('e2', 'De Outra', false, [{ id: 'c-2' }])],
+          },
+        },
+      },
+    };
+    try {
+      await render(
+        <MockedProvider mocks={[mock]} addTypename={false}>
+          <EventsAdminPage />
+        </MockedProvider>,
+      );
+      expect(await screen.findByText('Meu Meetup')).toBeInTheDocument();
+      expect(screen.queryByText('De Outra')).not.toBeInTheDocument();
+    } finally {
+      access = ADMIN;
+    }
+  });
+
   it('lists the unlisted events and marks them', async () => {
     await render(
       <MockedProvider mocks={[listMock]} addTypename={false}>

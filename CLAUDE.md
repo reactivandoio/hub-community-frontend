@@ -57,6 +57,14 @@ src/
   (`/admin/events` and the voting-session picker do). The event's own page and signup flow are never
   filtered — the direct link is the point.
 
+- **Admin access (REA-10)** — `/admin`, `/badge-printer`, `/checkin` and `/sorteio` have a layout with
+  `AdminGuard` (`components/admin/admin-guard.tsx`): signed in (else `/?login=true&redirect=…`) with the
+  `admin` or `community-manager` role, read from the BFF `adminAccess` query. Admin-only paths
+  (`ADMIN_ONLY_PATHS` in `lib/admin-access.ts`: usuários, palestrantes, votações) refuse a
+  community-manager, and lists are scoped with `visibleEvents` / `visibleCommunities`. Pages read the
+  access with `useAdminAccess()`. This only shapes the UI: the BFF checks the role on every operation.
+  There is no admin password anymore. `AuthState.isHydrated` tells when the saved session was read.
+
 ### Provider Hierarchy (layout.tsx)
 FirebaseProvider → ApolloProvider → AuthProvider → LogoutModalWrapper → AgendaProvider → FilterProvider → ThemeProvider → children
 
