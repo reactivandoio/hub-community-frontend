@@ -80,6 +80,20 @@ src/
   access with `useAdminAccess()`. This only shapes the UI: the BFF checks the role on every operation.
   There is no admin password anymore. `AuthState.isHydrated` tells when the saved session was read.
 
+- **Admin layout (REA-24)** — every `/admin` page is framed by `AdminShell`
+  (`components/admin/admin-shell.tsx`, inside `AdminGuard` in `app/admin/layout.tsx`): collapsible
+  sidebar (icons when collapsed, drawer on the phone, state in `localStorage` `admin_sidebar_open`),
+  a sticky `h-14` top bar with the breadcrumb, and the page below it. Pages must not add top padding
+  for a navbar nor `min-h-screen`. The public floating navigation and footer are hidden there
+  (`PublicOnly`), and `PageTransitionProvider` does not key `/admin` by path (it would remount the frame).
+  What the sidebar and breadcrumb show is in `lib/admin-nav.ts` (pure, tested): add a new admin page
+  there. Inside `/admin/events/<id>` the sidebar switches to that event (`eventNavGroups`).
+  Geral / Programação / Produtos & Lotes are one form (`EventEditor`) with three URLs
+  (`/admin/events/<id>`, `/programacao`, `/produtos`): it is rendered by the `(editar)` route-group
+  layout so it stays mounted between them; the old `#schedule` / `#products` links redirect. Cupons is
+  `/admin/events/<id>/cupons`. Links inside the shell use `GuardedLink` (`unsaved-guard.tsx`), which
+  asks before leaving unsaved changes registered with `useUnsavedChanges`.
+
 ### Provider Hierarchy (layout.tsx)
 FirebaseProvider → ApolloProvider → AuthProvider → LogoutModalWrapper → AgendaProvider → FilterProvider → ThemeProvider → children
 
