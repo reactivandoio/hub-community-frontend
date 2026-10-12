@@ -31,6 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/auth-context';
 import { usePageVisitTracker, useTracking } from '@/hooks/use-tracking';
 import { trackViewEventDetail } from '@/lib/analytics';
+import { richTextToMarkdown } from '@/lib/rich-text';
 import { GET_AGENDA_BY_EVENT_ID, GET_EVENT_BY_SLUG_OR_ID, IS_USER_SIGNED_UP } from '@/lib/queries';
 import { adjustToBrazilTimezone } from '@/utils/event';
 
@@ -204,6 +205,8 @@ export function EventDetails({ slugOrId }: EventDetailsProps) {
       </div>
     );
   }
+
+  const hasDescription = richTextToMarkdown(event.description).trim() !== '';
 
   // Event start_date/end_date are proper UTC — display with explicit timezone
   const startDate = new Date(event.start_date);
@@ -523,7 +526,7 @@ export function EventDetails({ slugOrId }: EventDetailsProps) {
       <div className="container mx-auto px-4 pb-16 space-y-12">
 
         {/* About Section */}
-        {event?.description && (
+        {hasDescription && (
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-5 flex items-center gap-2.5">
               <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-primary/10">
@@ -531,10 +534,10 @@ export function EventDetails({ slugOrId }: EventDetailsProps) {
               </div>
               Sobre o Evento
             </h2>
-            <div className="bg-card/50 border border-border/30 rounded-2xl p-5 sm:p-7 relative overflow-hidden">
+            <div className="bg-card/50 border border-border/30 rounded-2xl p-5 sm:p-8 relative overflow-hidden max-w-4xl">
               <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary via-primary/60 to-transparent rounded-l-2xl" />
-              <div className="pl-4">
-                <ExpandableRichText content={event?.description || ''} maxLines={15} />
+              <div className="pl-3 sm:pl-4">
+                <ExpandableRichText content={event.description} maxLines={24} />
               </div>
             </div>
           </section>

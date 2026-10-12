@@ -1,10 +1,11 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
+import { MarkdownContent } from '@/components/ui/markdown-content';
 import { Textarea } from '@/components/ui/textarea';
 import { CommentData } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface RichTextEditorProps {
   value: CommentData[];
@@ -21,6 +22,8 @@ export function RichTextEditor({
   className,
   disabled = false,
 }: RichTextEditorProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [previewing, setPreviewing] = useState(false);
   const [textValue, setTextValue] = useState(() => {
     // Convert CommentData[] to plain text for editing
     return value
@@ -60,10 +63,8 @@ export function RichTextEditor({
 
   const insertFormatting = useCallback(
     (type: 'bold' | 'italic' | 'code') => {
-      // For now, just add markdown-style formatting
-      const textarea = document.querySelector(
-        'textarea'
-      ) as HTMLTextAreaElement;
+      // Markdown markers; the public pages render them with MarkdownContent.
+      const textarea = textareaRef.current;
       if (!textarea) return;
 
       const start = textarea.selectionStart;
@@ -109,7 +110,7 @@ export function RichTextEditor({
           variant="ghost"
           size="sm"
           onClick={() => insertFormatting('bold')}
-          disabled={disabled}
+          disabled={disabled || previewing}
           className="h-8 px-2"
         >
           <strong>B</strong>
@@ -119,7 +120,7 @@ export function RichTextEditor({
           variant="ghost"
           size="sm"
           onClick={() => insertFormatting('italic')}
-          disabled={disabled}
+          disabled={disabled || previewing}
           className="h-8 px-2"
         >
           <em>I</em>
@@ -129,22 +130,43 @@ export function RichTextEditor({
           variant="ghost"
           size="sm"
           onClick={() => insertFormatting('code')}
-          disabled={disabled}
+          disabled={disabled || previewing}
           className="h-8 px-2 font-mono"
         >
           {'</>'}
         </Button>
+        <Button
+          type="button"
+          variant={previewing ? 'secondary' : 'ghost'}
+          size="sm"
+          onClick={() => setPreviewing(p => !p)}
+          aria-pressed={previewing}
+          className="h-8 px-2 ml-auto"
+        >
+          {previewing ? 'Editar' : 'Pré-visualizar'}
+        </Button>
       </div>
 
-      {/* Text Area */}
-      <Textarea
-        value={textValue}
-        onChange={e => handleTextChange(e.target.value)}
-        placeholder={placeholder}
-        disabled={disabled}
-        className="min-h-[120px] resize-y rounded-t-none"
-        rows={4}
-      />
+      {/* Preview uses the same renderer as the public pages */}
+      {previewing ? (
+        <div className="min-h-[120px] rounded-md rounded-t-none border bg-background px-3 py-2">
+          {textValue.trim() ? (
+            <MarkdownContent content={textValue} />
+          ) : (
+            <p className="text-sm text-muted-foreground">Nada para mostrar.</p>
+          )}
+        </div>
+      ) : (
+        <Textarea
+          ref={textareaRef}
+          value={textValue}
+          onChange={e => handleTextChange(e.target.value)}
+          placeholder={placeholder}
+          disabled={disabled}
+          className="min-h-[120px] resize-y rounded-t-none"
+          rows={4}
+        />
+      )}
 
       {/* Character Count */}
       <div className="text-xs text-gray-500 text-right">
