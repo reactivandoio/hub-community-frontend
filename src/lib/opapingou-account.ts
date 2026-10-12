@@ -1,3 +1,4 @@
+import { reaisToCents } from '@/lib/money';
 import type { OpaPingouConnection } from '@/lib/types';
 
 /**
@@ -53,4 +54,25 @@ export function opaPingouErrorMessage(error: unknown): string {
     return `${base} Falta: ${labels.join('; ')}.`;
   }
   return base;
+}
+
+/** Shown when a paid lot is saved without an account (same text the BFF answers). */
+export const ACCOUNT_REQUIRED_MESSAGE =
+  'Para criar lote pago, conecte a conta Opa Pingou do evento (bloco "Conta Opa Pingou do evento", na aba de produtos e lotes). Lotes gratuitos não precisam.';
+
+interface FormBatchLike { value?: number | string | null; enabled?: boolean }
+interface FormProductLike { enabled?: boolean; batches?: FormBatchLike[] }
+
+/** Any enabled lot with a price (form values, in reais) inside an enabled product. */
+export function hasPaidBatch(products: FormProductLike[] | null | undefined): boolean {
+  return (products || []).some(
+    (p) => p && p.enabled !== false && (p.batches || []).some((b) => b && b.enabled !== false && reaisToCents(b.value) > 0),
+  );
+}
+
+/** The BFF refused the lots because the event has no account. */
+export function isAccountRequiredError(error: unknown): boolean {
+  return Boolean(
+    (error as GraphQLLikeError)?.graphQLErrors?.some((e) => e.extensions?.code === 'OPAPINGOU_ACCOUNT_REQUIRED'),
+  );
 }

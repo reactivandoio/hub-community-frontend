@@ -4,6 +4,7 @@ import { CommunityFormDialog } from '@/components/admin/community-form-dialog';
 import { ImageCropDialog } from '@/components/admin/image-crop-dialog';
 import { LocationFormDialog } from '@/components/admin/location-form-dialog';
 import { OpaPingouAccountCard } from '@/components/admin/opapingou-account-card';
+import { ACCOUNT_REQUIRED_MESSAGE, hasPaidBatch, looksLikeOpaPingouKey } from '@/lib/opapingou-account';
 import { ProductFormDialog } from '@/components/admin/product-form-dialog';
 import { TalkFormDialog } from '@/components/admin/talk-form-dialog';
 import { Button } from '@/components/ui/button';
@@ -94,6 +95,10 @@ export function EventForm({
   const router = useRouter();
   const { toast: formToast } = useToast();
   const isEditing = !!initialData?.id;
+  const isNew = !initialData?.id;
+  // REA-12: key typed before the first save (new event) and whether a saved event can charge.
+  const [pendingOpaKey, setPendingOpaKey] = useState('');
+  const [hasOpaAccount, setHasOpaAccount] = useState<boolean | null>(isNew ? false : null);
 
   // Location State
   const [locations, setLocations] = useState(MOCK_LOCATIONS);
@@ -342,6 +347,22 @@ export function EventForm({
   };
 
   const handleFormSubmit = async (data: CreateEventFormValues) => {
+    // 0. REA-12: a paid lot needs the event's Opa Pingou account. A saved event must have it
+    // (or be legacy); a new one, a key typed in the card, connected right after creation.
+    // While the account is still loading (null) the BFF decides.
+    const hasKey = looksLikeOpaPingouKey(pendingOpaKey);
+    if (hasPaidBatch(data.products as any) && hasOpaAccount === false && !(isNew && hasKey)) {
+      formToast({ variant: 'destructive', title: 'Falta a conta Opa Pingou', description: ACCOUNT_REQUIRED_MESSAGE });
+      return;
+    }
+    if (isNew && pendingOpaKey.trim() && !hasKey) {
+      formToast({
+        variant: 'destructive',
+        title: 'Chave do Opa Pingou incompleta',
+        description: 'Cole a chave inteira do Opa Pingou: ela começa com opk_live_.',
+      });
+      return;
+    }
     // 1. Upload cover image FIRST if a new file was selected. If it fails the
     // event is not saved, so the admin sees why instead of losing the cover.
     if (coverImageFile) {
@@ -367,9 +388,12 @@ export function EventForm({
       }
     }
 
-    // 2. Submit
-    const savedId = await onSubmit(data);
+    // 2. Submit (the new-event page connects the key right after creating the event)
+    const savedId = await onSubmit(
+      isNew && hasKey ? ({ ...data, opaPingouApiKey: pendingOpaKey.trim() } as CreateEventFormValues) : data,
+    );
     if (savedId) {
+      setPendingOpaKey('');
       // The cover is now linked to the event; don't upload it again.
       setCoverImageFile(null);
       onSaved?.(savedId);
@@ -880,7 +904,12 @@ export function EventForm({
           </TabsContent>
 
           <TabsContent value="products" className="space-y-6 mt-6">
-            <OpaPingouAccountCard eventId={initialData?.id} />
+            <OpaPingouAccountCard
+              eventId={initialData?.id}
+              pendingKey={pendingOpaKey}
+              onPendingKeyChange={setPendingOpaKey}
+              onAccountChange={setHasOpaAccount}
+            />
 
             <div className="space-y-4 rounded-lg border p-4">
               <div className="flex items-center justify-between">

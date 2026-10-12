@@ -26,6 +26,7 @@ import { useEffect, useState } from 'react';
 import { Award, BarChart3, Dices, FileSpreadsheet, QrCode, Printer } from 'lucide-react';
 import { raffleUrl } from '@/lib/raffle';
 import { centsToReais, reaisToCents } from '@/lib/money';
+import { ACCOUNT_REQUIRED_MESSAGE, isAccountRequiredError } from '@/lib/opapingou-account';
 
 export default function EditEventPage() {
   const router = useRouter();
@@ -150,7 +151,9 @@ export default function EditEventPage() {
           toast({
             variant: 'destructive',
             title: 'Erro parcial',
-            description: 'Evento atualizado, mas houve um erro ao salvar os produtos/lotes.',
+            description: isAccountRequiredError(saleError)
+              ? `Evento atualizado, mas os lotes não foram salvos. ${ACCOUNT_REQUIRED_MESSAGE}`
+              : 'Evento atualizado, mas houve um erro ao salvar os produtos/lotes.',
           });
         }
       }
