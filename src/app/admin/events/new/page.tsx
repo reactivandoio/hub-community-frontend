@@ -29,7 +29,6 @@ export default function NewEventPage() {
         start_date: new Date(data.start_date).toISOString(),
         end_date: new Date(data.end_date).toISOString(),
         max_slots: Number(data.max_slots),
-        pixai_token_integration: data.pixai_token_integration,
         is_online: data.is_online || false,
         call_link: data.call_link || '',
         unlisted: data.unlisted || false,
@@ -54,7 +53,6 @@ export default function NewEventPage() {
               id: eventId,
               data: {
                 max_slots: Number(data.max_slots) || 0,
-                ...(paymentsV2 && data.payment_provider ? { payment_provider: data.payment_provider } : {}),
                 products: data.products.map((p: any) => ({
                   name: p.name,
                   enabled: p.enabled !== false,
@@ -114,7 +112,6 @@ export default function NewEventPage() {
           onSubmit={handleSubmit}
           onSaved={id => router.push(`/admin/events/${id}`)}
           isLoading={loading || paymentsV2 === null}
-          showPaymentProvider={!!paymentsV2}
         />
       </div>
     </div>

@@ -44,7 +44,8 @@ vi.mock('@/components/admin/event-form', () => ({
           end_date: '2026-11-01T12:00',
           max_slots: 10,
           images: ['42'],
-          payment_provider: 'opapingou',
+          pixai_token_integration: 'old-token',
+          payment_provider: 'pixai',
           products: [{ name: 'Ingresso', enabled: true, batches: [{ batch_number: 1, value: '50.9' }] }],
         });
         if (id) onSaved?.(id);
@@ -88,7 +89,7 @@ describe('NewEventPage', () => {
     expect(push).not.toHaveBeenCalled();
   });
 
-  it('keeps batch prices as typed and sends no provider while the BFF is the old one', async () => {
+  it('keeps batch prices as typed while the BFF is the old one', async () => {
     createEvent.mockResolvedValue({ data: { createEvent: { id: 'evt-1' } } });
     render(<NewEventPage />);
     fireEvent.click(screen.getByText('Salvar Evento'));
@@ -98,7 +99,7 @@ describe('NewEventPage', () => {
     expect(data).not.toHaveProperty('payment_provider');
   });
 
-  it('sends cents and the provider once the BFF has REA-6', async () => {
+  it('sends cents once the BFF has REA-6, and never a provider nor a Pix Aí token (REA-15)', async () => {
     paymentsV2 = true;
     createEvent.mockResolvedValue({ data: { createEvent: { id: 'evt-1' } } });
     render(<NewEventPage />);
@@ -106,6 +107,7 @@ describe('NewEventPage', () => {
     await waitFor(() => expect(updateEventSale).toHaveBeenCalled());
     const data = updateEventSale.mock.calls[0][0].variables.data;
     expect(data.products[0].batches[0].value).toBe(5090);
-    expect(data.payment_provider).toBe('opapingou');
+    expect(data).not.toHaveProperty('payment_provider');
+    expect(createEvent.mock.calls[0][0].variables.data).not.toHaveProperty('pixai_token_integration');
   });
 });

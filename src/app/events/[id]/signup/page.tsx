@@ -7,15 +7,12 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
-  CreditCard,
   Loader2,
   Mail,
   MapPin,
   Phone,
-  QrCode,
   Tag,
   Ticket,
-  Copy,
   ExternalLink,
   ImagePlus,
   UserPlus,
@@ -102,7 +99,6 @@ export default function EventSignupPage() {
   const [signupResult, setSignupResult] = useState<any>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [paymentPolling, setPaymentPolling] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [phoneInput, setPhoneInput] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [isNewAccount, setIsNewAccount] = useState(false);
@@ -469,25 +465,6 @@ export default function EventSignupPage() {
       setInlineBusy(false);
     }
   };
-
-  // Copy PIX code to clipboard
-  const handleCopyPix = useCallback(async (code: string) => {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback for older browsers
-      const textarea = document.createElement('textarea');
-      textarea.value = code;
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  }, []);
 
   if (loading || checkingSignup) {
     return (
@@ -1234,7 +1211,7 @@ export default function EventSignupPage() {
           )}
 
           {/* Step: Payment (Paid Event) */}
-          {step === 'payment' && signupResult?.payment?.payment_provider === 'opapingou' && (
+          {step === 'payment' && signupResult?.payment && (
             <div className="space-y-6">
               <SignupPixPayment
                 key={`${signupResult.signup_id}-${paymentAttempt}`}
@@ -1245,94 +1222,6 @@ export default function EventSignupPage() {
                 onChangeKind={paymentsV2 ? handleChangeKind : undefined}
                 linkUnavailable={linkUnavailable}
               />
-              <div className="text-center">
-                <Link href={`/events/${event.slug || slugOrId}`}>
-                  <Button variant="ghost" className="rounded-full">
-                    Voltar para o evento
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          )}
-
-          {step === 'payment' && signupResult?.payment && signupResult.payment.payment_provider !== 'opapingou' && (
-            <div className="space-y-6">
-              <div className="bg-card border border-border rounded-2xl p-6 text-center space-y-6">
-                <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto">
-                  <QrCode className="h-8 w-8 text-amber-500" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-foreground mb-2">
-                    Pagamento Pendente
-                  </h2>
-                  <p className="text-muted-foreground text-sm">
-                    Escaneie o QR Code abaixo ou copie o código PIX para realizar o pagamento.
-                  </p>
-                </div>
-
-                {/* PIX QR Code */}
-                {signupResult.payment.qr_code && (
-                  <div className="space-y-4">
-                    <div className="bg-white p-6 rounded-xl inline-block mx-auto">
-                      <img
-                        src={`data:image/png;base64,${signupResult.payment.qr_code}`}
-                        alt="QR Code PIX"
-                        className="w-48 h-48 mx-auto"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-2 max-w-md mx-auto">
-                      <Input
-                        value={signupResult.payment.qr_code}
-                        readOnly
-                        className="text-xs font-mono"
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleCopyPix(signupResult.payment.qr_code)}
-                      >
-                        {copied ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <Copy className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Payment Link (credit card) */}
-                {signupResult.payment.payment_link && (
-                  <div className="border-t border-border pt-6">
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Ou pague com cartão de crédito:
-                    </p>
-                    <a
-                      href={signupResult.payment.payment_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Button
-                        variant="outline"
-                        className="rounded-full gap-2"
-                        size="lg"
-                      >
-                        <CreditCard className="h-4 w-4" />
-                        Pagar com Cartão
-                        <ExternalLink className="h-3 w-3" />
-                      </Button>
-                    </a>
-                  </div>
-                )}
-
-                <div className="text-sm text-muted-foreground bg-muted/30 rounded-xl p-4">
-                  <p>
-                    Após o pagamento, sua inscrição será confirmada automaticamente.
-                  </p>
-                </div>
-              </div>
-
               <div className="text-center">
                 <Link href={`/events/${event.slug || slugOrId}`}>
                   <Button variant="ghost" className="rounded-full">
