@@ -24,7 +24,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Mesma versão do ambiente Docker de desenvolvimento e da produção (REA-21).
+          node-version-file: .nvmrc
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -55,3 +56,15 @@ jobs:
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
           NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:0000000000000000'
           NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: G-CIFAKE0000
+
+  # O ambiente de desenvolvimento (Dockerfile.dev) monta com a versão do .nvmrc.
+  docker-dev:
+    name: docker-dev
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Imagem de desenvolvimento usa o Node do .nvmrc
+        run: |
+          docker build -q -f Dockerfile.dev --build-arg NODE_VERSION="$(cat .nvmrc)" -t dev-check .
+          test "$(docker run --rm dev-check node -v)" = "v$(cat .nvmrc)"

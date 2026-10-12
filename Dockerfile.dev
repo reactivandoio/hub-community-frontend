@@ -1,14 +1,25 @@
-FROM node:22-alpine
+# check=skip=InvalidDefaultArgInFrom
+# Ambiente de desenvolvimento (REA-21). Só o Node e as ferramentas: o código entra por volume
+# e o node_modules fica num volume do compose. Use pelo Makefile (make dev, make test...).
+# A versão do Node vem do .nvmrc (o Makefile passa NODE_VERSION); a mesma que o CI usa.
+ARG NODE_VERSION
+FROM node:${NODE_VERSION}-bookworm-slim
 
-RUN corepack enable
+# git: dependências por git; python3/make/g++: módulos nativos; jq/ruby: testes dos scripts de deploy.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates git python3 make g++ jq ruby \
+  && rm -rf /var/lib/apt/lists/*
+
+# O container roda com o UID de quem chama (arquivos gerados no volume do código ficam seus);
+# por isso HOME, cache, corepack, node_modules e .next são graváveis por qualquer usuário.
+ENV HOME=/home/dev COREPACK_HOME=/opt/corepack COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+  npm_config_store_dir=/cache/pnpm NEXT_TELEMETRY_DISABLED=1
+RUN mkdir -p /home/dev /cache/pnpm /opt/corepack /opt/app/node_modules /opt/app/.next \
+  && chmod 1777 /home/dev /cache /cache/pnpm /opt/app/node_modules /opt/app/.next
+
+# pnpm na versão do packageManager do package.json, já baixado na imagem.
+COPY package.json /tmp/pm/package.json
+RUN cd /tmp/pm && corepack enable pnpm && corepack install \
+  && chmod -R a+rwX /opt/corepack && rm -rf /tmp/pm
 
 WORKDIR /opt/app
-
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN corepack prepare pnpm@10.13.1 --activate && pnpm install
-
-COPY . .
-
-EXPOSE 4010
-
-CMD ["pnpm", "exec", "next", "dev", "--port", "4010", "--hostname", "0.0.0.0"]
