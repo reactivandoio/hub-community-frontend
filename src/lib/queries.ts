@@ -353,6 +353,53 @@ export const SIGNUP_TO_EVENT_V2 = gql`
   }
 `;
 
+// REA-22: whether the BFF already has the signup without login (outcome and
+// confirmation_sent_to on SignupResponse). See hooks/use-guest-signup-support.ts.
+export const SIGNUP_RESPONSE_FIELDS = gql`
+  query SignupResponseFields {
+    __type(name: "SignupResponse") {
+      fields {
+        name
+      }
+    }
+  }
+`;
+
+// REA-22: signup without login. Only sent when the probe above said yes.
+export const SIGNUP_TO_EVENT_GUEST = gql`
+  mutation SignupToEventGuest(
+    $eventId: String!
+    $name: String!
+    $email: String!
+    $batch_id: String!
+    $coupon_code: String
+    $is_student: Boolean
+    $phone_number: String
+    $cpf: String
+    $kind: String
+  ) {
+    signupToEvent(
+      eventId: $eventId
+      name: $name
+      email: $email
+      batch_id: $batch_id
+      coupon_code: $coupon_code
+      is_student: $is_student
+      phone_number: $phone_number
+      cpf: $cpf
+      kind: $kind
+    ) {
+      success
+      message
+      payment
+      is_free
+      signup_id
+      outcome
+      confirmation_sent_to
+    }
+  }
+`;
+
 // Final price as the Eventando computes it (coupon or half price, never both).
 export const PREVIEW_COUPON = gql`
   query PreviewCoupon($eventSlug: String!, $batchId: ID!, $code: String!, $isStudent: Boolean) {

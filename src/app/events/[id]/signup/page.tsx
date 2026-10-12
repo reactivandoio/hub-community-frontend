@@ -27,6 +27,7 @@ import { useForm } from 'react-hook-form';
 import { AddToCalendarButton } from '@/components/add-to-calendar-button';
 import { SignupTicketQr } from '@/components/signup-ticket-qr';
 import { SignupPixPayment } from '@/components/signup-pix-payment';
+import { GuestPaymentResume } from '@/components/guest-payment-resume';
 import { FadeIn } from '@/components/animations';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,12 +43,14 @@ import { useAuth } from '@/contexts/auth-context';
 import { useCouponLink } from '@/hooks/use-coupon-link';
 import { useTracking } from '@/hooks/use-tracking';
 import { usePaymentsV2 } from '@/hooks/use-payments-v2';
+import { useGuestSignupSupport } from '@/hooks/use-guest-signup-support';
 import { clearPendingCoupon, pendingCouponHash } from '@/lib/coupon-link';
 import {
   GET_EVENT_BY_SLUG_OR_ID,
   PREVIEW_COUPON,
   SIGNUP_TO_EVENT,
   SIGNUP_TO_EVENT_V2,
+  SIGNUP_TO_EVENT_GUEST,
   VALIDATE_COUPON,
   IS_USER_SIGNED_UP,
 } from '@/lib/queries';
@@ -65,6 +68,13 @@ import {
   inlineSignupSchema,
   type InlineSignupValues,
 } from '@/lib/inline-signup';
+import {
+  CERTIFICATE_NOTE,
+  guestNextStep,
+  guestNotice,
+  paymentParam,
+  type GuestNotice,
+} from '@/lib/guest-signup';
 import { adjustToBrazilTimezone } from '@/utils/event';
 
 interface Batch {
@@ -105,6 +115,16 @@ export default function EventSignupPage() {
   const [phoneInput, setPhoneInput] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [isNewAccount, setIsNewAccount] = useState(false);
+  // REA-22: signup without login (any batch, CPF and e-mail rules on the server).
+  // false = older BFF: free batches only, paid ones through the login as before.
+  const guestSupport = useGuestSignupSupport();
+  const [guestResult, setGuestResult] = useState<GuestNotice | null>(null);
+  // The way back to the Pix from the "Finalize sua inscrição" e-mail (?pagamento=<id>).
+  const [resumePaymentId, setResumePaymentId] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setResumePaymentId(paymentParam(new URLSearchParams(window.location.search).get('pagamento')));
+  }, []);
   const [inlineBusy, setInlineBusy] = useState(false);
   // REA-6 (only with the new BFF): CPF on every signup, coupon priced by the server,
   // Pix or payment link.
@@ -148,7 +168,8 @@ export default function EventSignupPage() {
 
   const [signupToEventLegacy, { loading: signingUpLegacy }] = useMutation(SIGNUP_TO_EVENT);
   const [signupToEventV2, { loading: signingUpV2 }] = useMutation(SIGNUP_TO_EVENT_V2);
-  const signingUp = signingUpLegacy || signingUpV2;
+  const [signupToEventGuest, { loading: signingUpGuest }] = useMutation(SIGNUP_TO_EVENT_GUEST);
+  const signingUp = signingUpLegacy || signingUpV2 || signingUpGuest;
 
   const event = data?.eventBySlugOrId;
   const isAlreadySignedUp = signupCheckData?.isUserSignedUp?.is_signed_up;
@@ -164,25 +185,25 @@ export default function EventSignupPage() {
     [event?.products]
   );
 
-  // For unauthenticated users, v1 scope is free batches only.
-  // Paid batches require the existing login-redirect flow because an
-  // unconfirmed account + pending PIX payment is an ambiguous state we
-  // haven't designed for yet.
+  // REA-22: a guest sees every batch, paid ones included (the Pix comes right after
+  // the signup). Only an older BFF, without the signup-without-login rules, keeps
+  // guests on free batches, with paid ones going through the login.
   const availableProducts: Product[] = useMemo(() => {
-    if (isAuthenticated) return allAvailableProducts;
+    if (isAuthenticated || guestSupport !== false) return allAvailableProducts;
     return allAvailableProducts
       .map((p) => ({
         ...p,
         batches: p.batches.filter((b) => b.enabled && b.value === 0),
       }))
       .filter((p) => p.batches.length > 0);
-  }, [allAvailableProducts, isAuthenticated]);
+  }, [allAvailableProducts, isAuthenticated, guestSupport]);
 
   // If the event has no free batches and the user is not authenticated, the
   // inline flow can't help them — fall back to the original login redirect.
   const onlyPaidForGuest =
     !loading &&
     !isAuthenticated &&
+    guestSupport === false &&
     allAvailableProducts.length > 0 &&
     availableProducts.length === 0;
 
@@ -513,19 +534,28 @@ export default function EventSignupPage() {
       }
       if (halfPrice) variables.is_student = true;
 
-      const result = await submitSignup(variables);
+      let result;
+      if (guestSupport) {
+        const { data } = await signupToEventGuest({
+          variables: { ...variables, cpf: cpfInput.replace(/\D/g, ''), kind: 'PIX_QR' },
+        });
+        result = data?.signupToEvent;
+      } else {
+        result = await submitSignup(variables);
+      }
 
       if (result?.success) {
         succeeded = true;
         setSignupResult(result);
         clearPendingCoupon(slugOrId);
         setIsNewAccount(true);
+        if (guestSupport) setGuestResult(guestNotice(result, values.email));
         track({
           eventType: 'signup_complete',
           eventDocumentId: event?.documentId,
-          metadata: { route: `/events/${slugOrId}/signup`, isNewAccount: true },
+          metadata: { route: `/events/${slugOrId}/signup`, isNewAccount: true, outcome: result.outcome ?? null },
         });
-        setStep('success');
+        setStep(guestSupport ? guestNextStep(result) : 'success');
       } else {
         showSignupError(result?.message || 'Erro ao realizar inscrição.');
         setStep('confirm');
@@ -749,8 +779,19 @@ export default function EventSignupPage() {
             </div>
           </div>
 
+          {/* REA-22: back to the Pix from the e-mail */}
+          {resumePaymentId && step === 'select' && (
+            <GuestPaymentResume
+              signupId={resumePaymentId}
+              onStartOver={() => {
+                setResumePaymentId(null);
+                router.replace(`/events/${slugOrId}/signup`);
+              }}
+            />
+          )}
+
           {/* Step: Select Product/Batch */}
-          {step === 'select' && (
+          {step === 'select' && !resumePaymentId && (
             <div className="space-y-6">
               {availableProducts.length === 0 ? (
                 <div className="bg-card border border-border rounded-2xl p-8 text-center">
@@ -1257,18 +1298,35 @@ export default function EventSignupPage() {
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-foreground mb-2">
-                  Inscrição Confirmada! 🎉
+                  {guestResult?.title ?? 'Inscrição Confirmada! 🎉'}
                 </h2>
-                <p className="text-muted-foreground">
-                  Sua inscrição no evento <strong>{event.title}</strong> foi realizada com sucesso.
-                </p>
+                {guestResult && !guestResult.ownSignup ? (
+                  <p className="text-muted-foreground" data-testid="guest-notice">
+                    {guestResult.body}
+                  </p>
+                ) : (
+                  <p className="text-muted-foreground">
+                    Sua inscrição no evento <strong>{event.title}</strong> foi realizada com sucesso.
+                  </p>
+                )}
               </div>
 
               {signupResult?.signup_id && (
                 <SignupTicketQr eventSlug={event.slug || slugOrId} signupId={signupResult.signup_id} />
               )}
 
-              {isNewAccount && (
+              {guestResult?.ownSignup && (
+                <div className="bg-primary/5 border border-primary/20 rounded-xl p-6 text-left space-y-2" data-testid="guest-notice">
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-5 w-5 text-primary" />
+                    <h3 className="font-semibold text-foreground">Confira seu email</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{guestResult.body}</p>
+                  <p className="text-sm text-muted-foreground">{CERTIFICATE_NOTE}</p>
+                </div>
+              )}
+
+              {isNewAccount && !guestResult && (
                 <div className="bg-primary/5 border border-primary/20 rounded-xl p-6 text-left">
                   <div className="flex items-center gap-2 mb-2">
                     <Mail className="h-5 w-5 text-primary" />
@@ -1331,13 +1389,20 @@ export default function EventSignupPage() {
           {/* Step: Payment (Paid Event) */}
           {step === 'payment' && signupResult?.payment && (
             <div className="space-y-6">
+              {guestResult && (
+                <p className="text-sm text-muted-foreground text-center" data-testid="guest-payment-note">
+                  Enviamos também para {signupResult.confirmation_sent_to || inlineForm.getValues('email')} um
+                  e-mail com o link para voltar a este Pix. {CERTIFICATE_NOTE}
+                </p>
+              )}
               <SignupPixPayment
                 key={`${signupResult.signup_id}-${paymentAttempt}`}
                 signupId={String(signupResult.signup_id)}
                 initial={signupResult.payment}
                 onPaid={handlePaid}
                 onRetry={handleRetryPayment}
-                onChangeKind={paymentsV2 ? handleChangeKind : undefined}
+                // A guest has no session to ask for another kind with: the e-mail brings the Pix back.
+                onChangeKind={paymentsV2 && isAuthenticated ? handleChangeKind : undefined}
                 linkUnavailable={linkUnavailable}
               />
               <div className="text-center">
