@@ -382,15 +382,78 @@ export type PaymentProvider = 'pixai' | 'opapingou';
 // Eventando Payment.status ("PEDING_PAYMENT" is the stored spelling).
 export type PaymentStatus = 'PEDING_PAYMENT' | 'CONFIRMED' | 'EXPIRED' | 'CANCELED' | 'REFUND';
 
+export type PaymentKind = 'PIX_QR' | 'PAYMENT_LINK';
+
+export interface RefundSupport {
+  text?: string | null;
+  whatsapp?: string | null;
+}
+
 export interface SignupPaymentStatus {
   signup_id: string;
   status: PaymentStatus;
   provider?: PaymentProvider | null;
+  kind?: PaymentKind | null;
   expires_at?: string | null;
   confirmed_at?: string | null;
   pix_br_code?: string | null;
   payment_link?: string | null;
   value?: number | null;
+  refund_support?: RefundSupport | null;
+}
+
+export type DiscountKind = 'coupon' | 'student';
+
+/** `signupToEvent.payment` for an Opa Pingou signup (values in cents). */
+export interface SignupPayment {
+  payment_provider?: PaymentProvider | string | null;
+  kind?: PaymentKind | null;
+  pix_br_code?: string | null;
+  payment_link?: string | null;
+  expires_at?: string | null;
+  value?: number | null;
+  original_value?: number | null;
+  discount_kind?: DiscountKind | null;
+  min_charge_applied?: boolean | null;
+}
+
+/** previewCoupon: the Eventando's price for a batch + coupon (values in cents). */
+export interface CouponPreview {
+  valid: boolean;
+  message?: string | null;
+  discount_kind?: DiscountKind | null;
+  final_value?: number | null;
+  original_value?: number | null;
+  min_charge_applied?: boolean | null;
+}
+
+export type CouponDiscountType = 'percentage' | 'fixed';
+
+export interface Coupon {
+  id: string;
+  code: string;
+  discount_type?: CouponDiscountType | null;
+  discount_percentage?: number | null;
+  discount_value_cents?: number | null;
+  starts_at?: string | null;
+  expires_at?: string | null;
+  max_uses?: number | null;
+  uses?: number | null;
+  enabled?: boolean | null;
+  batches?: { id: string; batch_number?: number | null }[] | null;
+}
+
+export interface CouponInput {
+  code: string;
+  event: string;
+  discount_type?: CouponDiscountType;
+  discount_percentage?: number | null;
+  discount_value_cents?: number | null;
+  starts_at?: string | null;
+  expires_at?: string | null;
+  max_uses?: number | null;
+  enabled: boolean;
+  batches: string[];
 }
 
 export interface EventSaleInput {

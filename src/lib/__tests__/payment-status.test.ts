@@ -1,5 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { paymentPhase, paymentStatusLabel, isTerminalPhase, summarizePayments } from '../payment-status';
+import {
+  discountLabel,
+  formatCountdown,
+  isPaymentLinkUnavailable,
+  minChargeNotice,
+  isTerminalPhase,
+  paymentPhase,
+  paymentStatusLabel,
+  refundContact,
+  summarizePayments,
+} from '../payment-status';
 
 const NOW = new Date('2026-11-01T12:00:00Z');
 
@@ -63,5 +73,49 @@ describe('paymentStatusLabel', () => {
     expect(paymentStatusLabel('CANCELED')).toBe('Cancelado');
     expect(paymentStatusLabel('REFUND')).toBe('Reembolsado');
     expect(paymentStatusLabel(undefined)).toBe('—');
+  });
+});
+
+describe('formatCountdown', () => {
+  it('shows minutes and seconds left, never negative', () => {
+    expect(formatCountdown(15 * 60 * 1000)).toBe('15:00');
+    expect(formatCountdown(61 * 1000 + 400)).toBe('01:02');
+    expect(formatCountdown(-5)).toBe('00:00');
+  });
+});
+
+describe('refundContact', () => {
+  it('builds the WhatsApp link from the configured number', () => {
+    expect(refundContact({ text: 'Reembolso pelo suporte.', whatsapp: '+55 (11) 98765-4321' })).toEqual({
+      text: 'Reembolso pelo suporte.',
+      href: 'https://wa.me/5511987654321',
+    });
+  });
+
+  it('has a default text', () => {
+    expect(refundContact({ whatsapp: '5511987654321' })?.text).toMatch(/reembolso/i);
+  });
+
+  it('shows nothing without a number', () => {
+    expect(refundContact({ text: 'Reembolso pelo suporte.', whatsapp: '' })).toBeNull();
+    expect(refundContact(null)).toBeNull();
+  });
+});
+
+describe('price messages', () => {
+  it('names the discount the server applied', () => {
+    expect(discountLabel('coupon')).toBe('Desconto do cupom');
+    expect(discountLabel('student')).toBe('Meia-entrada');
+    expect(discountLabel(null)).toBeNull();
+  });
+
+  it('warns about the minimum charge with the adjusted value', () => {
+    expect(minChargeNotice(100)).toBe('O valor foi ajustado para o mínimo de cobrança: R$ 1,00.');
+  });
+
+  it('recognizes the payment link refusal', () => {
+    expect(isPaymentLinkUnavailable('Link indisponível, pague por Pix')).toBe(true);
+    expect(isPaymentLinkUnavailable('PAYMENT_LINK_UNAVAILABLE')).toBe(true);
+    expect(isPaymentLinkUnavailable('Este evento já atingiu a lotação máxima.')).toBe(false);
   });
 });

@@ -1,4 +1,5 @@
 import type { PaymentStatus } from './types';
+import { formatCents } from './money';
 
 export type PaymentPhase = 'pending' | 'paid' | 'expired' | 'canceled' | 'refunded';
 
@@ -78,4 +79,42 @@ const LABELS: Record<string, string> = {
 
 export function paymentStatusLabel(status: PaymentStatus | string | null | undefined): string {
   return (status && LABELS[status]) || '—';
+}
+
+/** "mm:ss" left on the charge. */
+export function formatCountdown(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const mm = String(Math.floor(total / 60)).padStart(2, '0');
+  const ss = String(total % 60).padStart(2, '0');
+  return `${mm}:${ss}`;
+}
+
+const DEFAULT_REFUND_TEXT = 'Precisa de reembolso? Fale com o suporte pelo WhatsApp.';
+
+/**
+ * Refunds are manual, through support on WhatsApp. Text and number come from the
+ * server (REFUND_SUPPORT_TEXT / REFUND_SUPPORT_WHATSAPP); without a number there
+ * is nothing to show.
+ */
+export function refundContact(
+  support: { text?: string | null; whatsapp?: string | null } | null | undefined,
+): { text: string; href: string } | null {
+  const digits = String(support?.whatsapp || '').replace(/\D/g, '');
+  if (!digits) return null;
+  return { text: support?.text?.trim() || DEFAULT_REFUND_TEXT, href: `https://wa.me/${digits}` };
+}
+
+export function discountLabel(kind: string | null | undefined): string | null {
+  if (kind === 'coupon') return 'Desconto do cupom';
+  if (kind === 'student') return 'Meia-entrada';
+  return null;
+}
+
+/** Shown when the server raised a tiny discounted price to the provider's minimum. */
+export function minChargeNotice(cents: number | null | undefined): string {
+  return `O valor foi ajustado para o mínimo de cobrança: ${formatCents(cents)}.`;
+}
+
+export function isPaymentLinkUnavailable(message: string | null | undefined): boolean {
+  return /link\s+(de pagamento\s+)?indispon[ií]vel|PAYMENT_LINK_UNAVAILABLE/i.test(message || '');
 }
