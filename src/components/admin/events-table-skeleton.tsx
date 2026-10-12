@@ -2,13 +2,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export function EventsTableSkeleton() {
   return (
-    <div className="container mx-auto py-10 px-4">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <Skeleton className="h-8 w-56 mb-2" />
-          <Skeleton className="h-4 w-72" />
-        </div>
-        <Skeleton className="h-10 w-32" />
+    <div role="status" aria-label="Carregando eventos" className="w-full space-y-6 px-4 py-8">
+      <div className="space-y-2">
+        <Skeleton className="h-7 w-48" />
+        <Skeleton className="h-4 w-72 max-w-full" />
       </div>
 
       <div className="border rounded-md">

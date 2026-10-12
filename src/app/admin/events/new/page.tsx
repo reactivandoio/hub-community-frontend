@@ -4,6 +4,7 @@ import { useMutation } from '@apollo/client';
 import { useRouter } from 'next/navigation';
 
 import { EventForm } from '@/components/admin/event-form';
+import { AdminPage, AdminPageHeader } from '@/components/admin/admin-page';
 import { FadeIn } from '@/components/animations';
 import { useToast } from '@/hooks/use-toast';
 import { CONNECT_EVENT_OPAPINGOU, CREATE_EVENT, UPDATE_EVENT_SALE } from '@/lib/queries';
@@ -125,13 +126,11 @@ export default function NewEventPage() {
 
   return (
     <FadeIn direction="up" duration={0.3}>
-    <div className="container mx-auto py-10 px-4 max-w-3xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Novo Evento</h1>
-        <p className="text-muted-foreground mt-2">
-          Preencha os detalhes abaixo para criar um novo evento.
-        </p>
-      </div>
+    <AdminPage>
+      <AdminPageHeader
+        title="Novo Evento"
+        description="Preencha os detalhes abaixo para criar um novo evento."
+      />
 
       <div className="border rounded-lg p-6 bg-card">
         <EventForm
@@ -140,7 +139,7 @@ export default function NewEventPage() {
           isLoading={loading || paymentsV2 === null}
         />
       </div>
-    </div>
+    </AdminPage>
     </FadeIn>
   );
 }

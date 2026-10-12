@@ -4,6 +4,7 @@ import { CommunityFormDialog } from '@/components/admin/community-form-dialog';
 import { ImageCropDialog } from '@/components/admin/image-crop-dialog';
 import { LocationFormDialog } from '@/components/admin/location-form-dialog';
 import { OpaPingouAccountCard } from '@/components/admin/opapingou-account-card';
+import { AdminPageActions } from '@/components/admin/page-actions';
 import { ACCOUNT_REQUIRED_MESSAGE, hasPaidBatch, looksLikeOpaPingouKey } from '@/lib/opapingou-account';
 import { ProductFormDialog } from '@/components/admin/product-form-dialog';
 import { TalkFormDialog } from '@/components/admin/talk-form-dialog';
@@ -63,9 +64,12 @@ import {
   createEventSchema,
   type CreateEventFormValues,
 } from '@/lib/schemas';
+import type { EventFormSection } from '@/lib/admin-nav';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
+
+const EVENT_FORM_ID = 'event-form';
 
 interface EventFormProps {
   initialData?: CreateEventFormValues & { id?: string };
@@ -73,6 +77,15 @@ interface EventFormProps {
   /** Called after "Salvar Evento" saved the event, with its id. */
   onSaved?: (id: string) => void;
   isLoading?: boolean;
+  /**
+   * The part of the form to show, when the page picks it by URL (the event's sidebar, REA-24).
+   * Without it the form shows its own tabs, synced with the URL hash (new event).
+   */
+  section?: EventFormSection;
+  /** Asked to show another part (a validation error is there). Only with `section`. */
+  onSectionChange?: (section: EventFormSection) => void;
+  /** Whether there are changes not saved yet. */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 // Mock locations - deprecated, now using GET_LOCATIONS
@@ -91,6 +104,9 @@ export function EventForm({
   onSubmit,
   onSaved,
   isLoading,
+  section,
+  onSectionChange,
+  onDirtyChange,
 }: EventFormProps) {
   const router = useRouter();
   const { toast: formToast } = useToast();
@@ -167,9 +183,16 @@ export function EventForm({
   useEffect(() => {
     if (initialData?.products) {
       setProducts(initialData.products);
+      // Data coming from the server, not an edit: it must not count as an unsaved change.
+      syncingRef.current = true;
       form.setValue('products', initialData.products);
+      syncingRef.current = false;
     }
   }, [initialData?.products]);
+
+  // Unsaved changes (REA-24): any edit of a field, of the talks, products or cover, until saved.
+  const [dirty, setDirty] = useState(false);
+  const syncingRef = useRef(false);
 
   // Image Upload State
   const [coverImagePreview, setCoverImagePreview] = useState<string | null>(
@@ -202,6 +225,7 @@ export function EventForm({
     setUploadError(null);
     setCropDialogOpen(false);
     setRawImageSrc(null);
+    setDirty(true);
   }, []);
 
   const handleCropClose = useCallback(() => {
@@ -224,6 +248,7 @@ export function EventForm({
     setCoverImagePreview(null);
     setCoverImageFile(null);
     setUploadError(null);
+    setDirty(true);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -248,10 +273,33 @@ export function EventForm({
 
   const isOnline = form.watch('is_online');
 
-  // Tabs state synced with URL hash
-  const [activeTab, setActiveTab] = useState<string>('general');
+  useEffect(() => {
+    // The subscription also fires on state changes (submitting, validating): only a change in
+    // the values counts.
+    let seen = JSON.stringify(form.getValues());
+    const subscription = form.watch((values) => {
+      const next = JSON.stringify(values);
+      if (next === seen) return;
+      seen = next;
+      if (!syncingRef.current) setDirty(true);
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
 
   useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
+
+  // Tabs state: given by the page (`section`) or synced with the URL hash
+  const [hashTab, setActiveTabState] = useState<string>('general');
+  const activeTab = section ?? hashTab;
+  const setActiveTab = (value: string) => {
+    if (section) onSectionChange?.(value as EventFormSection);
+    else setActiveTabState(value);
+  };
+
+  useEffect(() => {
+    if (section) return;
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
       if (['general', 'schedule', 'products'].includes(hash)) {
@@ -264,11 +312,11 @@ export function EventForm({
 
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
+  }, [section]);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
-    window.location.hash = value;
+    if (!section) window.location.hash = value;
   };
 
   const generateSlug = () => {
@@ -341,7 +389,10 @@ export function EventForm({
   const handleSaveEventForTalk = async (): Promise<string | undefined> => {
     const isValid = await form.trigger();
     if (isValid) {
-      return await onSubmit(form.getValues());
+      const savedId = await onSubmit(form.getValues());
+      // Everything but a cover still waiting for upload was saved.
+      if (savedId && !coverImageFile) setDirty(false);
+      return savedId;
     }
     return undefined;
   };
@@ -396,13 +447,14 @@ export function EventForm({
       setPendingOpaKey('');
       // The cover is now linked to the event; don't upload it again.
       setCoverImageFile(null);
+      setDirty(false);
       onSaved?.(savedId);
     }
   };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleFormSubmit, (errors) => {
+      <form id={EVENT_FORM_ID} onSubmit={form.handleSubmit(handleFormSubmit, (errors) => {
           // Auto-navigate to the tab that contains the first error
           const generalFields = ['title', 'slug', 'start_date', 'end_date', 'max_slots', 'description', 'location', 'communityId', 'is_online', 'call_link', 'unlisted', 'images'];
           const scheduleFields = ['talks'];
@@ -423,11 +475,14 @@ export function EventForm({
           });
         })} className="space-y-8">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="general">Geral</TabsTrigger>
-            <TabsTrigger value="schedule">Programação</TabsTrigger>
-            <TabsTrigger value="products">Produtos & Lotes</TabsTrigger>
-          </TabsList>
+          {/* With `section` the event's sidebar is the tab list. */}
+          {!section && (
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="general">Geral</TabsTrigger>
+              <TabsTrigger value="schedule">Programação</TabsTrigger>
+              <TabsTrigger value="products">Produtos & Lotes</TabsTrigger>
+            </TabsList>
+          )}
 
           <TabsContent value="general" className="space-y-6 mt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -549,6 +604,8 @@ export function EventForm({
               />
             </div>
 
+            {/* Side by side on a wide screen, where the form takes the whole width. */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
             {/* Online Event Section */}
             <div className="space-y-4 rounded-lg border p-4">
               <div className="flex items-center justify-between">
@@ -633,9 +690,10 @@ export function EventForm({
                 />
               </div>
             </div>
+            </div>
 
-            {/* Cover Image Upload Section */}
-            <div className="space-y-4 rounded-lg border p-4">
+            {/* Cover Image Upload Section (capped: a cover from edge to edge would be huge) */}
+            <div className="space-y-4 rounded-lg border p-4 max-w-3xl">
               <Label className="text-base font-semibold flex items-center gap-2">
                 <ImagePlus className="h-4 w-4" />
                 Imagem de Capa
@@ -709,6 +767,7 @@ export function EventForm({
               )}
             </div>
 
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
             {/* Location Section */}
             <div className="space-y-4 rounded-lg border p-4">
               <div className="flex items-center justify-between">
@@ -798,6 +857,7 @@ export function EventForm({
                     ) : null;
                   })()}
               </div>
+            </div>
             </div>
 
             <FormField
@@ -1046,14 +1106,20 @@ export function EventForm({
           </TabsContent>
         </Tabs>
 
-        <div className="flex justify-end gap-4">
-          <Button type="button" variant="outline" onClick={() => router.back()}>
+        {/* Page actions: shown in the admin top bar, always in view (hence `form=`). */}
+        <AdminPageActions>
+          {dirty && isEditing && (
+            <p role="status" className="text-sm text-amber-600 dark:text-amber-400 md:mr-1">
+              Há alterações não salvas.
+            </p>
+          )}
+          <Button type="button" variant="outline" size="sm" onClick={() => router.back()}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={isLoading}>
+          <Button type="submit" size="sm" form={EVENT_FORM_ID} disabled={isLoading}>
             {isLoading ? 'Salvando...' : 'Salvar Evento'}
           </Button>
-        </div>
+        </AdminPageActions>
       </form>
 
       {/* Image Crop Dialog */}

@@ -1,10 +1,9 @@
 'use client';
 
-import { useAdminAccess } from '@/components/admin/admin-guard';
-import { CouponsTab } from '@/components/admin/coupons-tab';
 import { EventForm } from '@/components/admin/event-form';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useUnsavedChanges } from '@/components/admin/unsaved-guard';
 import { usePaymentsV2 } from '@/hooks/use-payments-v2';
+import { AdminPage, AdminPageError, AdminPageHeader, AdminPageLoading } from '@/components/admin/admin-page';
 import { FadeIn } from '@/components/animations';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -21,17 +20,49 @@ import {
 } from '@/lib/types';
 import { useMutation, useQuery } from '@apollo/client';
 import { format } from 'date-fns';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Award, BarChart3, Dices, FileSpreadsheet, QrCode, Printer } from 'lucide-react';
-import { raffleUrl } from '@/lib/raffle';
+import {
+  eventFormSection,
+  eventIdFromPath,
+  eventSectionHref,
+  legacyEventHashHref,
+  type EventFormSection,
+} from '@/lib/admin-nav';
 import { centsToReais, reaisToCents } from '@/lib/money';
 import { ACCOUNT_REQUIRED_MESSAGE, isAccountRequiredError } from '@/lib/opapingou-account';
 
-export default function EditEventPage() {
+const SECTION_TITLES: Record<EventFormSection, { title: string; text: string }> = {
+  general: { title: 'Geral', text: 'Título, datas, local, comunidade, capa e descrição do evento.' },
+  schedule: { title: 'Programação', text: 'As palestras do evento.' },
+  products: { title: 'Produtos & Lotes', text: 'Ingressos, lotes e a conta de pagamento do evento.' },
+};
+
+/**
+ * The event form behind `/admin/events/<id>`, `/programacao` and `/produtos` (REA-24). It is one
+ * form with one "Salvar Evento": rendered by the layout those three routes share, it stays
+ * mounted while the sidebar switches between them, so nothing typed is lost. Leaving for any
+ * other page with unsaved changes asks first.
+ */
+export function EventEditor() {
   const router = useRouter();
   const params = useParams();
+  const pathname = usePathname();
   const id = params?.id as string;
+  const section = eventFormSection(pathname) ?? 'general';
+  const [dirty, setDirty] = useState(false);
+
+  // The other parts of this same form keep what was typed; any other link would lose it.
+  useUnsavedChanges(dirty, (href) => {
+    const path = href.split(/[?#]/)[0];
+    return eventIdFromPath(path) === eventIdFromPath(pathname) && eventFormSection(path) !== null;
+  });
+
+  // Old links: the sections used to be tabs with a fragment (#schedule, #products).
+  useEffect(() => {
+    const target = legacyEventHashHref(id, window.location.hash);
+    if (target) router.replace(target);
+  }, [id, router]);
 
   const { toast } = useToast();
   const {
@@ -50,13 +81,10 @@ export default function EditEventPage() {
   const [updateEventSale] =
     useMutation<UpdateEventSaleResponse>(UPDATE_EVENT_SALE);
   const [initialData, setInitialData] = useState<any>(null);
-  const eventSlug = data?.eventBySlugOrId?.slug || id;
 
   // REA-6 only runs against a BFF that has it: before that, prices stay as typed
-  // (the old backend's unit), and the Cupons tab stays hidden.
+  // (the old backend's unit).
   const paymentsV2 = usePaymentsV2();
-  // Coupons are admin only on the BFF; a community-manager edits the rest.
-  const { isAdmin } = useAdminAccess();
 
   useEffect(() => {
     if (data?.eventBySlugOrId && paymentsV2 !== null) {
@@ -177,135 +205,38 @@ export default function EditEventPage() {
     }
   };
 
-  if (queryLoading) {
-    return (
-      <div className="container mx-auto py-10 px-4 max-w-3xl">
-        <div className="mb-8">
-          <div className="h-8 w-48 bg-muted animate-pulse rounded mb-2" />
-          <div className="h-4 w-72 bg-muted animate-pulse rounded" />
-        </div>
-        <div className="border rounded-lg p-6 bg-card space-y-4">
-          {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className="space-y-2">
-              <div className="h-4 w-24 bg-muted animate-pulse rounded" />
-              <div className="h-10 w-full bg-muted animate-pulse rounded" />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  if (queryLoading) return <AdminPageLoading label="Carregando evento" />;
 
   if (error) {
     return (
-      <div className="container mx-auto py-10 text-center text-red-500">
-        <p>Erro ao carregar evento: {error.message}</p>
-        <Button
-          variant="outline"
-          onClick={() => router.push('/admin/events')}
-          className="mt-4"
-        >
-          Voltar para lista
-        </Button>
-      </div>
+      <AdminPageError
+        title="Erro ao carregar evento"
+        message={error.message}
+        action={{ label: 'Voltar para os eventos', onClick: () => router.push('/admin/events') }}
+      />
     );
   }
 
   return (
     <FadeIn direction="up" duration={0.3}>
-    <div className="container mx-auto py-10 px-4 max-w-3xl">
-      <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Editar Evento</h1>
-          <p className="text-muted-foreground mt-2">
-            Atualize os detalhes do evento abaixo.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => router.push(`/admin/events/${id}/analytics`)}
-          >
-            <BarChart3 className="w-4 h-4 mr-2" />
-            Analytics
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => router.push(`/admin/events/${id}/certificados`)}
-          >
-            <Award className="w-4 h-4 mr-2" />
-            Certificados
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => router.push(`/admin/events/${id}/import-signups`)}
-          >
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
-            Inscrições
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => router.push(raffleUrl(eventSlug))}
-          >
-            <Dices className="w-4 h-4 mr-2" />
-            Sorteio
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => window.open(`/checkin/${eventSlug}`, '_blank')}
-          >
-            <QrCode className="w-4 h-4 mr-2" />
-            Check-in
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => window.open(`/badge-printer/event/${eventSlug}`, '_blank')}
-          >
-            <Printer className="w-4 h-4 mr-2" />
-            Crachá
-          </Button>
-        </div>
-      </div>
+    <AdminPage>
+      {/* Analytics, certificados, inscrições and the tools are items of the event's sidebar;
+          "Salvar Evento" and "Cancelar" are in the top bar (declared by EventForm). */}
+      <AdminPageHeader title={SECTION_TITLES[section].title} description={SECTION_TITLES[section].text} />
 
-      {paymentsV2 && isAdmin && data?.eventBySlugOrId?.id ? (
-        <Tabs defaultValue="event" className="w-full">
-          <TabsList className="mb-4">
-            <TabsTrigger value="event">Evento</TabsTrigger>
-            <TabsTrigger value="coupons">Cupons</TabsTrigger>
-          </TabsList>
-          <TabsContent value="event">
-            <div className="border rounded-lg p-6 bg-card">
-              {initialData && (
-                <EventForm
-                  initialData={initialData}
-                  onSubmit={handleSubmit}
-                  isLoading={mutationLoading}
-                />
-              )}
-            </div>
-          </TabsContent>
-          <TabsContent value="coupons">
-            <div className="border rounded-lg p-6 bg-card">
-              <CouponsTab
-                eventId={data.eventBySlugOrId.id}
-                eventSlug={eventSlug}
-                products={data.eventBySlugOrId.products || []}
-              />
-            </div>
-          </TabsContent>
-        </Tabs>
-      ) : (
-        <div className="border rounded-lg p-6 bg-card">
-          {initialData && (
-            <EventForm
-              initialData={initialData}
-              onSubmit={handleSubmit}
-              isLoading={mutationLoading}
-            />
-          )}
-        </div>
-      )}
-    </div>
+      <div className="border rounded-lg p-6 bg-card">
+        {initialData && (
+          <EventForm
+            initialData={initialData}
+            onSubmit={handleSubmit}
+            isLoading={mutationLoading}
+            section={section}
+            onSectionChange={(next) => router.push(eventSectionHref(id, next))}
+            onDirtyChange={setDirty}
+          />
+        )}
+      </div>
+    </AdminPage>
     </FadeIn>
   );
 }

@@ -12,6 +12,7 @@ import { Footer } from '@/components/footer';
 import { CompleteProfileModal } from '@/components/complete-profile-modal';
 import { LogoutModalWrapper } from '@/components/logout-modal-wrapper';
 import { Navigation } from '@/components/navigation';
+import { PublicOnly } from '@/components/public-only';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 import { AgendaProvider } from '@/contexts/agenda-context';
@@ -66,7 +67,9 @@ export default function RootLayout({
                       enableSystem
                       disableTransitionOnChange
                     >
-                      <Navigation />
+                      <PublicOnly>
+                        <Navigation />
+                      </PublicOnly>
                       <RouteErrorBoundary>
                         <PageTransitionProvider>
                           {children}
@@ -74,7 +77,9 @@ export default function RootLayout({
                       </RouteErrorBoundary>
                       <Toaster />
                       <SonnerToaster richColors position="top-right" />
-                      <Footer />
+                      <PublicOnly>
+                        <Footer />
+                      </PublicOnly>
                       <CookieConsentBanner />
                     </ThemeProvider>
                   </FilterProvider>

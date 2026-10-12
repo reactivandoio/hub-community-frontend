@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, Trash2 } from 'lucide-react';
 
+import { AdminPageActions } from '@/components/admin/page-actions';
 import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import {
@@ -134,7 +135,7 @@ export function VotingSessionForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form id="voting-session-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <Tabs defaultValue="general" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="general">Geral</TabsTrigger>
@@ -309,14 +310,15 @@ export function VotingSessionForm({
           </TabsContent>
         </Tabs>
 
-        <div className="flex justify-end gap-4 pt-4 border-t">
-          <Button type="button" variant="outline" onClick={() => router.back()}>
-            Voltar
+        {/* Page actions: shown in the admin top bar (hence `form=`). */}
+        <AdminPageActions>
+          <Button type="button" variant="outline" size="sm" onClick={() => router.back()}>
+            Cancelar
           </Button>
-          <Button type="submit" disabled={isLoading}>
+          <Button type="submit" size="sm" form="voting-session-form" disabled={isLoading}>
             {isLoading ? 'Salvando...' : 'Salvar Sessão'}
           </Button>
-        </div>
+        </AdminPageActions>
       </form>
     </Form>
   );

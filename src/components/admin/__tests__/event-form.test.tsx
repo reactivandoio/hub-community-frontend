@@ -117,6 +117,71 @@ describe('EventForm cover upload', () => {
   });
 });
 
+describe('EventForm: section by URL and unsaved changes (REA-24)', () => {
+  const saved = { ...initialData, id: 'evt-1' };
+  const renderForm = (props: Partial<React.ComponentProps<typeof EventForm>> = {}) => {
+    const onSubmit = vi.fn().mockResolvedValue('evt-1');
+    const onDirtyChange = vi.fn();
+    render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <EventForm initialData={saved} onSubmit={onSubmit} onDirtyChange={onDirtyChange} {...props} />
+      </MockedProvider>
+    );
+    return { onSubmit, onDirtyChange };
+  };
+  const lastDirty = (fn: ReturnType<typeof vi.fn>) => fn.mock.calls.at(-1)?.[0];
+
+  it('without a section keeps its own tabs (new event)', () => {
+    renderForm();
+    expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual([
+      'Geral', 'Programação', 'Produtos & Lotes',
+    ]);
+  });
+
+  it('with a section shows that part only, without the tab list (the sidebar is it)', () => {
+    renderForm({ section: 'schedule' });
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+    expect(screen.getByText('Palestras (Talks)')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Meetup')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Salvar Evento/ })).toBeInTheDocument();
+  });
+
+  it('asks for the section with the error instead of switching by itself', async () => {
+    const onSectionChange = vi.fn();
+    render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <EventForm initialData={{ ...saved, title: '' }} onSubmit={vi.fn()} section="schedule" onSectionChange={onSectionChange} />
+      </MockedProvider>
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Evento/ }));
+    await waitFor(() => expect(onSectionChange).toHaveBeenCalledWith('general'));
+  });
+
+  it('starts clean, reports an edit as unsaved and a save as clean again', async () => {
+    const { onSubmit, onDirtyChange } = renderForm({ section: 'general' });
+    expect(lastDirty(onDirtyChange)).toBe(false);
+    expect(screen.queryByText('Há alterações não salvas.')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByDisplayValue('Meetup'), { target: { value: 'Meetup 2' } });
+    await waitFor(() => expect(lastDirty(onDirtyChange)).toBe(true));
+    expect(screen.getByText('Há alterações não salvas.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Evento/ }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    await waitFor(() => expect(lastDirty(onDirtyChange)).toBe(false));
+    expect(screen.queryByText('Há alterações não salvas.')).not.toBeInTheDocument();
+  });
+
+  it('keeps the changes marked when the save fails', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const { onDirtyChange } = renderForm({ section: 'general', onSubmit });
+    fireEvent.change(screen.getByDisplayValue('Meetup'), { target: { value: 'Meetup 2' } });
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Evento/ }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(lastDirty(onDirtyChange)).toBe(true);
+  });
+});
+
 describe('EventForm: lote pago exige conta Opa Pingou (REA-12)', () => {
   const KEY = `opk_live_${'k'.repeat(43)}`;
   const paidProducts = [

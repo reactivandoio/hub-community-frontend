@@ -33,6 +33,19 @@
     --ring: 158 83% 39%; /* Match primary */
 
     --radius: 0.5rem;
+
+    /* Admin: height shared by the top bar and the sidebar header (admin-shell.tsx) */
+    --admin-header-height: 3.5rem;
+
+    /* Admin sidebar (components/ui/sidebar) */
+    --sidebar-background: 210 40% 98%;
+    --sidebar-foreground: 217 33% 17%;
+    --sidebar-primary: 158 83% 39%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 214 32% 91%;
+    --sidebar-accent-foreground: 217 33% 17%;
+    --sidebar-border: 214.3 31.8% 91.4%;
+    --sidebar-ring: 158 83% 39%;
   }
   .dark {
     --background: 217 33% 17%; /* Dark Gray #1F2937 */
@@ -62,6 +75,15 @@
     --border: 217 33% 30%;
     --input: 217 33% 30%;
     --ring: 142.4 71.8% 29.2%;
+
+    --sidebar-background: 217 33% 14%;
+    --sidebar-foreground: 210 20% 98%;
+    --sidebar-primary: 158 83% 39%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 33% 24%;
+    --sidebar-accent-foreground: 210 20% 98%;
+    --sidebar-border: 217 33% 30%;
+    --sidebar-ring: 158 83% 39%;
   }
 }
 
