@@ -24,11 +24,12 @@ import {
 import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 
 import { AddToCalendarButton } from '@/components/add-to-calendar-button';
 import { SignupTicketQr } from '@/components/signup-ticket-qr';
+import { SignupPixPayment } from '@/components/signup-pix-payment';
 import { FadeIn } from '@/components/animations';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,12 +43,19 @@ import {
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/auth-context';
 import { useTracking } from '@/hooks/use-tracking';
+import { usePaymentsV2 } from '@/hooks/use-payments-v2';
 import {
   GET_EVENT_BY_SLUG_OR_ID,
+  PREVIEW_COUPON,
   SIGNUP_TO_EVENT,
+  SIGNUP_TO_EVENT_V2,
   VALIDATE_COUPON,
   IS_USER_SIGNED_UP,
 } from '@/lib/queries';
+import { cpfError, isCpfMessage, maskCpfInput } from '@/lib/cpf';
+import { formatCents } from '@/lib/money';
+import { discountLabel, isPaymentLinkUnavailable, minChargeNotice } from '@/lib/payment-status';
+import type { CouponPreview, PaymentKind } from '@/lib/types';
 import { signupName } from '@/lib/signup-name';
 import { acquireSignupLock, releaseSignupLock } from '@/lib/signup-lock';
 import { signupErrorMessage } from '@/lib/signup-error';
@@ -99,6 +107,15 @@ export default function EventSignupPage() {
   const [phoneError, setPhoneError] = useState('');
   const [isNewAccount, setIsNewAccount] = useState(false);
   const [inlineBusy, setInlineBusy] = useState(false);
+  // REA-6 (only with the new BFF): CPF on every signup, coupon priced by the server,
+  // Pix or payment link.
+  const paymentsV2 = usePaymentsV2();
+  const [cpfInput, setCpfInput] = useState('');
+  const [cpfFieldError, setCpfFieldError] = useState('');
+  const [couponPreview, setCouponPreview] = useState<CouponPreview | null>(null);
+  const [paymentAttempt, setPaymentAttempt] = useState(0);
+  const [linkUnavailable, setLinkUnavailable] = useState(false);
+  const lastSignupVars = useRef<Record<string, unknown> | null>(null);
 
   // Inline signup form (for unauthenticated users)
   const inlineForm = useForm<InlineSignupValues>({
@@ -111,14 +128,20 @@ export default function EventSignupPage() {
     variables: { slugOrId },
   });
 
-  const [validateCoupon, { loading: validatingCoupon }] = useLazyQuery(VALIDATE_COUPON);
+  const [validateCoupon, { loading: validatingLegacyCoupon }] = useLazyQuery(VALIDATE_COUPON);
+  const [previewCoupon, { loading: previewingCoupon }] = useLazyQuery(PREVIEW_COUPON, {
+    fetchPolicy: 'network-only',
+  });
+  const validatingCoupon = validatingLegacyCoupon || previewingCoupon;
 
   const { data: signupCheckData, loading: checkingSignup } = useQuery(IS_USER_SIGNED_UP, {
     variables: { eventId: slugOrId, email: user?.email || '' },
     skip: !isAuthenticated || !user?.email,
   });
 
-  const [signupToEvent, { loading: signingUp }] = useMutation(SIGNUP_TO_EVENT);
+  const [signupToEventLegacy, { loading: signingUpLegacy }] = useMutation(SIGNUP_TO_EVENT);
+  const [signupToEventV2, { loading: signingUpV2 }] = useMutation(SIGNUP_TO_EVENT_V2);
+  const signingUp = signingUpLegacy || signingUpV2;
 
   const event = data?.eventBySlugOrId;
   const isAlreadySignedUp = signupCheckData?.isUserSignedUp?.is_signed_up;
@@ -175,16 +198,64 @@ export default function EventSignupPage() {
     }
   }, [availableProducts, selectedBatch]);
 
-  // Calculate price
+  // A CPF already on the account fills the field (still editable).
+  useEffect(() => {
+    if (user?.cpf && !cpfInput) setCpfInput(maskCpfInput(user.cpf));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.cpf]);
+
+  // The server prices a coupon per batch: another batch needs a new preview.
+  useEffect(() => {
+    setCouponPreview(null);
+    if (paymentsV2) setCouponMessage('');
+  }, [selectedBatch?.id, paymentsV2]);
+
+  // Calculate price. With the new BFF the coupon price is the server's (coupon or
+  // half price, never both); the legacy path keeps today's percentage.
   const basePrice = selectedBatch?.value || 0;
-  const discountedPrice = couponDiscount
-    ? basePrice - (basePrice * couponDiscount) / 100
-    : basePrice;
+  const previewApplies = !!couponPreview?.valid && typeof couponPreview.final_value === 'number';
+  const discountedPrice = previewApplies
+    ? Number(couponPreview!.final_value)
+    : couponDiscount
+      ? basePrice - (basePrice * couponDiscount) / 100
+      : basePrice;
   const finalPrice = discountedPrice;
+  const discountCents = basePrice - finalPrice;
+  const discountText = previewApplies
+    ? discountLabel(couponPreview!.discount_kind)
+    : couponDiscount
+      ? `Desconto (${couponDiscount}%)`
+      : null;
+  const couponApplied = paymentsV2 ? previewApplies && couponPreview?.discount_kind === 'coupon' : !!couponDiscount;
 
   // Handle coupon validation
   const handleValidateCoupon = async () => {
     if (!couponCode.trim()) return;
+    if (paymentsV2) {
+      if (!selectedBatch) return;
+      try {
+        const { data, error } = await previewCoupon({
+          variables: {
+            eventSlug: slugOrId,
+            batchId: selectedBatch.id,
+            code: couponCode.trim(),
+            isStudent: false,
+          },
+        });
+        if (error) throw error;
+        const result: CouponPreview | null = data?.previewCoupon ?? null;
+        setCouponPreview(result?.valid ? result : null);
+        setCouponMessage(
+          result?.valid
+            ? result.message || 'Cupom aplicado.'
+            : result?.message || 'Cupom inválido.',
+        );
+      } catch {
+        setCouponPreview(null);
+        setCouponMessage('Erro ao validar cupom.');
+      }
+      return;
+    }
     try {
       const { data } = await validateCoupon({
         variables: { eventSlug: slugOrId, code: couponCode.trim() },
@@ -202,9 +273,44 @@ export default function EventSignupPage() {
     }
   };
 
+  // CPF is required on every signup once the server stores it (REA-6).
+  const checkCpf = (): boolean => {
+    if (!paymentsV2) return true;
+    const error = cpfError(cpfInput);
+    setCpfFieldError(error || '');
+    return !error;
+  };
+
+  // A refused signup: CPF messages go under the CPF field, the rest on top.
+  const showSignupError = (message: string) => {
+    if (paymentsV2 && isCpfMessage(message)) {
+      setCpfFieldError(message);
+      setErrorMessage('');
+    } else {
+      setErrorMessage(message);
+    }
+  };
+
+  // signupToEvent with the arguments the connected BFF knows.
+  const submitSignup = async (variables: Record<string, unknown>, kind: PaymentKind = 'PIX_QR') => {
+    if (paymentsV2) {
+      const v2 = { ...variables, cpf: cpfInput.replace(/\D/g, ''), kind };
+      lastSignupVars.current = v2;
+      const { data } = await signupToEventV2({ variables: v2 });
+      return data?.signupToEvent;
+    }
+    const { data } = await signupToEventLegacy({ variables });
+    return data?.signupToEvent;
+  };
+
   // Handle signup (authenticated path)
   const handleSignup = async () => {
     if (!user || !selectedBatch) return;
+
+    if (!checkCpf()) {
+      setStep('confirm');
+      return;
+    }
 
     // If user has no phone and didn't provide one, show error
     if (!user.phone && !phoneInput.trim()) {
@@ -244,12 +350,11 @@ export default function EventSignupPage() {
         phone_number: phoneToSend || undefined,
       };
 
-      if (couponCode && couponDiscount) {
+      if (couponCode && couponApplied) {
         variables.coupon_code = couponCode;
       }
 
-      const { data } = await signupToEvent({ variables });
-      const result = data?.signupToEvent;
+      const result = await submitSignup(variables);
 
       if (result?.success) {
         setSignupResult(result);
@@ -258,24 +363,58 @@ export default function EventSignupPage() {
           eventDocumentId: event?.documentId,
           metadata: { route: `/events/${slugOrId}/signup`, isNewAccount: false },
         });
-        if (finalPrice === 0) {
-          setStep('success');
-        } else {
-          setStep('payment');
-        }
+        // The server's word wins: a coupon or half price may have made it free.
+        const isFree = typeof result.is_free === 'boolean' ? result.is_free : finalPrice === 0;
+        setStep(isFree ? 'success' : 'payment');
       } else {
-        setErrorMessage(result?.message || 'Erro ao realizar inscrição.');
+        showSignupError(result?.message || 'Erro ao realizar inscrição.');
         setStep('confirm');
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Erro ao realizar inscrição.');
+      showSignupError(err.message || 'Erro ao realizar inscrição.');
       setStep('confirm');
     }
   };
 
+  // Pix ↔ payment link: a new attempt on the same signup (spec §0). Resolves to an
+  // error message, or null once the step has the new charge.
+  const handleChangeKind = useCallback(
+    async (kind: PaymentKind): Promise<string | null> => {
+      if (!lastSignupVars.current) return 'Não foi possível trocar a forma de pagamento.';
+      try {
+        const v2 = { ...lastSignupVars.current, kind };
+        const { data } = await signupToEventV2({ variables: v2 });
+        const result = data?.signupToEvent;
+        if (result?.success && result.payment) {
+          lastSignupVars.current = v2;
+          setSignupResult(result);
+          setPaymentAttempt((n) => n + 1);
+          return null;
+        }
+        const message = result?.message || 'Não foi possível trocar a forma de pagamento.';
+        if (kind === 'PAYMENT_LINK' && isPaymentLinkUnavailable(message)) setLinkUnavailable(true);
+        return message;
+      } catch (err: any) {
+        return err?.message || 'Não foi possível trocar a forma de pagamento.';
+      }
+    },
+    [signupToEventV2],
+  );
+
+  // Opa Pingou: the webhook confirmed the payment while the Pix step was polling.
+  const handlePaid = useCallback(() => setStep('success'), []);
+
+  // The charge expired or was canceled: the slot is free again, start over.
+  const handleRetryPayment = useCallback(() => {
+    setSignupResult(null);
+    setPaymentAttempt((n) => n + 1);
+    setStep('select');
+  }, []);
+
   // Handle inline signup + event registration (guest path)
   const handleInlineSignup = async (values: InlineSignupValues) => {
     if (!selectedBatch || inlineBusy) return;
+    if (!checkCpf()) return;
 
     // Held only by a successful signup: any failure below releases it, so a
     // corrected retry goes through instead of hitting "em andamento".
@@ -302,12 +441,11 @@ export default function EventSignupPage() {
         batch_id: selectedBatch.id,
         phone_number: cleanedPhone || undefined,
       };
-      if (couponCode && couponDiscount) {
+      if (couponCode && couponApplied) {
         variables.coupon_code = couponCode;
       }
 
-      const { data: mutData } = await signupToEvent({ variables });
-      const result = mutData?.signupToEvent;
+      const result = await submitSignup(variables);
 
       if (result?.success) {
         succeeded = true;
@@ -320,11 +458,11 @@ export default function EventSignupPage() {
         });
         setStep('success');
       } else {
-        setErrorMessage(result?.message || 'Erro ao realizar inscrição.');
+        showSignupError(result?.message || 'Erro ao realizar inscrição.');
         setStep('confirm');
       }
     } catch (err: any) {
-      setErrorMessage(signupErrorMessage(err));
+      showSignupError(signupErrorMessage(err));
       setStep('confirm');
     } finally {
       if (!succeeded) releaseSignupLock(slugOrId, values.email);
@@ -625,7 +763,7 @@ export default function EventSignupPage() {
                                   <p className="text-lg font-bold text-foreground">
                                     {batch.value === 0
                                       ? 'Grátis'
-                                      : `R$ ${(batch.value / 100).toFixed(2)}`}
+                                      : formatCents(batch.value)}
                                   </p>
                                 </div>
                               </button>
@@ -649,6 +787,7 @@ export default function EventSignupPage() {
                           onChange={(e) => {
                             setCouponCode(e.target.value.toUpperCase());
                             setCouponDiscount(null);
+                            setCouponPreview(null);
                             setCouponMessage('');
                           }}
                           className="flex-1"
@@ -668,7 +807,7 @@ export default function EventSignupPage() {
                       {couponMessage && (
                         <p
                           className={`text-sm mt-2 ${
-                            couponDiscount ? 'text-green-600' : 'text-red-500'
+                            couponDiscount || previewApplies ? 'text-green-600' : 'text-red-500'
                           }`}
                         >
                           {couponMessage}
@@ -687,23 +826,24 @@ export default function EventSignupPage() {
                             {selectedProduct?.name} — {selectedBatch.batch_number}º Lote
                           </span>
                           <span className="text-foreground">
-                            {basePrice === 0 ? 'Grátis' : `R$ ${(basePrice / 100).toFixed(2)}`}
+                            {basePrice === 0 ? 'Grátis' : formatCents(basePrice)}
                           </span>
                         </div>
-                        {couponDiscount && basePrice > 0 && (
+                        {discountText && discountCents > 0 && (
                           <div className="flex justify-between text-green-600">
-                            <span>Desconto ({couponDiscount}%)</span>
-                            <span>
-                              -R$ {(((basePrice * couponDiscount) / 100) / 100).toFixed(2)}
-                            </span>
+                            <span>{discountText}</span>
+                            <span>-{formatCents(discountCents)}</span>
                           </div>
+                        )}
+                        {previewApplies && couponPreview?.min_charge_applied && (
+                          <p className="text-xs text-amber-600">{minChargeNotice(finalPrice)}</p>
                         )}
                         <div className="border-t border-border pt-2 flex justify-between font-bold text-lg">
                           <span>Total</span>
                           <span className="text-primary">
                             {finalPrice === 0
                               ? 'Grátis'
-                              : `R$ ${(finalPrice / 100).toFixed(2)}`}
+                              : formatCents(finalPrice)}
                           </span>
                         </div>
                       </div>
@@ -783,10 +923,34 @@ export default function EventSignupPage() {
                   <span className="text-primary">
                     {finalPrice === 0
                       ? 'Grátis'
-                      : `R$ ${(finalPrice / 100).toFixed(2)}`}
+                      : formatCents(finalPrice)}
                   </span>
                 </div>
               </div>
+
+              {paymentsV2 && (
+                <div className="space-y-2">
+                  <label htmlFor="signup-cpf" className="text-sm font-medium text-foreground">
+                    CPF
+                  </label>
+                  <Input
+                    id="signup-cpf"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    placeholder="000.000.000-00"
+                    value={cpfInput}
+                    onChange={(e) => {
+                      setCpfInput(maskCpfInput(e.target.value));
+                      setCpfFieldError('');
+                    }}
+                    aria-invalid={!!cpfFieldError}
+                    aria-describedby="signup-cpf-help"
+                  />
+                  <p id="signup-cpf-help" className={`text-xs ${cpfFieldError ? 'text-red-500' : 'text-muted-foreground'}`}>
+                    {cpfFieldError || 'Obrigatório para a inscrição.'}
+                  </p>
+                </div>
+              )}
 
               {errorMessage && (
                 <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-600 text-sm">
@@ -814,7 +978,7 @@ export default function EventSignupPage() {
                   className="flex-1 rounded-full"
                   size="lg"
                   onClick={handleSignup}
-                  disabled={signingUp}
+                  disabled={signingUp || paymentsV2 === null}
                 >
                   {signingUp ? (
                     <>
@@ -903,13 +1067,38 @@ export default function EventSignupPage() {
                     )}
                   />
 
+                  {paymentsV2 && (
+                    <div className="space-y-2">
+                      <label htmlFor="signup-cpf" className="text-sm font-medium text-foreground">
+                        CPF
+                      </label>
+                      <Input
+                        id="signup-cpf"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        placeholder="000.000.000-00"
+                        value={cpfInput}
+                        onChange={(e) => {
+                          setCpfInput(maskCpfInput(e.target.value));
+                          setCpfFieldError('');
+                        }}
+                        aria-invalid={!!cpfFieldError}
+                        aria-describedby="signup-cpf-help"
+                        disabled={inlineBusy}
+                      />
+                      <p id="signup-cpf-help" className={`text-xs ${cpfFieldError ? 'text-red-500' : 'text-muted-foreground'}`}>
+                        {cpfFieldError || 'Obrigatório para a inscrição.'}
+                      </p>
+                    </div>
+                  )}
+
                   <div className="bg-muted/30 rounded-xl p-4 space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">
                         {selectedProduct?.name} — {selectedBatch?.batch_number}º Lote
                       </span>
                       <span className="font-medium text-foreground">
-                        {finalPrice === 0 ? 'Grátis' : `R$ ${(finalPrice / 100).toFixed(2)}`}
+                        {finalPrice === 0 ? 'Grátis' : formatCents(finalPrice)}
                       </span>
                     </div>
                   </div>
@@ -937,7 +1126,7 @@ export default function EventSignupPage() {
                       type="submit"
                       className="flex-1 rounded-full"
                       size="lg"
-                      disabled={inlineBusy || signingUp}
+                      disabled={inlineBusy || signingUp || paymentsV2 === null}
                     >
                       {inlineBusy || signingUp ? (
                         <>
@@ -1045,7 +1234,28 @@ export default function EventSignupPage() {
           )}
 
           {/* Step: Payment (Paid Event) */}
-          {step === 'payment' && signupResult?.payment && (
+          {step === 'payment' && signupResult?.payment?.payment_provider === 'opapingou' && (
+            <div className="space-y-6">
+              <SignupPixPayment
+                key={`${signupResult.signup_id}-${paymentAttempt}`}
+                signupId={String(signupResult.signup_id)}
+                initial={signupResult.payment}
+                onPaid={handlePaid}
+                onRetry={handleRetryPayment}
+                onChangeKind={paymentsV2 ? handleChangeKind : undefined}
+                linkUnavailable={linkUnavailable}
+              />
+              <div className="text-center">
+                <Link href={`/events/${event.slug || slugOrId}`}>
+                  <Button variant="ghost" className="rounded-full">
+                    Voltar para o evento
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {step === 'payment' && signupResult?.payment && signupResult.payment.payment_provider !== 'opapingou' && (
             <div className="space-y-6">
               <div className="bg-card border border-border rounded-2xl p-6 text-center space-y-6">
                 <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto">

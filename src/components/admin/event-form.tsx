@@ -31,6 +31,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { formatCents, reaisToCents } from '@/lib/money';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GET_COMMUNITIES, GET_LOCATIONS } from '@/lib/queries';
@@ -68,6 +76,8 @@ interface EventFormProps {
   /** Called after "Salvar Evento" saved the event, with its id. */
   onSaved?: (id: string) => void;
   isLoading?: boolean;
+  /** REA-6: the BFF has Opa Pingou; otherwise the provider select stays hidden. */
+  showPaymentProvider?: boolean;
 }
 
 // Mock locations - deprecated, now using GET_LOCATIONS
@@ -86,6 +96,7 @@ export function EventForm({
   onSubmit,
   onSaved,
   isLoading,
+  showPaymentProvider = false,
 }: EventFormProps) {
   const router = useRouter();
   const { toast: formToast } = useToast();
@@ -154,6 +165,13 @@ export function EventForm({
       form.setValue('products', initialData.products);
     }
   }, [initialData?.products]);
+
+  // The provider comes from its own admin query and may land after the form mounts.
+  useEffect(() => {
+    if (initialData?.payment_provider) {
+      form.setValue('payment_provider', initialData.payment_provider);
+    }
+  }, [initialData?.payment_provider]);
 
   // Image Upload State
   const [coverImagePreview, setCoverImagePreview] = useState<string | null>(
@@ -889,6 +907,34 @@ export function EventForm({
           </TabsContent>
 
           <TabsContent value="products" className="space-y-6 mt-6">
+            {showPaymentProvider && (
+            <FormField
+              control={form.control}
+              name="payment_provider"
+              render={({ field }) => (
+                <FormItem className="rounded-lg border p-4">
+                  <FormLabel className="text-base font-semibold">Pagamento dos lotes pagos</FormLabel>
+                  <Select value={field.value ?? 'pixai'} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger className="sm:max-w-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="opapingou">Opa Pingou (Pix ou link de pagamento)</SelectItem>
+                      <SelectItem value="pixai">Pix Aí</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Lotes com valor zero continuam gratuitos. Nos pagos, a inscrição só é confirmada
+                    depois que o pagamento é aprovado.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            )}
+
             <div className="space-y-4 rounded-lg border p-4">
               <div className="flex items-center justify-between">
                 <FormLabel className="text-base font-semibold">
@@ -1005,7 +1051,7 @@ export function EventForm({
                             >
                               <div className="w-2 h-2 rounded-full bg-primary/50" />
                               <span>
-                                Lote {batch.batch_number}: R$ {batch.value} (
+                                Lote {batch.batch_number}: {formatCents(reaisToCents(batch.value))} (
                                 {batch.max_quantity || 'Ilimitado'} un.)
                               </span>
                             </div>

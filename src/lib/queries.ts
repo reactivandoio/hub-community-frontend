@@ -288,6 +288,157 @@ export const SIGNUP_TO_EVENT = gql`
   }
 `;
 
+// Paid signups (REA-6): the payment step polls this until the provider's webhook
+// confirms or the charge expires.
+export const SIGNUP_PAYMENT_STATUS = gql`
+  query SignupPaymentStatus($signupId: ID!) {
+    signupPaymentStatus(signupId: $signupId) {
+      signup_id
+      status
+      provider
+      expires_at
+      confirmed_at
+      kind
+      pix_br_code
+      payment_link
+      value
+      refund_support {
+        text
+        whatsapp
+      }
+    }
+  }
+`;
+
+// Asks the BFF whether it already speaks REA-6 (see lib/server-support.ts).
+// An unknown signup id resolves to null on the new BFF; the old one refuses the field.
+export const PAYMENTS_V2_PROBE = gql`
+  query PaymentsV2Probe {
+    signupPaymentStatus(signupId: "0") {
+      signup_id
+    }
+  }
+`;
+
+// signupToEvent with the REA-6 arguments: only sent when the probe said yes.
+export const SIGNUP_TO_EVENT_V2 = gql`
+  mutation SignupToEventV2(
+    $eventId: String!
+    $name: String!
+    $email: String!
+    $batch_id: String!
+    $coupon_code: String
+    $is_student: Boolean
+    $phone_number: String
+    $cpf: String
+    $kind: String
+  ) {
+    signupToEvent(
+      eventId: $eventId
+      name: $name
+      email: $email
+      batch_id: $batch_id
+      coupon_code: $coupon_code
+      is_student: $is_student
+      phone_number: $phone_number
+      cpf: $cpf
+      kind: $kind
+    ) {
+      success
+      message
+      payment
+      is_free
+      signup_id
+    }
+  }
+`;
+
+// Final price as the Eventando computes it (coupon or half price, never both).
+export const PREVIEW_COUPON = gql`
+  query PreviewCoupon($eventSlug: String!, $batchId: ID!, $code: String!, $isStudent: Boolean) {
+    previewCoupon(eventSlug: $eventSlug, batchId: $batchId, code: $code, isStudent: $isStudent) {
+      valid
+      message
+      discount_kind
+      final_value
+      original_value
+      min_charge_applied
+    }
+  }
+`;
+
+const COUPON_FIELDS = `
+  id
+  code
+  discount_type
+  discount_percentage
+  discount_value_cents
+  starts_at
+  expires_at
+  max_uses
+  uses
+  enabled
+  batches {
+    id
+    batch_number
+  }
+`;
+
+// Admin only.
+export const EVENT_COUPONS = gql`
+  query EventCoupons($eventId: ID!) {
+    eventCoupons(eventId: $eventId) {
+      ${COUPON_FIELDS}
+    }
+  }
+`;
+
+export const CREATE_COUPON = gql`
+  mutation CreateCoupon($data: CouponInput!) {
+    createCoupon(data: $data) {
+      ${COUPON_FIELDS}
+    }
+  }
+`;
+
+export const UPDATE_COUPON = gql`
+  mutation UpdateCoupon($id: String!, $data: CouponInput!) {
+    updateCoupon(id: $id, data: $data) {
+      ${COUPON_FIELDS}
+    }
+  }
+`;
+
+export const DELETE_COUPON = gql`
+  mutation DeleteCoupon($id: String!) {
+    deleteCoupon(id: $id) {
+      id
+    }
+  }
+`;
+
+// Admin only: payment state of each paid signup (Eventando Payment).
+export const EVENT_PAYMENTS = gql`
+  query EventPayments($slugOrId: String!) {
+    eventPayments(slugOrId: $slugOrId) {
+      email
+      name
+      status
+      value
+      expires_at
+    }
+  }
+`;
+
+// Admin only, kept out of GET_EVENT_BY_SLUG_OR_ID so the public page never depends on it.
+export const EVENT_PAYMENT_SETTINGS = gql`
+  query EventPaymentSettings($eventId: ID!) {
+    eventPaymentSettings(eventId: $eventId) {
+      payment_provider
+    }
+  }
+`;
+
 export const IS_USER_SIGNED_UP = gql`
   query IsUserSignedUp($eventId: String!, $email: String!) {
     isUserSignedUp(eventId: $eventId, email: $email) {

@@ -8,10 +8,14 @@ import { FadeIn } from '@/components/animations';
 import { useToast } from '@/hooks/use-toast';
 import { CREATE_EVENT, UPDATE_EVENT_SALE } from '@/lib/queries';
 import { CreateEventResponse, EventInput, UpdateEventSaleResponse } from '@/lib/types';
+import { reaisToCents } from '@/lib/money';
+import { usePaymentsV2 } from '@/hooks/use-payments-v2';
 
 export default function NewEventPage() {
   const router = useRouter();
   const { toast } = useToast();
+  // Batch prices go in cents only once the backend expects them (REA-6).
+  const paymentsV2 = usePaymentsV2();
   const [createEvent, { loading }] =
     useMutation<CreateEventResponse>(CREATE_EVENT);
   const [updateEventSale] =
@@ -50,12 +54,14 @@ export default function NewEventPage() {
               id: eventId,
               data: {
                 max_slots: Number(data.max_slots) || 0,
+                ...(paymentsV2 && data.payment_provider ? { payment_provider: data.payment_provider } : {}),
                 products: data.products.map((p: any) => ({
                   name: p.name,
                   enabled: p.enabled !== false,
                   batches: (p.batches || []).map((b: any) => ({
                     batch_number: Number(b.batch_number) || 1,
-                    value: Number(b.value) || 0,
+                    // Cents only once the backend expects them (REA-6); before that, as typed.
+                    value: paymentsV2 ? reaisToCents(b.value) : Number(b.value) || 0,
                     max_quantity: Number(b.max_quantity) || 0,
                     valid_from: b.valid_from || undefined,
                     valid_until: b.valid_until || undefined,
@@ -107,7 +113,8 @@ export default function NewEventPage() {
         <EventForm
           onSubmit={handleSubmit}
           onSaved={id => router.push(`/admin/events/${id}`)}
-          isLoading={loading}
+          isLoading={loading || paymentsV2 === null}
+          showPaymentProvider={!!paymentsV2}
         />
       </div>
     </div>

@@ -40,6 +40,7 @@ import {
 } from 'recharts';
 
 import { FadeIn } from '@/components/animations';
+import { EventPaymentsCard } from '@/components/admin/event-payments-card';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -497,6 +498,8 @@ export default function EventAnalyticsPage() {
             delay={150}
           />
         </div>
+
+        <EventPaymentsCard slugOrId={id} />
 
         {/* ─── Check-in ────────────────────────────────────────── */}
         <div className="space-y-4">

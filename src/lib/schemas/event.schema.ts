@@ -20,6 +20,7 @@ export const createEventSchema = z.object({
   end_date: z.string({ required_error: 'A data de término é obrigatória.' }),
   max_slots: z.coerce.number().min(0, { message: 'O número de vagas não pode ser negativo.' }),
   pixai_token_integration: z.string().optional(),
+  payment_provider: z.enum(['pixai', 'opapingou']).optional(),
   is_online: z.boolean().optional(),
   call_link: z.string().optional(),
   unlisted: z.boolean().optional(),
