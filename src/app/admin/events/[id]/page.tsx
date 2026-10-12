@@ -1,6 +1,9 @@
 'use client';
 
+import { CouponsTab } from '@/components/admin/coupons-tab';
 import { EventForm } from '@/components/admin/event-form';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { usePaymentsV2 } from '@/hooks/use-payments-v2';
 import { FadeIn } from '@/components/animations';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -49,19 +52,23 @@ export default function EditEventPage() {
   const [initialData, setInitialData] = useState<any>(null);
   const eventSlug = data?.eventBySlugOrId?.slug || id;
 
+  // REA-6 only runs against a BFF that has it: before that, prices stay as typed
+  // (the old backend's unit), and the provider select and the Cupons tab stay hidden.
+  const paymentsV2 = usePaymentsV2();
+
   // Separate query: if it fails the form still loads (the select just shows the default).
   const { data: paymentData } = useQuery<{
     eventPaymentSettings: { payment_provider: PaymentProvider | null } | null;
   }>(EVENT_PAYMENT_SETTINGS, {
     variables: { eventId: data?.eventBySlugOrId?.id },
-    skip: !data?.eventBySlugOrId?.id,
+    skip: !data?.eventBySlugOrId?.id || !paymentsV2,
     fetchPolicy: 'network-only',
   });
   const paymentProvider: PaymentProvider =
     paymentData?.eventPaymentSettings?.payment_provider || 'pixai';
 
   useEffect(() => {
-    if (data?.eventBySlugOrId) {
+    if (data?.eventBySlugOrId && paymentsV2 !== null) {
       const event = data.eventBySlugOrId;
       setInitialData({
         title: event.title,
@@ -84,12 +91,15 @@ export default function EditEventPage() {
         // The form edits prices in reais; Eventando stores cents.
         products: (event.products || []).map((p) => ({
           ...p,
-          batches: (p.batches || []).map((b) => ({ ...b, value: centsToReais(b.value) })),
+          batches: (p.batches || []).map((b) => ({
+            ...b,
+            value: paymentsV2 ? centsToReais(b.value) : b.value,
+          })),
         })),
         coverImage: event.images?.[0] || null,
       });
     }
-  }, [data]);
+  }, [data, paymentsV2]);
 
   const handleSubmit = async (formData: any) => {
     try {
@@ -128,7 +138,9 @@ export default function EditEventPage() {
               id: eventId,
               data: {
                 max_slots: Number(formData.max_slots) || 0,
-                ...(formData.payment_provider ? { payment_provider: formData.payment_provider } : {}),
+                ...(paymentsV2 && formData.payment_provider
+                  ? { payment_provider: formData.payment_provider }
+                  : {}),
                 products: formData.products.map((p: any) => ({
                   id: (p.id && p.id.toString().startsWith('new-')) ? undefined : p.id || undefined,
                   name: p.name,
@@ -136,7 +148,7 @@ export default function EditEventPage() {
                   batches: (p.batches || []).map((b: any) => ({
                     id: (b.id && b.id.toString().startsWith('new-')) ? undefined : b.id || undefined,
                     batch_number: Number(b.batch_number) || 1,
-                    value: reaisToCents(b.value),
+                    value: paymentsV2 ? reaisToCents(b.value) : Number(b.value) || 0,
                     max_quantity: Number(b.max_quantity) || 0,
                     valid_from: b.valid_from || undefined,
                     valid_until: b.valid_until || undefined,
@@ -266,15 +278,44 @@ export default function EditEventPage() {
         </div>
       </div>
 
-      <div className="border rounded-lg p-6 bg-card">
-        {initialData && (
-          <EventForm
-            initialData={{ ...initialData, payment_provider: paymentProvider }}
-            onSubmit={handleSubmit}
-            isLoading={mutationLoading}
-          />
-        )}
-      </div>
+      {paymentsV2 && data?.eventBySlugOrId?.id ? (
+        <Tabs defaultValue="event" className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="event">Evento</TabsTrigger>
+            <TabsTrigger value="coupons">Cupons</TabsTrigger>
+          </TabsList>
+          <TabsContent value="event">
+            <div className="border rounded-lg p-6 bg-card">
+              {initialData && (
+                <EventForm
+                  initialData={{ ...initialData, payment_provider: paymentProvider }}
+                  onSubmit={handleSubmit}
+                  isLoading={mutationLoading}
+                  showPaymentProvider
+                />
+              )}
+            </div>
+          </TabsContent>
+          <TabsContent value="coupons">
+            <div className="border rounded-lg p-6 bg-card">
+              <CouponsTab
+                eventId={data.eventBySlugOrId.id}
+                products={data.eventBySlugOrId.products || []}
+              />
+            </div>
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <div className="border rounded-lg p-6 bg-card">
+          {initialData && (
+            <EventForm
+              initialData={initialData}
+              onSubmit={handleSubmit}
+              isLoading={mutationLoading}
+            />
+          )}
+        </div>
+      )}
     </div>
     </FadeIn>
   );
