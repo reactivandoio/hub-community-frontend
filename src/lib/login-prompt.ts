@@ -6,11 +6,26 @@
  * The real protection is the BFF; this only shapes the experience.
  */
 
-/** A path of this site (no //host, no scheme), or null. */
+// Any URL resolved against it stays on it only when the path is of this site.
+const SAME_SITE_BASE = 'https://same-site.invalid';
+
+/**
+ * A path of this site, or null. Refuses //host, a scheme, backslashes and control characters:
+ * browsers drop tabs and line breaks while parsing, so "/\t/evil.com" would become "//evil.com"
+ * (another site). The last word is the URL parser itself: the origin must not change.
+ */
 export function safeReturnPath(path: string | null | undefined): string | null {
-  if (!path) return null;
-  if (!path.startsWith('/') || path.startsWith('//') || path.startsWith('/\\')) return null;
-  return path;
+  if (!path || typeof path !== 'string') return null;
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f\\]/.test(path)) return null;
+  if (!path.startsWith('/') || path.startsWith('//')) return null;
+  try {
+    const url = new URL(path, SAME_SITE_BASE);
+    if (url.origin !== SAME_SITE_BASE) return null;
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return null;
+  }
 }
 
 /**

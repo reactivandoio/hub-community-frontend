@@ -13,6 +13,22 @@ describe('safeReturnPath', () => {
     expect(safeReturnPath('')).toBeNull();
     expect(safeReturnPath(null)).toBeNull();
   });
+
+  it('refuses what a browser would turn into another site (tab, line break, backslash)', () => {
+    // URLSearchParams decodes %09 and %0A; the URL parser then drops them: "/\t/evil" → "//evil".
+    expect(safeReturnPath('/\t/evil.example')).toBeNull();
+    expect(safeReturnPath('/\n/evil.example')).toBeNull();
+    expect(safeReturnPath('/\r\n/evil.example/x')).toBeNull();
+    expect(safeReturnPath('/x\\..\\evil')).toBeNull();
+    expect(safeReturnPath('/%2F%2Fevil.example')).toBe('/%2F%2Fevil.example');
+    expect(legacyLoginTarget('/', '?login=true&redirect=%2F%09%2Fevil.example')).toEqual({ path: '/' });
+    expect(legacyLoginTarget('/', '?login=true&redirect=https%3A%2F%2Fevil.example')).toEqual({ path: '/' });
+  });
+
+  it('keeps query and fragment of an internal path', () => {
+    expect(safeReturnPath('/events/meetup/signup?ticket=1#cupom=PROMO10')).toBe('/events/meetup/signup?ticket=1#cupom=PROMO10');
+    expect(safeReturnPath('/admin/events/abc#products')).toBe('/admin/events/abc#products');
+  });
 });
 
 describe('legacyLoginTarget (old ?login=true links)', () => {
