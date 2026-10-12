@@ -3,6 +3,7 @@
 import { CommunityFormDialog } from '@/components/admin/community-form-dialog';
 import { ImageCropDialog } from '@/components/admin/image-crop-dialog';
 import { LocationFormDialog } from '@/components/admin/location-form-dialog';
+import { OpaPingouAccountCard } from '@/components/admin/opapingou-account-card';
 import { ProductFormDialog } from '@/components/admin/product-form-dialog';
 import { TalkFormDialog } from '@/components/admin/talk-form-dialog';
 import { Button } from '@/components/ui/button';
@@ -879,24 +880,7 @@ export function EventForm({
           </TabsContent>
 
           <TabsContent value="products" className="space-y-6 mt-6">
-            <div className="rounded-lg border p-4 space-y-1">
-              <p className="text-base font-semibold">Pagamento dos lotes pagos</p>
-              <p className="text-sm text-muted-foreground">
-                Lotes pagos são cobrados pelo Opa Pingou, parceiro oficial de pagamentos do Hub
-                Community, por Pix ou link de pagamento. Lotes com valor zero continuam gratuitos; nos
-                pagos, a inscrição só é confirmada depois que o pagamento é aprovado. Ainda não tem
-                conta no Opa Pingou?{' '}
-                <a
-                  href="https://opapingou.com.br/cadastro"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary underline underline-offset-2"
-                >
-                  Crie a sua
-                </a>
-                .
-              </p>
-            </div>
+            <OpaPingouAccountCard eventId={initialData?.id} />
 
             <div className="space-y-4 rounded-lg border p-4">
               <div className="flex items-center justify-between">

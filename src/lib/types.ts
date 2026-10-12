@@ -946,3 +946,21 @@ export interface UpdateCpfsResponse {
     items: { email: string; cpf: string; status: import('./cpf-mapping').CpfMappingStatus }[];
   };
 }
+
+/** REA-12: Opa Pingou account of an event. Never the key: company, masked CNPJ, last 4 of the key. */
+export interface OpaPingouConnection {
+  id: string;
+  companyName: string | null;
+  companyDocument: string | null;
+  testMode: boolean;
+  keyLast4: string | null;
+  createdByName: string | null;
+  createdAt: string | null;
+}
+
+export interface EventOpaPingouAccount {
+  connection: OpaPingouConnection | null;
+  legacy: boolean;
+  available: boolean;
+  reusable: OpaPingouConnection[];
+}

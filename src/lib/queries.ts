@@ -1540,3 +1540,43 @@ export const SET_USER_ROLE = gql`
     }
   }
 `;
+
+// REA-12: Opa Pingou account of an event (admin). The key goes in connectEventOpaPingou and never comes back.
+const OPAPINGOU_ACCOUNT_FIELDS = `
+  connection { id companyName companyDocument testMode keyLast4 createdByName createdAt }
+  legacy
+  available
+  reusable { id companyName companyDocument testMode keyLast4 createdByName createdAt }
+`;
+
+export const EVENT_OPAPINGOU_ACCOUNT = gql`
+  query EventOpaPingouAccount($eventId: ID!) {
+    eventOpaPingouAccount(eventId: $eventId) {
+      ${OPAPINGOU_ACCOUNT_FIELDS}
+    }
+  }
+`;
+
+export const CONNECT_EVENT_OPAPINGOU = gql`
+  mutation ConnectEventOpaPingou($eventId: ID!, $apiKey: String!) {
+    connectEventOpaPingou(eventId: $eventId, apiKey: $apiKey) {
+      ${OPAPINGOU_ACCOUNT_FIELDS}
+    }
+  }
+`;
+
+export const USE_OPAPINGOU_CONNECTION = gql`
+  mutation UseOpaPingouConnection($eventId: ID!, $connectionId: ID!) {
+    useOpaPingouConnection(eventId: $eventId, connectionId: $connectionId) {
+      ${OPAPINGOU_ACCOUNT_FIELDS}
+    }
+  }
+`;
+
+export const DISCONNECT_EVENT_OPAPINGOU = gql`
+  mutation DisconnectEventOpaPingou($eventId: ID!) {
+    disconnectEventOpaPingou(eventId: $eventId) {
+      ${OPAPINGOU_ACCOUNT_FIELDS}
+    }
+  }
+`;
