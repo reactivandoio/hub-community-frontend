@@ -24,22 +24,22 @@ import {
 import { Input } from '@/components/ui/input';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { useToast } from '@/hooks/use-toast';
-import { CREATE_TALK, GET_SPEAKERS, UPDATE_TALK } from '@/lib/queries';
+import { CREATE_TALK, UPDATE_TALK } from '@/lib/queries';
 import {
   talkSchema,
   type TalkFormValues,
 } from '@/lib/schemas';
+import { fetchAllSpeakers, mergeSpeakers } from '@/lib/speaker-options';
 import {
   CreateTalkResponse,
   Speaker,
-  SpeakersResponse,
   Talk,
   UpdateTalkResponse,
 } from '@/lib/types';
-import { useMutation, useQuery } from '@apollo/client';
+import { useApolloClient, useMutation } from '@apollo/client';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, User, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 
 interface TalkInput extends Omit<Talk, 'speakers'> {
@@ -69,26 +69,47 @@ export function TalkFormDialog({
     useMutation<CreateTalkResponse>(CREATE_TALK);
   const [updateTalk, { loading: updating }] =
     useMutation<UpdateTalkResponse>(UPDATE_TALK);
-  const [speakersOptions, setSpeakersOptions] = useState<
-    { label: string; value: string; data: Speaker }[]
-  >([]);
+  const client = useApolloClient();
+  // Every speaker the picker knows: all pages from the server, plus the ones
+  // already on the talk and the ones created here (they may not be loaded yet).
+  const [speakers, setSpeakers] = useState<Speaker[]>(
+    () => mergeSpeakers(initialData?.speakers ?? [], [])
+  );
+  const [loadingSpeakers, setLoadingSpeakers] = useState(false);
   const [selectedSpeakerIds, setSelectedSpeakerIds] = useState<string[]>(
     initialData?.speakers?.map(s => s.id) || []
   );
 
-  const { data: speakersData, loading: loadingSpeakers } =
-    useQuery<SpeakersResponse>(GET_SPEAKERS);
-
   useEffect(() => {
-    if (speakersData?.speakers?.data) {
-      const options = speakersData.speakers.data.map(s => ({
-        label: s.name,
-        value: s.id,
-        data: s,
-      }));
-      setSpeakersOptions(options);
-    }
-  }, [speakersData]);
+    if (!open) return;
+    let cancelled = false;
+    setLoadingSpeakers(true);
+    fetchAllSpeakers(client)
+      .then(loaded => {
+        if (!cancelled) setSpeakers(prev => mergeSpeakers(loaded, prev));
+      })
+      .catch(err => {
+        console.error('Error loading speakers:', err);
+        if (!cancelled) {
+          toast({
+            variant: 'destructive',
+            title: 'Erro ao carregar palestrantes',
+            description: 'Não foi possível carregar a lista de palestrantes.',
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingSpeakers(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, client, toast]);
+
+  const speakersOptions = useMemo(
+    () => speakers.map(s => ({ label: s.name, value: s.id, data: s })),
+    [speakers]
+  );
 
   const form = useForm<TalkFormValues>({
     resolver: zodResolver(talkSchema),
@@ -103,11 +124,13 @@ export function TalkFormDialog({
   });
 
   const handleAddSpeakerToList = (id: string) => {
-    if (!selectedSpeakerIds.includes(id)) {
-      const newIds = [...selectedSpeakerIds, id];
-      setSelectedSpeakerIds(newIds);
-      form.setValue('speakerIds', newIds);
-    }
+    // Read the form, not the render's state: this also runs from the
+    // "Novo Palestrante" dialog after an await.
+    const current = form.getValues('speakerIds') ?? [];
+    if (!id || current.includes(id)) return;
+    const newIds = [...current, id];
+    setSelectedSpeakerIds(newIds);
+    form.setValue('speakerIds', newIds);
   };
 
   const handleRemoveSpeaker = (id: string) => {
@@ -117,14 +140,8 @@ export function TalkFormDialog({
   };
 
   const handleAddSpeaker = (newSpeaker: Speaker) => {
-    const id = newSpeaker.id;
-    const speakerOption = {
-      label: newSpeaker.name,
-      value: id,
-      data: newSpeaker,
-    };
-    setSpeakersOptions(prev => [...prev, speakerOption]);
-    handleAddSpeakerToList(id);
+    setSpeakers(prev => mergeSpeakers([newSpeaker], prev));
+    handleAddSpeakerToList(newSpeaker.id);
   };
 
   const onSubmit = async (data: TalkFormValues) => {
@@ -151,9 +168,6 @@ export function TalkFormDialog({
       }
 
       const selectedSpeakerIdsList = data.speakerIds;
-      const selectedSpeakerList = speakersOptions
-        .filter(s => data.speakerIds.includes(s.value))
-        .map(s => s.data);
 
       const talkInput: Record<string, any> = {
         title: data.title,
@@ -207,6 +221,7 @@ export function TalkFormDialog({
 
       setOpen(false);
       form.reset();
+      setSelectedSpeakerIds(initialData?.speakers?.map(s => s.id) || []);
     } catch (err) {
       console.error('Error saving talk:', err);
       toast({
