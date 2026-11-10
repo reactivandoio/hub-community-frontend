@@ -936,6 +936,7 @@ export const GET_EVENT_ANALYTICS = gql`
       total_signups
       free_signups
       paid_signups
+      pending_paid_signups
       max_slots
       occupancy_percentage
       certificate_requests

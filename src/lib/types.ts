@@ -631,7 +631,10 @@ export interface EventAnalytics {
   event_slug: string;
   total_signups: number;
   free_signups: number;
+  /** Confirmed payments with a value; pending, expired, canceled and refunded are out. */
   paid_signups: number;
+  /** Charges with a value still waiting for payment, within their deadline. */
+  pending_paid_signups?: number | null;
   max_slots: number | null;
   occupancy_percentage: number | null;
   certificate_requests: number;

@@ -64,6 +64,8 @@ import { EVENT_PAYMENTS, GET_EVENT_ANALYTICS, GET_EVENT_TRACKING_METRICS } from 
 import { formatCents } from '@/lib/money';
 import { EventPaymentRow, summarizePayments } from '@/lib/payment-status';
 import { EventAnalyticsResponse, SignupEntry } from '@/lib/types';
+import { formatLastUpdated, useLastUpdated } from '@/hooks/use-last-updated';
+import { paidSignupsSubtitle } from '@/lib/paid-signups';
 import { ORIGIN_LABELS, absentCount, hourLabel, originSummary } from '@/lib/checkin-analytics';
 import { formatCpf } from '@/lib/cpf';
 
@@ -199,6 +201,9 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
+// Analytics and payments are asked again every 30 s, in the background.
+const REFRESH_MS = 30_000;
+
 /* ─── Main Page ──────────────────────────────────────────────── */
 export default function EventAnalyticsPage() {
   const router = useRouter();
@@ -207,19 +212,23 @@ export default function EventAnalyticsPage() {
   const [trackingPeriod, setTrackingPeriod] = useState('all');
   const [isDownloading, setIsDownloading] = useState(false);
 
-  const { data, loading, error, refetch } = useQuery<EventAnalyticsResponse>(
-    GET_EVENT_ANALYTICS,
-    {
+  const { data, previousData, loading, error, networkStatus, refetch } =
+    useQuery<EventAnalyticsResponse>(GET_EVENT_ANALYTICS, {
       variables: { slugOrId: id },
       skip: !id,
       fetchPolicy: 'network-only',
       // Keeps check-ins live on the event day without reloading.
-      pollInterval: 30_000,
-    }
-  );
+      pollInterval: REFRESH_MS,
+      // Each poll reports its end, so "Última atualização" moves even when nothing changed.
+      // `loading` then turns true on every poll: only the first load shows the skeleton.
+      notifyOnNetworkStatusChange: true,
+    });
+  // A failed refresh keeps what is on screen (REA-27).
+  const analytics = (data ?? previousData)?.eventAnalytics;
+  const lastUpdated = useLastUpdated(networkStatus, Boolean(error));
 
   // Use the real documentId from the eventAnalytics response (URL id may be a slug)
-  const resolvedEventDocId = data?.eventAnalytics?.event_id || id;
+  const resolvedEventDocId = analytics?.event_id || id;
 
   const { data: trackingData, refetch: refetchTracking } = useQuery(
     GET_EVENT_TRACKING_METRICS,
@@ -234,10 +243,16 @@ export default function EventAnalyticsPage() {
 
   // What was actually paid (coupon and meia-entrada included), the same source as the
   // Pagamentos card — not batch price times signups.
-  const { data: paymentsData } = useQuery<{ eventPayments: EventPaymentRow[] | null }>(
-    EVENT_PAYMENTS,
-    { variables: { slugOrId: id }, skip: !id, fetchPolicy: 'network-only' }
-  );
+  // Polled with the analytics so the paid count and the money move together; the Pagamentos
+  // card watches the same query and follows.
+  const { data: paymentsData, refetch: refetchPayments } = useQuery<{
+    eventPayments: EventPaymentRow[] | null;
+  }>(EVENT_PAYMENTS, {
+    variables: { slugOrId: id },
+    skip: !id,
+    fetchPolicy: 'network-only',
+    pollInterval: REFRESH_MS,
+  });
   const paidRevenueCents = summarizePayments(paymentsData?.eventPayments || []).revenueCents;
 
   /* ─── CSV Download Handler ──────────────────────────────────── */
@@ -320,13 +335,12 @@ export default function EventAnalyticsPage() {
     }
   }, [id]);
 
-  if (loading) return <AdminPageLoading label="Carregando analytics" />;
+  // Only before the first answer: a refresh never goes back to the skeleton (REA-27).
+  if (loading && !analytics) return <AdminPageLoading label="Carregando analytics" />;
 
-  if (error) {
+  if (error && !analytics) {
     return <AdminPageError title="Erro ao carregar analytics" message={error.message} />;
   }
-
-  const analytics = data?.eventAnalytics;
 
   if (!analytics) {
     return (
@@ -366,13 +380,27 @@ export default function EventAnalyticsPage() {
         {/* The event title and the way back are in the breadcrumb and the sidebar (REA-24). */}
         <AdminPageHeader
           title="Analytics"
-          description={analytics.event_slug ? `/${analytics.event_slug}` : 'Inscrições, vendas e acessos do evento.'}
+          description={
+            <>
+              {analytics.event_slug ? `/${analytics.event_slug}` : 'Inscrições, vendas e acessos do evento.'}
+              {lastUpdated && (
+                <span className="block text-xs" aria-live="polite">
+                  Última atualização: {formatLastUpdated(lastUpdated)}
+                  {error ? ' · não foi possível atualizar agora' : ''}
+                </span>
+              )}
+            </>
+          }
           actions={
             <>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => { refetch(); refetchTracking(); }}
+              onClick={() => {
+                refetch().catch(() => undefined);
+                refetchPayments().catch(() => undefined);
+                refetchTracking().catch(() => undefined);
+              }}
               className="gap-2"
             >
               <RefreshCw className="w-3.5 h-3.5" />
@@ -426,9 +454,7 @@ export default function EventAnalyticsPage() {
           <MetricCard
             title="Inscrições Pagas"
             value={analytics.paid_signups}
-            subtitle={
-              paidRevenueCents > 0 ? `${formatCents(paidRevenueCents)} arrecadados` : undefined
-            }
+            subtitle={paidSignupsSubtitle(paidRevenueCents, analytics.pending_paid_signups)}
             icon={DollarSign}
             color={COLORS.secondary}
             bgColor={COLORS.secondaryDim}
