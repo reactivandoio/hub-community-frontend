@@ -936,6 +936,7 @@ export const GET_EVENT_ANALYTICS = gql`
       total_signups
       free_signups
       paid_signups
+      pending_paid_signups
       max_slots
       occupancy_percentage
       certificate_requests
@@ -966,6 +967,9 @@ export const GET_EVENT_ANALYTICS = gql`
         checked_in_at
         origin
         cpf
+        payment_status
+        paid_cents
+        coupon_code
       }
       checked_in_count
       attendance_rate
