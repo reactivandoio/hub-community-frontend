@@ -65,7 +65,12 @@ import { formatCents } from '@/lib/money';
 import { EventPaymentRow, summarizePayments } from '@/lib/payment-status';
 import { EventAnalyticsResponse, SignupEntry } from '@/lib/types';
 import { formatLastUpdated, useLastUpdated } from '@/hooks/use-last-updated';
-import { SignupPaymentTone, paidSignupsSubtitle, signupPaymentView } from '@/lib/paid-signups';
+import {
+  SignupPaymentTone,
+  paidSignupsSubtitle,
+  participantsDescription,
+  signupPaymentView,
+} from '@/lib/paid-signups';
 import { ORIGIN_LABELS, absentCount, hourLabel, originSummary } from '@/lib/checkin-analytics';
 import { formatCpf } from '@/lib/cpf';
 import { cn } from '@/lib/utils';
@@ -289,7 +294,17 @@ export default function EventAnalyticsPage() {
       }
 
       // Build CSV content
-      const header = ['Nome', 'E-mail', 'CPF', 'WhatsApp', 'Produto', 'Data de Inscrição'];
+      const header = [
+        'Nome',
+        'E-mail',
+        'CPF',
+        'WhatsApp',
+        'Produto',
+        'Pagamento',
+        'Valor pago',
+        'Cupom',
+        'Data de Inscrição',
+      ];
       const rows = signups.map((s) => {
         const date = s.created_at
           ? new Date(s.created_at).toLocaleDateString('pt-BR', {
@@ -300,6 +315,8 @@ export default function EventAnalyticsPage() {
               minute: '2-digit',
             })
           : '';
+        // Same reading as the list (REA-28): no value unless the payment was confirmed.
+        const payment = signupPaymentView(s);
 
         return [
           s.name || '',
@@ -307,6 +324,9 @@ export default function EventAnalyticsPage() {
           formatCpf(s.cpf),
           s.phone_number || '',
           s.product_name || '',
+          payment.status,
+          payment.paid || '',
+          payment.coupon || '',
           date,
         ];
       });
@@ -861,7 +881,7 @@ export default function EventAnalyticsPage() {
                   Participantes
                 </CardTitle>
                 <CardDescription className="mt-1.5">
-                  {analytics.all_signups?.length ?? 0} inscrições
+                  {participantsDescription(analytics.all_signups?.length ?? 0, analytics.total_signups)}
                 </CardDescription>
               </div>
               <Button

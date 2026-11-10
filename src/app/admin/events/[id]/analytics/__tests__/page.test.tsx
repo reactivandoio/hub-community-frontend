@@ -6,6 +6,9 @@ import { EVENT_PAYMENTS, GET_EVENT_ANALYTICS, GET_EVENT_TRACKING_METRICS } from 
 
 import EventAnalyticsPage from '../page';
 
+const clientQuery = vi.fn();
+vi.mock('@/lib/apollo-client', () => ({ getApolloClient: () => ({ query: clientQuery }) }));
+
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: 'meetup' }),
   useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
@@ -169,5 +172,33 @@ describe('Event analytics participants list (REA-28)', () => {
     const free = await row('gratis@x.io');
     expect(free).toHaveTextContent('Gratuito');
     expect(free).not.toHaveTextContent('R$');
+  });
+});
+
+describe('Event analytics CSV (REA-28)', () => {
+  it('exports Pagamento, Valor pago and Cupom for each participant', async () => {
+    const list = [
+      signup({ email: 'pago@x.io', payment_status: 'CONFIRMED', paid_cents: 1500, coupon_code: 'MEETUP25' }),
+      signup({ email: 'expirado@x.io', payment_status: 'EXPIRED' }),
+    ];
+    clientQuery.mockResolvedValue({ data: { eventAnalytics: analytics({ all_signups: list }) } });
+    let blob: Blob | undefined;
+    const createObjectURL = vi.fn((b: Blob) => {
+      blob = b;
+      return 'blob:csv';
+    });
+    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+
+    renderPage([analyticsMock(analytics({ all_signups: list }))]);
+    fireEvent.click(await screen.findByRole('button', { name: /Baixar CSV/ }));
+    await waitFor(() => expect(click).toHaveBeenCalled());
+
+    const [header, paid, expired] = (await blob!.text()).replace(/^\uFEFF/, '').split('\n');
+    expect(header).toBe('Nome,E-mail,CPF,WhatsApp,Produto,Pagamento,Valor pago,Cupom,Data de Inscrição');
+    // The value has a comma, so the field is quoted.
+    expect(paid).toMatch(/,Pago,"R\$\s15,00",MEETUP25,/);
+    expect(expired).toMatch(/,Expirado,,,/);
+    click.mockRestore();
   });
 });

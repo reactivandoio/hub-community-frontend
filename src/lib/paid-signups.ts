@@ -53,3 +53,14 @@ export function signupPaymentView(signup: SignupPaymentLike): SignupPaymentView 
   // No payment, or a confirmed one of zero (free batch, or a coupon that took it all).
   return { status: 'Gratuito', tone: 'free', paid: null, coupon };
 }
+
+/**
+ * Under "Participantes": the list has everyone, while the total leaves expired and
+ * canceled signups out (REA-27), so say how many of them are in the list.
+ */
+export function participantsDescription(listed: number, total: number): string {
+  const dropped = listed - total;
+  const base = `${listed} inscriç${listed === 1 ? 'ão' : 'ões'}`;
+  if (dropped <= 0) return base;
+  return `${base} · ${dropped} expirada${dropped === 1 ? '' : 's'} ou cancelada${dropped === 1 ? '' : 's'}`;
+}

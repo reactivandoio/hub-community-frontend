@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { paidSignupsSubtitle, signupPaymentView } from '../paid-signups';
+import { paidSignupsSubtitle, participantsDescription, signupPaymentView } from '../paid-signups';
 
 describe('paidSignupsSubtitle', () => {
   it('shows the money and the pending charges apart from the count', () => {
@@ -61,5 +61,17 @@ describe('signupPaymentView (REA-28)', () => {
       paid: null,
       coupon: 'FREE',
     });
+  });
+});
+
+describe('participantsDescription', () => {
+  it('says how many listed signups are out of the total', () => {
+    expect(participantsDescription(14, 12)).toBe('14 inscrições · 2 expiradas ou canceladas');
+    expect(participantsDescription(13, 12)).toBe('13 inscrições · 1 expirada ou cancelada');
+  });
+
+  it('is just the count when nobody was dropped', () => {
+    expect(participantsDescription(12, 12)).toBe('12 inscrições');
+    expect(participantsDescription(1, 1)).toBe('1 inscrição');
   });
 });
