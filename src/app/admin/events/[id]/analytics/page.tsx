@@ -231,8 +231,12 @@ export default function EventAnalyticsPage() {
       // `loading` then turns true on every poll: only the first load shows the skeleton.
       notifyOnNetworkStatusChange: true,
     });
-  // A failed refresh keeps what is on screen (REA-27).
-  const analytics = (data ?? previousData)?.eventAnalytics;
+  // A failed refresh keeps what is on screen (REA-27) — but only the same event: after a
+  // move to another event, previousData is the old one.
+  const previous = previousData?.eventAnalytics;
+  const analytics =
+    data?.eventAnalytics ??
+    (previous && (previous.event_slug === id || previous.event_id === id) ? previous : undefined);
   const lastUpdated = useLastUpdated(networkStatus, Boolean(error));
 
   // Use the real documentId from the eventAnalytics response (URL id may be a slug)
