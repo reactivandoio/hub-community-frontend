@@ -86,6 +86,7 @@ describe('eventNavGroups', () => {
       ['Inscrições', '/admin/events/e1/import-signups'],
       ['Presenças', '/admin/events/e1/attendance'],
       ['Certificados', '/admin/events/e1/certificados'],
+      ['E-mail marketing', '/admin/events/e1/email'],
       ['Check-in', '/checkin/meetup'],
       ['Credenciamento', '/badge-printer/event/meetup'],
       ['Sorteio', '/sorteio?event=meetup'],

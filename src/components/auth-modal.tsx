@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -117,7 +118,7 @@ export function AuthModal({ isOpen, onClose, onSignedIn, reason }: AuthModalProp
   // Sign Up Form
   const signUpForm = useForm<SignUpFormValues>({
     resolver: zodResolver(signUpSchema),
-    defaultValues: { email: '', name: '', password: '', username: '', phone: '' },
+    defaultValues: { email: '', name: '', password: '', username: '', phone: '', marketing_opt_in: false },
   });
 
   // Reset Password Form
@@ -426,6 +427,25 @@ export function AuthModal({ isOpen, onClose, onSignedIn, reason }: AuthModalProp
                         </button>
                       </div>
                       <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* REA-29: optional, never pre-checked; recorded with its date by the backend. */}
+                <FormField
+                  control={signUpForm.control}
+                  name="marketing_opt_in"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start gap-3 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value === true}
+                          onCheckedChange={(checked) => field.onChange(checked === true)}
+                        />
+                      </FormControl>
+                      <FormLabel className="text-sm font-normal leading-snug text-muted-foreground">
+                        Quero receber por e-mail convites e novidades de eventos do Hub Community (opcional).
+                      </FormLabel>
                     </FormItem>
                   )}
                 />

@@ -188,6 +188,8 @@ export interface SignUpInput {
   password: string;
   username: string;
   phone?: string;
+  /** "Quero receber novidades e convites de eventos por e-mail" (REA-29). Only recorded. */
+  marketing_opt_in?: boolean;
 }
 
 export interface SignInInput {
@@ -973,4 +975,32 @@ export interface EventOpaPingouAccount {
   legacy: boolean;
   available: boolean;
   reusable: OpaPingouConnection[];
+}
+
+// E-mail marketing do evento (REA-29)
+export type EmailCampaignType = 'invite' | 'share' | 'reminder';
+export type EmailCampaignStatus = 'draft' | 'sending' | 'paused' | 'done' | 'canceled';
+
+export interface EmailCampaign {
+  id: string;
+  type: EmailCampaignType;
+  subject: string;
+  message: string | null;
+  status: EmailCampaignStatus;
+  total: number;
+  sent: number;
+  failed: number;
+  created_by_email: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  createdAt: string | null;
+}
+
+export interface EmailCampaignAudience {
+  total: number;
+  approximate: boolean;
+  daily_limit: number;
+  estimated_days: number | null;
+  sending_enabled: boolean;
+  redirect_to: string | null;
 }

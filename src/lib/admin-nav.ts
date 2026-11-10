@@ -23,6 +23,7 @@ export type AdminNavIcon =
   | 'signups'
   | 'attendance'
   | 'certificates'
+  | 'email'
   | 'checkin'
   | 'badge'
   | 'raffle'
@@ -137,6 +138,8 @@ export const eventNavGroups = ({
         { label: 'Inscrições', href: eventHref(id, 'import-signups'), icon: 'signups' },
         { label: 'Presenças', href: eventHref(id, 'attendance'), icon: 'attendance' },
         { label: 'Certificados', href: eventHref(id, 'certificados'), icon: 'certificates' },
+        // REA-29: convite para a base (admin), "convide alguém" e lembrete para os inscritos.
+        { label: 'E-mail marketing', href: eventHref(id, 'email'), icon: 'email' },
       ],
     },
     {
