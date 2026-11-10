@@ -623,6 +623,11 @@ export interface SignupEntry {
   checked_in_at?: string | null;
   origin?: SignupOrigin | null;
   cpf?: string | null;
+  /** PEDING_PAYMENT | CONFIRMED | EXPIRED | CANCELED | REFUND; null without payment. */
+  payment_status?: string | null;
+  /** Cents; only for a confirmed payment with a value. */
+  paid_cents?: number | null;
+  coupon_code?: string | null;
 }
 
 export interface EventAnalytics {

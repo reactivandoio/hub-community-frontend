@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { paidSignupsSubtitle } from '../paid-signups';
+import { paidSignupsSubtitle, signupPaymentView } from '../paid-signups';
 
 describe('paidSignupsSubtitle', () => {
   it('shows the money and the pending charges apart from the count', () => {
@@ -19,5 +19,47 @@ describe('paidSignupsSubtitle', () => {
     expect(paidSignupsSubtitle(0, 0)).toBeUndefined();
     expect(paidSignupsSubtitle(0, undefined)).toBeUndefined();
     expect(paidSignupsSubtitle(1000, null)).toBe('R$ 10,00 arrecadados');
+  });
+});
+
+describe('signupPaymentView (REA-28)', () => {
+  it('shows what a confirmed signup paid and its coupon', () => {
+    expect(signupPaymentView({ payment_status: 'CONFIRMED', paid_cents: 1500, coupon_code: 'MEETUP25' })).toEqual({
+      status: 'Pago',
+      tone: 'paid',
+      paid: 'R$ 15,00',
+      coupon: 'MEETUP25',
+    });
+  });
+
+  it('never shows a pending charge as paid', () => {
+    expect(signupPaymentView({ payment_status: 'PEDING_PAYMENT', paid_cents: null })).toMatchObject({
+      status: 'Pendente',
+      paid: null,
+    });
+  });
+
+  it('shows an expired one as Expirado', () => {
+    expect(signupPaymentView({ payment_status: 'EXPIRED', coupon_code: 'X' })).toEqual({
+      status: 'Expirado',
+      tone: 'lost',
+      paid: null,
+      coupon: 'X',
+    });
+  });
+
+  it('shows canceled and refunded ones', () => {
+    expect(signupPaymentView({ payment_status: 'CANCELED' }).status).toBe('Cancelado');
+    expect(signupPaymentView({ payment_status: 'REFUND' }).status).toBe('Reembolsado');
+  });
+
+  it('shows a free signup as Gratuito with no value, with or without payment', () => {
+    expect(signupPaymentView({ payment_status: null })).toMatchObject({ status: 'Gratuito', paid: null });
+    expect(signupPaymentView({})).toMatchObject({ status: 'Gratuito', paid: null, coupon: null });
+    expect(signupPaymentView({ payment_status: 'CONFIRMED', paid_cents: null, coupon_code: 'FREE' })).toMatchObject({
+      status: 'Gratuito',
+      paid: null,
+      coupon: 'FREE',
+    });
   });
 });

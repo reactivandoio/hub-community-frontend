@@ -21,6 +21,9 @@ const signup = (overrides: Record<string, unknown> = {}) => ({
   checked_in_at: null,
   origin: 'SITE',
   cpf: null,
+  payment_status: null,
+  paid_cents: null,
+  coupon_code: null,
   ...overrides,
 });
 
@@ -139,5 +142,32 @@ describe('Event analytics page (REA-27)', () => {
     await screen.findByText(/não foi possível atualizar agora/);
     expect(screen.queryByText('Erro ao carregar analytics')).not.toBeInTheDocument();
     expect(paidCard()).toHaveTextContent('10');
+  });
+});
+
+describe('Event analytics participants list (REA-28)', () => {
+  it('shows what each person paid, the coupon and when it expired', async () => {
+    renderPage([
+      analyticsMock(
+        analytics({
+          all_signups: [
+            signup({ email: 'pago@x.io', payment_status: 'CONFIRMED', paid_cents: 1500, coupon_code: 'MEETUP25' }),
+            signup({ email: 'pendente@x.io', payment_status: 'PEDING_PAYMENT' }),
+            signup({ email: 'expirado@x.io', payment_status: 'EXPIRED' }),
+            signup({ email: 'gratis@x.io' }),
+          ],
+        }),
+      ),
+    ]);
+    const row = async (email: string) => (await screen.findByText(email)).closest('tr') as HTMLElement;
+
+    expect(await row('pago@x.io')).toHaveTextContent(/Pago.*R\$\s15,00.*MEETUP25/);
+    const pending = await row('pendente@x.io');
+    expect(pending).toHaveTextContent('Pendente');
+    expect(pending).not.toHaveTextContent('R$');
+    expect(await row('expirado@x.io')).toHaveTextContent('Expirado');
+    const free = await row('gratis@x.io');
+    expect(free).toHaveTextContent('Gratuito');
+    expect(free).not.toHaveTextContent('R$');
   });
 });

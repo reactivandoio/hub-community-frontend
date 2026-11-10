@@ -65,9 +65,10 @@ import { formatCents } from '@/lib/money';
 import { EventPaymentRow, summarizePayments } from '@/lib/payment-status';
 import { EventAnalyticsResponse, SignupEntry } from '@/lib/types';
 import { formatLastUpdated, useLastUpdated } from '@/hooks/use-last-updated';
-import { paidSignupsSubtitle } from '@/lib/paid-signups';
+import { SignupPaymentTone, paidSignupsSubtitle, signupPaymentView } from '@/lib/paid-signups';
 import { ORIGIN_LABELS, absentCount, hourLabel, originSummary } from '@/lib/checkin-analytics';
 import { formatCpf } from '@/lib/cpf';
+import { cn } from '@/lib/utils';
 
 /* ─── Color Palette ──────────────────────────────────────────── */
 const COLORS = {
@@ -203,6 +204,13 @@ function CustomTooltip({ active, payload, label }: any) {
 
 // Analytics and payments are asked again every 30 s, in the background.
 const REFRESH_MS = 30_000;
+
+const PAYMENT_TONE: Record<SignupPaymentTone, string> = {
+  paid: 'text-primary',
+  free: 'text-muted-foreground',
+  pending: 'text-amber-600 dark:text-amber-400',
+  lost: 'text-destructive',
+};
 
 /* ─── Main Page ──────────────────────────────────────────────── */
 export default function EventAnalyticsPage() {
@@ -876,6 +884,9 @@ export default function EventAnalyticsPage() {
                       <TableHead>E-mail</TableHead>
                       <TableHead>WhatsApp</TableHead>
                       <TableHead>Produto</TableHead>
+                      <TableHead>Pagamento</TableHead>
+                      <TableHead className="text-right">Valor pago</TableHead>
+                      <TableHead>Cupom</TableHead>
                       <TableHead>Data</TableHead>
                       <TableHead>Check-in</TableHead>
                     </TableRow>
@@ -903,6 +914,8 @@ export default function EventAnalyticsPage() {
                         );
                       }
 
+                      const payment = signupPaymentView(signup);
+
                       return (
                         <TableRow key={index} className="hover:bg-muted/30">
                           <TableCell className="font-medium whitespace-nowrap">
@@ -921,6 +934,21 @@ export default function EventAnalyticsPage() {
                           </TableCell>
                           <TableCell className="text-sm">
                             {signup.product_name || '—'}
+                          </TableCell>
+                          <TableCell className={cn('text-sm whitespace-nowrap font-medium', PAYMENT_TONE[payment.tone])}>
+                            {payment.status}
+                          </TableCell>
+                          <TableCell className="text-sm whitespace-nowrap text-right tabular-nums">
+                            {payment.paid ?? <span className="text-muted-foreground">—</span>}
+                          </TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">
+                            {payment.coupon ? (
+                              <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                                {payment.coupon}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-sm whitespace-nowrap text-muted-foreground">
                             {date}
