@@ -40,6 +40,8 @@ export const signUpSchema = z.object({
   name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres.'),
   password: strongPasswordSchema,
   phone: z.string().optional(),
+  // REA-29: e-mail marketing opt-in, optional and off by default.
+  marketing_opt_in: z.boolean().optional(),
 });
 
 export type SignUpFormValues = z.infer<typeof signUpSchema>;

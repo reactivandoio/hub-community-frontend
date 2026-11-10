@@ -268,7 +268,7 @@ describe('AdminShell: event context', () => {
     const nav = menu('Menu do evento');
     expect(linkNames(nav)).toEqual([
       'Geral', 'Programação', 'Produtos & Lotes', 'Cupons',
-      'Analytics', 'Inscrições', 'Presenças', 'Certificados',
+      'Analytics', 'Inscrições', 'Presenças', 'Certificados', 'E-mail marketing',
       'Check-in', 'Credenciamento', 'Sorteio', 'Página pública',
     ]);
     expect(within(nav).getByRole('link', { name: 'Programação' })).toHaveAttribute('aria-current', 'page');

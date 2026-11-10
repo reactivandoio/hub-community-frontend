@@ -4,6 +4,7 @@ import { useMutation } from '@apollo/client';
 import { useCallback, useEffect, useRef } from 'react';
 
 import { TRACK_EVENT } from '@/lib/queries';
+import { captureShareRef } from '@/lib/share-ref';
 
 // Generate or retrieve a persistent session ID
 function getSessionId(): string {
@@ -41,12 +42,15 @@ export function useTracking() {
   const track = useCallback(
     ({ eventType, eventDocumentId, metadata }: TrackOptions) => {
       try {
+        // Who invited this visitor, from a signup's share link (REA-29).
+        const ref = captureShareRef();
+        const withRef = ref ? { ...(metadata || {}), ref } : metadata;
         trackMutation({
           variables: {
             input: {
               event_type: eventType,
               event_id: eventDocumentId || undefined,
-              metadata: metadata || undefined,
+              metadata: withRef || undefined,
               session_id: getSessionId(),
               user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
               referrer: typeof document !== 'undefined' ? document.referrer || undefined : undefined,

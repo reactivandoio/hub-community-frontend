@@ -109,6 +109,18 @@ src/
   `/admin/events/<id>/cupons`. Links inside the shell use `GuardedLink` (`unsaved-guard.tsx`), which
   asks before leaving unsaved changes registered with `useUnsavedChanges`.
 
+- **E-mail marketing (REA-29)** — `/admin/events/<id>/email`: convite para a base (admin only), "Convide
+  alguém" and lembrete (signups), each with preview, "Enviar teste para mim" and send; history below
+  with pause/resume/cancel (`components/admin/email-campaigns/`, texts in `lib/email-campaign.ts`).
+  The queue lives in the BFF: daily quota (`EMAIL_CAMPAIGN_DAILY_LIMIT`, 70 — Mailgun free is 100 and
+  is shared with the transactional e-mails), off unless `EMAIL_CAMPAIGNS_ENABLED=true`,
+  `EMAIL_CAMPAIGN_REDIRECT_TO` sends everything to one test address. Every campaign e-mail links
+  `/descadastro?t=` (asks for a click) and sends `List-Unsubscribe` to `POST /api/email/unsubscribe`
+  (one-click, `lib/email-unsubscribe.ts`). The signup's share link is `/events/<slug>?ref=<code>`;
+  `lib/share-ref.ts` keeps the code for the session and `useTracking` sends it as `metadata.ref`. The
+  signup form has an optional `marketing_opt_in` checkbox (only recorded: campaigns go to everyone who
+  has not unsubscribed, legitimate interest).
+
 ### Provider Hierarchy (layout.tsx)
 FirebaseProvider → ApolloProvider → AuthProvider → LoginPromptProvider → LogoutModalWrapper → AgendaProvider → FilterProvider → ThemeProvider → children
 

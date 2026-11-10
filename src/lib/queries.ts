@@ -1658,3 +1658,78 @@ export const DISCONNECT_EVENT_OPAPINGOU = gql`
     }
   }
 `;
+
+// E-mail marketing do evento (REA-29): convite para a base (admin), "convide alguém" e lembrete
+// para os inscritos. A fila e a cota diária ficam no BFF.
+const EMAIL_CAMPAIGN_FIELDS = `
+  id
+  type
+  subject
+  message
+  status
+  total
+  sent
+  failed
+  created_by_email
+  started_at
+  finished_at
+  createdAt
+`;
+
+export const GET_EVENT_EMAIL_CAMPAIGNS = gql`
+  query EventEmailCampaigns($eventSlug: String!) {
+    eventEmailCampaigns(eventSlug: $eventSlug) {
+      ${EMAIL_CAMPAIGN_FIELDS}
+    }
+  }
+`;
+
+export const GET_EMAIL_CAMPAIGN_AUDIENCE = gql`
+  query EmailCampaignAudience($eventSlug: String!, $type: EmailCampaignType!) {
+    emailCampaignAudience(eventSlug: $eventSlug, type: $type) {
+      total
+      approximate
+      daily_limit
+      estimated_days
+      sending_enabled
+      redirect_to
+    }
+  }
+`;
+
+export const GET_EMAIL_CAMPAIGN_PREVIEW = gql`
+  query EmailCampaignPreview($input: EmailCampaignInput!) {
+    emailCampaignPreview(input: $input) {
+      subject
+      html
+    }
+  }
+`;
+
+export const SEND_EMAIL_CAMPAIGN_TEST = gql`
+  mutation SendEmailCampaignTest($input: EmailCampaignInput!) {
+    sendEmailCampaignTest(input: $input)
+  }
+`;
+
+export const START_EMAIL_CAMPAIGN = gql`
+  mutation StartEmailCampaign($input: EmailCampaignInput!) {
+    startEmailCampaign(input: $input) {
+      ${EMAIL_CAMPAIGN_FIELDS}
+    }
+  }
+`;
+
+export const UPDATE_EMAIL_CAMPAIGN_STATUS = gql`
+  mutation UpdateEmailCampaignStatus($eventSlug: String!, $id: ID!, $action: EmailCampaignAction!) {
+    updateEmailCampaignStatus(eventSlug: $eventSlug, id: $id, action: $action) {
+      ${EMAIL_CAMPAIGN_FIELDS}
+    }
+  }
+`;
+
+export const UNSUBSCRIBE_EMAIL = gql`
+  mutation UnsubscribeEmail($token: String!) {
+    unsubscribeEmail(token: $token)
+  }
+`;
