@@ -60,12 +60,31 @@ describe('summarizePayments', () => {
       { email: 'g@x', status: 'CONFIRMED', value: 0 },
     ];
     expect(summarizePayments(rows, NOW)).toEqual({
-      paid: 2, pending: 1, expired: 2, canceled: 1, refunded: 0, revenueCents: 7500,
+      paid: 2, pending: 1, expired: 2, canceled: 1, refunded: 0, manual: 0, revenueCents: 7500,
+    });
+  });
+});
+
+describe('summarizePayments (REA-34)', () => {
+  it('counts a manual approval apart and keeps it out of the revenue', () => {
+    const rows = [
+      { email: 'a@x', status: 'CONFIRMED', value: 5000 },
+      // The stored value stays as history; the approval is R$ 0.
+      { email: 'b@x', status: 'CONFIRMED', value: 5000, manual_approved: true },
+      { email: 'c@x', status: 'CONFIRMED', value: 0, manual_approved: true },
+    ];
+    expect(summarizePayments(rows, NOW)).toEqual({
+      paid: 1, pending: 0, expired: 0, canceled: 0, refunded: 0, manual: 2, revenueCents: 5000,
     });
   });
 });
 
 describe('paymentStatusLabel', () => {
+  it('labels a manual approval', () => {
+    expect(paymentStatusLabel('CONFIRMED', true)).toBe('Aprovada manualmente');
+    expect(paymentStatusLabel('CONFIRMED', false)).toBe('Pago');
+  });
+
   it('labels every stored status for the admin list', () => {
     expect(paymentStatusLabel('PEDING_PAYMENT')).toBe('Pagamento pendente');
     expect(paymentStatusLabel('CONFIRMED')).toBe('Pago');

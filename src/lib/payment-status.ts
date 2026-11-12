@@ -41,6 +41,8 @@ export interface EventPaymentRow {
   status: PaymentStatus | string;
   value?: number | null;
   expires_at?: string | null;
+  /** Approved by an admin without a charge (REA-34); `value` stays as history. */
+  manual_approved?: boolean | null;
 }
 
 export interface PaymentSummary {
@@ -49,13 +51,24 @@ export interface PaymentSummary {
   expired: number;
   canceled: number;
   refunded: number;
+  /** Approved by hand (REA-34): confirmed, but no money came in. */
+  manual: number;
   revenueCents: number;
 }
 
-/** Paid signups only (free ones are CONFIRMED with value 0 and are not counted). */
+/**
+ * Paid signups only (free ones are CONFIRMED with value 0 and are not counted). A manual
+ * approval is counted apart and never adds to the revenue, whatever its stored value.
+ */
 export function summarizePayments(rows: EventPaymentRow[], now: Date = new Date()): PaymentSummary {
-  const summary: PaymentSummary = { paid: 0, pending: 0, expired: 0, canceled: 0, refunded: 0, revenueCents: 0 };
+  const summary: PaymentSummary = {
+    paid: 0, pending: 0, expired: 0, canceled: 0, refunded: 0, manual: 0, revenueCents: 0,
+  };
   for (const row of rows) {
+    if (row.manual_approved) {
+      summary.manual += 1;
+      continue;
+    }
     const value = Number(row.value) || 0;
     if (value <= 0) continue;
     const phase = paymentPhase(row, now);
@@ -77,7 +90,11 @@ const LABELS: Record<string, string> = {
   REFUND: 'Reembolsado',
 };
 
-export function paymentStatusLabel(status: PaymentStatus | string | null | undefined): string {
+export function paymentStatusLabel(
+  status: PaymentStatus | string | null | undefined,
+  manualApproved?: boolean | null,
+): string {
+  if (manualApproved) return 'Aprovada manualmente';
   return (status && LABELS[status]) || '—';
 }
 

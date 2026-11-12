@@ -8,10 +8,15 @@ import { formatCents } from './money';
 export function paidSignupsSubtitle(
   revenueCents: number,
   pending: number | null | undefined,
+  /** Signups approved by hand (REA-34): confirmed, but neither paid nor revenue. */
+  manual?: number | null,
 ): string | undefined {
   const parts: string[] = [];
   if (revenueCents > 0) parts.push(`${formatCents(revenueCents)} arrecadados`);
   if (pending && pending > 0) parts.push(`+${pending} pendente${pending === 1 ? '' : 's'}`);
+  if (manual && manual > 0) {
+    parts.push(`${manual} aprovada${manual === 1 ? '' : 's'} manualmente`);
+  }
   return parts.length ? parts.join(' · ') : undefined;
 }
 
@@ -19,12 +24,16 @@ export interface SignupPaymentLike {
   payment_status?: string | null;
   paid_cents?: number | null;
   coupon_code?: string | null;
+  /** Approved by an admin without a charge (REA-34). */
+  manual_approved?: boolean | null;
 }
 
-export type SignupPaymentTone = 'paid' | 'free' | 'pending' | 'lost';
+export const MANUAL_APPROVAL_LABEL = 'Aprovada manualmente';
+
+export type SignupPaymentTone = 'paid' | 'free' | 'pending' | 'lost' | 'manual';
 
 export interface SignupPaymentView {
-  /** "Pago", "Gratuito", "Pendente", "Expirado", "Cancelado", "Reembolsado". */
+  /** "Pago", "Gratuito", "Pendente", "Expirado", "Cancelado", "Reembolsado", "Aprovada manualmente". */
   status: string;
   tone: SignupPaymentTone;
   /** What was paid, formatted; null when free or not paid (a pending charge is not paid). */
@@ -46,6 +55,10 @@ const STATUS: Record<string, { status: string; tone: SignupPaymentTone }> = {
  */
 export function signupPaymentView(signup: SignupPaymentLike): SignupPaymentView {
   const coupon = signup.coupon_code?.trim() || null;
+  // Confirmed by hand (REA-34): counts as a signup, R$ 0, never revenue.
+  if (signup.manual_approved) {
+    return { status: MANUAL_APPROVAL_LABEL, tone: 'manual', paid: formatCents(0), coupon };
+  }
   const paidCents = Number(signup.paid_cents) || 0;
   if (paidCents > 0) return { status: 'Pago', tone: 'paid', paid: formatCents(paidCents), coupon };
   const known = signup.payment_status ? STATUS[signup.payment_status] : undefined;

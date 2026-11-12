@@ -485,6 +485,34 @@ export const EVENT_PAYMENTS = gql`
       status
       value
       expires_at
+      manual_approved
+      manual_approved_at
+      manual_approved_by
+    }
+  }
+`;
+
+// REA-34 (admin only): can this signup be approved by hand, and what would it break.
+export const SIGNUP_APPROVAL_PREVIEW = gql`
+  query SignupApprovalPreview($event: String!, $signupId: ID!) {
+    signupApprovalPreview(event: $event, signup_id: $signupId) {
+      approvable
+      reason
+      status
+      warnings
+    }
+  }
+`;
+
+// REA-34 (admin only): confirms a paid signup without a charge; the person gets the ticket e-mail.
+export const APPROVE_SIGNUP_MANUALLY = gql`
+  mutation ApproveSignupManually($event: String!, $signupId: ID!) {
+    approveSignupManually(event: $event, signup_id: $signupId) {
+      success
+      message
+      already_approved
+      warnings
+      email_sent
     }
   }
 `;
@@ -937,6 +965,7 @@ export const GET_EVENT_ANALYTICS = gql`
       free_signups
       paid_signups
       pending_paid_signups
+      manual_signups
       max_slots
       occupancy_percentage
       certificate_requests
@@ -970,6 +999,10 @@ export const GET_EVENT_ANALYTICS = gql`
         payment_status
         paid_cents
         coupon_code
+        signup_id
+        manual_approved
+        manual_approved_at
+        manual_approved_by
       }
       checked_in_count
       attendance_rate

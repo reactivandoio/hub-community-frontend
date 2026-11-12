@@ -2,12 +2,23 @@ import { MockedProvider, type MockedResponse } from '@apollo/client/testing';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { EVENT_PAYMENTS, GET_EVENT_ANALYTICS, GET_EVENT_TRACKING_METRICS } from '@/lib/queries';
+import {
+  APPROVE_SIGNUP_MANUALLY,
+  EVENT_PAYMENTS,
+  GET_EVENT_ANALYTICS,
+  GET_EVENT_TRACKING_METRICS,
+  SIGNUP_APPROVAL_PREVIEW,
+} from '@/lib/queries';
 
 import EventAnalyticsPage from '../page';
 
 const clientQuery = vi.fn();
 vi.mock('@/lib/apollo-client', () => ({ getApolloClient: () => ({ query: clientQuery }) }));
+
+const access = vi.hoisted(() => ({ isAdmin: true }));
+vi.mock('@/components/admin/admin-guard', () => ({ useAdminAccess: () => access }));
+const toast = vi.hoisted(() => vi.fn());
+vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: 'meetup' }),
@@ -27,6 +38,10 @@ const signup = (overrides: Record<string, unknown> = {}) => ({
   payment_status: null,
   paid_cents: null,
   coupon_code: null,
+  signup_id: null,
+  manual_approved: null,
+  manual_approved_at: null,
+  manual_approved_by: null,
   ...overrides,
 });
 
@@ -38,6 +53,7 @@ const analytics = (overrides: Record<string, unknown> = {}) => ({
   free_signups: 2,
   paid_signups: 10,
   pending_paid_signups: 2,
+  manual_signups: 0,
   max_slots: 100,
   occupancy_percentage: 14,
   certificate_requests: 0,
@@ -64,6 +80,9 @@ const payments = Array.from({ length: 12 }, (_, i) => ({
   status: i < 10 ? 'CONFIRMED' : 'PEDING_PAYMENT',
   value: 2000,
   expires_at: i < 10 ? null : '2999-01-01T00:00:00.000Z',
+  manual_approved: null,
+  manual_approved_at: null,
+  manual_approved_by: null,
 }));
 const paymentsMock: MockedResponse = {
   request: { query: EVENT_PAYMENTS, variables: { slugOrId: 'meetup' } },
@@ -195,10 +214,117 @@ describe('Event analytics CSV (REA-28)', () => {
     await waitFor(() => expect(click).toHaveBeenCalled());
 
     const [header, paid, expired] = (await blob!.text()).replace(/^\uFEFF/, '').split('\n');
-    expect(header).toBe('Nome,E-mail,CPF,WhatsApp,Produto,Pagamento,Valor pago,Cupom,Data de Inscrição');
+    expect(header).toBe(
+      'Nome,E-mail,CPF,WhatsApp,Produto,Pagamento,Valor pago,Cupom,Data de Inscrição,Aprovado por,Aprovado em',
+    );
     // The value has a comma, so the field is quoted.
     expect(paid).toMatch(/,Pago,"R\$\s15,00",MEETUP25,/);
     expect(expired).toMatch(/,Expirado,,,/);
+    click.mockRestore();
+  });
+});
+
+describe('Manual approval in the participants list (REA-34)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    access.isAdmin = true;
+  });
+
+  const list = [
+    signup({ signup_id: 's-pend', email: 'pendente@x.io', payment_status: 'PEDING_PAYMENT' }),
+    signup({ signup_id: 's-exp', email: 'expirado@x.io', payment_status: 'EXPIRED' }),
+    signup({ signup_id: 's-canc', email: 'cancelado@x.io', payment_status: 'CANCELED' }),
+    signup({ signup_id: 's-ref', email: 'reembolsado@x.io', payment_status: 'REFUND' }),
+    signup({ signup_id: 's-pago', email: 'pago@x.io', payment_status: 'CONFIRMED', paid_cents: 1500 }),
+    signup({ signup_id: 's-free', email: 'gratis@x.io' }),
+    signup({
+      signup_id: 's-man',
+      email: 'manual@x.io',
+      payment_status: 'CONFIRMED',
+      paid_cents: 0,
+      manual_approved: true,
+      manual_approved_at: '2026-11-10T15:30:00.000Z',
+      manual_approved_by: 'Pedro',
+    }),
+  ];
+  const row = async (email: string) => (await screen.findByText(email)).closest('tr') as HTMLElement;
+  const approveIn = (tr: HTMLElement) => tr.querySelector('button[aria-label^="Aprovar"]');
+
+  it('offers Aprovar to an admin only on pending, expired and canceled rows', async () => {
+    renderPage([analyticsMock(analytics({ all_signups: list }))]);
+    for (const email of ['pendente@x.io', 'expirado@x.io', 'cancelado@x.io']) {
+      expect(approveIn(await row(email))).not.toBeNull();
+    }
+    for (const email of ['reembolsado@x.io', 'pago@x.io', 'gratis@x.io', 'manual@x.io']) {
+      expect(approveIn(await row(email))).toBeNull();
+    }
+  });
+
+  it('shows the approval badge, who and when, also to a community manager, without the button', async () => {
+    access.isAdmin = false;
+    renderPage([analyticsMock(analytics({ all_signups: list }))]);
+    const manual = await row('manual@x.io');
+    expect(manual).toHaveTextContent('Aprovada manualmente');
+    expect(manual).toHaveTextContent('por Pedro em 10/11/2026 12:30');
+    expect(manual).toHaveTextContent('R$ 0,00');
+    expect(screen.queryAllByRole('button', { name: /^Aprovar/ })).toHaveLength(0);
+  });
+
+  it('counts the manual approvals next to the paid ones', async () => {
+    renderPage([analyticsMock(analytics({ manual_signups: 1 }))]);
+    await screen.findByText('Inscrições Pagas');
+    await waitFor(() => expect(paidCard()).toHaveTextContent('1 aprovada manualmente'));
+  });
+
+  it('approves from the dialog and refreshes the list', async () => {
+    const approved = list.map((s) =>
+      s.signup_id === 's-exp'
+        ? { ...s, payment_status: 'CONFIRMED', paid_cents: 0, manual_approved: true, manual_approved_by: 'Pedro' }
+        : s,
+    );
+    const mutation = vi.fn(() => ({
+      data: {
+        approveSignupManually: { success: true, message: null, already_approved: false, warnings: [], email_sent: true },
+      },
+    }));
+    renderPage([
+      analyticsMock(analytics({ all_signups: list })),
+      {
+        request: { query: SIGNUP_APPROVAL_PREVIEW, variables: { event: 'ev-1', signupId: 's-exp' } },
+        result: { data: { signupApprovalPreview: { approvable: true, reason: null, status: 'EXPIRED', warnings: [] } } },
+      },
+      { request: { query: APPROVE_SIGNUP_MANUALLY, variables: { event: 'ev-1', signupId: 's-exp' } }, result: mutation },
+      analyticsMock(analytics({ all_signups: approved })),
+    ]);
+
+    fireEvent.click(approveIn(await row('expirado@x.io')) as HTMLElement);
+    const confirm = await screen.findByRole('button', { name: 'Aprovar inscrição' });
+    await waitFor(() => expect(confirm).toBeEnabled());
+    fireEvent.click(confirm);
+
+    await waitFor(() => expect(mutation).toHaveBeenCalledTimes(1));
+    await waitFor(async () => expect(await row('expirado@x.io')).toHaveTextContent('Aprovada manualmente'));
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Inscrição aprovada' }));
+  });
+
+  it('exports a manual approval as R$ 0,00 with who and when', async () => {
+    clientQuery.mockResolvedValue({ data: { eventAnalytics: analytics({ all_signups: [list[6]] }) } });
+    let blob: Blob | undefined;
+    Object.assign(URL, {
+      createObjectURL: vi.fn((b: Blob) => {
+        blob = b;
+        return 'blob:csv';
+      }),
+      revokeObjectURL: vi.fn(),
+    });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+
+    renderPage([analyticsMock(analytics({ all_signups: [list[6]] }))]);
+    fireEvent.click(await screen.findByRole('button', { name: /Baixar CSV/ }));
+    await waitFor(() => expect(click).toHaveBeenCalled());
+
+    const [, manual] = (await blob!.text()).replace(/^\uFEFF/, '').split('\n');
+    expect(manual).toMatch(/,Aprovada manualmente,"R\$\s0,00",,.*,Pedro,10\/11\/2026 12:30$/);
     click.mockRestore();
   });
 });
