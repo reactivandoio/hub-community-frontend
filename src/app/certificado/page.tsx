@@ -247,7 +247,7 @@ function CertificadoContent() {
                 <>
                   <p>
                     {incomplete.passwordPending
-                      ? 'Depois de criar sua senha pelo link do e-mail, entre na sua conta: vamos pedir o que faltar no perfil.'
+                      ? 'Entre com o seu e-mail (enviamos um código de acesso, sem senha): vamos pedir o que faltar no perfil e você volta para cá.'
                       : 'Entre na sua conta: vamos pedir o que faltar no perfil e você volta para cá.'}
                   </p>
                   <Button

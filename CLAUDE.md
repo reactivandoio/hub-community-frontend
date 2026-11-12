@@ -17,7 +17,7 @@ pnpm start      # Start production server on port 4010
 ### Stack
 - **Framework**: Next.js 16 with App Router (`src/app/`)
 - **API**: Apollo Client v3 → GraphQL BFF (`NEXT_PUBLIC_GRAPHQL_URL`)
-- **Auth**: Firebase + JWT tokens stored in localStorage (`auth_token`, `auth_user`)
+- **Auth**: login by a code sent to the e-mail (REA-26, no password) → JWT stored in localStorage (`auth_token`, `auth_user`)
 - **Forms**: React Hook Form + Zod validation
 - **Rich Text**: Tiptap editor (input), Strapi blocks renderer (output)
 - **Theming**: next-themes (dark/light), CSS variables in `globals.css`
@@ -85,9 +85,18 @@ src/
   action now or after the login (the action must not re-check the session). A page that needs a session renders
   `<LoginRequired>` (`components/login-required.tsx`) once `isHydrated` and signed out — it opens the modal once and keeps
   a button — and fetches nothing protected before the session. Old `?login=true&redirect=/x` links still work: the
-  provider goes to `/x` and opens the modal there. Signup and "Recuperar" keep the page (`lib/login-prompt.ts`,
-  `login_return_to`, 24 h) so `/email-confirmed` and the new-password pages send the person back after the login.
-  New login methods (Google, code by e-mail) go in as tabs of `AuthModal`.
+  provider goes to `/x` and opens the modal there. `lib/login-prompt.ts` (`login_return_to`, 24 h) still lets the old
+  `/email-confirmed` links send the person back after the login.
+
+- **Login by e-mail code (REA-26)** — there is no password. `AuthModal` has two steps: e-mail → `REQUEST_LOGIN_CODE`
+  (6 digits, 10 min, one a minute; the BFF answers the same whether the account exists) → code → `VERIFY_LOGIN_CODE`,
+  which returns the session; a new e-mail gets its account then, and `CompleteProfileModal` asks for name, CPF, date of
+  birth, WhatsApp and the 18+ declaration. Errors come with a code in `extensions` (`LOGIN_CODE_COOLDOWN` +
+  `retryAfter`, `LOGIN_CODE_INVALID` + `attemptsLeft`, `LOGIN_CODE_EXPIRED`, `LOGIN_CODE_LIMIT`, `LOGIN_CODE_NOT_SENT`
+  when Mailgun refused, `ACCOUNT_BLOCKED`, `RATE_LIMITED`); the modal shows the BFF's pt-BR message. `useAuth()` has
+  `requestLoginCode` / `verifyLoginCode` (no signIn/signUp/forwardPassword/resetPassword). `/criar-senha` and
+  `/reset-password` only redirect to `/completar-cadastro` (old e-mail links), which opens the login and then the
+  profile. "Continuar com o Google" is the next step, above the e-mail.
 
 - **Admin layout (REA-24)** — every `/admin` page is framed by `AdminShell`
   (`components/admin/admin-shell.tsx`, inside `AdminGuard` in `app/admin/layout.tsx`): collapsible
@@ -112,8 +121,9 @@ src/
 - **E-mail marketing (REA-29)** — `/admin/events/<id>/email`: convite para a base (admin only), "Convide
   alguém" and lembrete (signups), each with preview, "Enviar teste para mim" and send; history below
   with pause/resume/cancel (`components/admin/email-campaigns/`, texts in `lib/email-campaign.ts`).
-  The queue lives in the BFF: daily quota (`EMAIL_CAMPAIGN_DAILY_LIMIT`, 70 — Mailgun free is 100 and
-  is shared with the transactional e-mails), off unless `EMAIL_CAMPAIGNS_ENABLED=true`,
+  The queue lives in the BFF: campaigns use at most `EMAIL_DAILY_LIMIT - EMAIL_DAILY_RESERVE` (100 - 30 by
+  default) minus every e-mail already sent that day — login codes and transactional e-mails always go first (REA-26),
+  off unless `EMAIL_CAMPAIGNS_ENABLED=true`,
   `EMAIL_CAMPAIGN_REDIRECT_TO` sends everything to one test address. Every campaign e-mail links
   `/descadastro?t=` (asks for a click) and sends `List-Unsubscribe` to `POST /api/email/unsubscribe`
   (one-click, `lib/email-unsubscribe.ts`). The signup's share link is `/events/<slug>?ref=<code>`;
@@ -133,11 +143,12 @@ src/
 
 - **Maioridade (REA-36)** — the Hub is 18+ only. Every signup form has the required
   `AdultDeclaration` checkbox (`components/adult-declaration.tsx`, "Declaro que tenho 18 anos ou
-  mais", never pre-checked) and sends `adult_declaration: true`: account signup (`AuthModal`), logged
+  mais", never pre-checked) and sends `adult_declaration: true`: logged
   and guest event signup, the three `MANUAL_SIGNUP` forms (badge-printer live/event and the admin
   Inscrições tab; there the staff ticks "A pessoa declarou…"), both certificate forms and the
   attendance list. `CompleteProfileModal` shows it while the account never declared
-  (`user.adult_declaration`, from `SIGN_IN`/`ME`). Dates of birth must be of an adult: `isAdult` /
+  (`user.adult_declaration`, from `VERIFY_LOGIN_CODE`/`ME`) — for accounts created by a login code (REA-26) this is
+  where the declaration is made. Dates of birth must be of an adult: `isAdult` /
   `ageOn` in `lib/birth-date.ts` (São Paulo calendar day, same rule as the BFF and the backend).
   The BFF refuses all of it again. `/admin/usuarios/idade` (admin only, sidebar "Idade (18+)",
   `lib/age-review.ts`): accounts without a date of birth (select up to 50 → e-mail asking for it;

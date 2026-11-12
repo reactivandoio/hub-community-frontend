@@ -42,9 +42,9 @@ describe('cleanSignupPhone', () => {
 });
 
 describe('guestSignupSuccessMessage', () => {
-  it('tells where the ticket and the set-password link went', () => {
+  it('tells where the ticket and the complete-registration link went', () => {
     expect(guestSignupSuccessMessage('maria@exemplo.com')).toBe(
-      'Enviamos seu ingresso e o link para criar sua senha para maria@exemplo.com',
+      'Enviamos seu ingresso e o link para concluir seu cadastro para maria@exemplo.com',
     );
   });
 });
