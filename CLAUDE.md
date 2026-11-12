@@ -121,6 +121,16 @@ src/
   signup form has an optional `marketing_opt_in` checkbox (only recorded: campaigns go to everyone who
   has not unsubscribed, legitimate interest).
 
+- **Aprovação manual (REA-34)** — in Analytics → Participantes an admin (`useAdminAccess().isAdmin`)
+  approves a paid signup without a charge: "Aprovar" shows only on pending / expired / canceled rows
+  (`canApproveSignup` in `lib/manual-approval.ts`; never refunded, confirmed, already approved or
+  without payment). `ApproveSignupButton` (`components/admin/approve-signup-dialog.tsx`) fetches
+  `SIGNUP_APPROVAL_PREVIEW` when it opens (lote/evento lotado, cupom esgotado), then runs
+  `APPROVE_SIGNUP_MANUALLY` and refetches analytics + eventPayments; the person gets the normal
+  confirmation e-mail. An approved signup reads "Aprovada manualmente" (`manual_approved`, tone
+  `manual`), R$ 0, out of the revenue (`summarizePayments` counts it in `manual`), with "por X em
+  data" in the list and "Aprovado por" / "Aprovado em" in the CSV. The BFF checks the role.
+
 ### Provider Hierarchy (layout.tsx)
 FirebaseProvider → ApolloProvider → AuthProvider → LoginPromptProvider → LogoutModalWrapper → AgendaProvider → FilterProvider → ThemeProvider → children
 

@@ -630,6 +630,32 @@ export interface SignupEntry {
   /** Cents; only for a confirmed payment with a value. */
   paid_cents?: number | null;
   coupon_code?: string | null;
+  /** Id accepted by approveSignupManually (REA-34). */
+  signup_id?: string | null;
+  /** Approved by an admin without a charge: payment_status CONFIRMED, paid_cents 0. */
+  manual_approved?: boolean | null;
+  manual_approved_at?: string | null;
+  /** Name or e-mail of who approved. */
+  manual_approved_by?: string | null;
+}
+
+/** REA-34: signupApprovalPreview. */
+export interface SignupApprovalPreview {
+  approvable: boolean;
+  /** NOT_FOUND | NO_PAYMENT | ALREADY_CONFIRMED | REFUNDED | ALREADY_APPROVED */
+  reason?: string | null;
+  status?: string | null;
+  /** BATCH_FULL | EVENT_FULL | COUPON_EXHAUSTED */
+  warnings: string[];
+}
+
+/** REA-34: approveSignupManually. */
+export interface ApproveSignupResult {
+  success: boolean;
+  message?: string | null;
+  already_approved?: boolean | null;
+  warnings: string[];
+  email_sent?: boolean | null;
 }
 
 export interface EventAnalytics {
@@ -642,6 +668,8 @@ export interface EventAnalytics {
   paid_signups: number;
   /** Charges with a value still waiting for payment, within their deadline. */
   pending_paid_signups?: number | null;
+  /** Approved by hand (REA-34): in the total, out of paid, free and revenue. */
+  manual_signups?: number | null;
   max_slots: number | null;
   occupancy_percentage: number | null;
   certificate_requests: number;

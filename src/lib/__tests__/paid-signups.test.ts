@@ -64,6 +64,27 @@ describe('signupPaymentView (REA-28)', () => {
   });
 });
 
+describe('signupPaymentView (REA-34)', () => {
+  it('shows a manually approved signup as Aprovada manualmente, R$ 0, whatever the stored status', () => {
+    expect(
+      signupPaymentView({ payment_status: 'CONFIRMED', paid_cents: 0, coupon_code: 'X', manual_approved: true }),
+    ).toEqual({ status: 'Aprovada manualmente', tone: 'manual', paid: 'R$ 0,00', coupon: 'X' });
+    // Even if an older field still carried a value, an approval is never revenue.
+    expect(signupPaymentView({ payment_status: 'CONFIRMED', paid_cents: 1500, manual_approved: true })).toMatchObject({
+      status: 'Aprovada manualmente',
+      paid: 'R$ 0,00',
+    });
+  });
+});
+
+describe('paidSignupsSubtitle (REA-34)', () => {
+  it('adds the manual approvals', () => {
+    expect(paidSignupsSubtitle(20000, 2, 1)).toBe('R$ 200,00 arrecadados · +2 pendentes · 1 aprovada manualmente');
+    expect(paidSignupsSubtitle(0, 0, 3)).toBe('3 aprovadas manualmente');
+    expect(paidSignupsSubtitle(0, 0, null)).toBeUndefined();
+  });
+});
+
 describe('participantsDescription', () => {
   it('says how many listed signups are out of the total', () => {
     expect(participantsDescription(14, 12)).toBe('14 inscrições · 2 expiradas ou canceladas');

@@ -40,6 +40,8 @@ import {
 } from 'recharts';
 
 import { AdminPage, AdminPageError, AdminPageHeader, AdminPageLoading } from '@/components/admin/admin-page';
+import { useAdminAccess } from '@/components/admin/admin-guard';
+import { ApproveSignupButton } from '@/components/admin/approve-signup-dialog';
 import { FadeIn } from '@/components/animations';
 import { EventPaymentsCard } from '@/components/admin/event-payments-card';
 import { ProductsBreakdownCard } from '@/components/admin/products-breakdown-card';
@@ -73,6 +75,7 @@ import {
 } from '@/lib/paid-signups';
 import { ORIGIN_LABELS, absentCount, hourLabel, originSummary } from '@/lib/checkin-analytics';
 import { formatCpf } from '@/lib/cpf';
+import { canApproveSignup, formatApprovalDate, manualApprovalNote } from '@/lib/manual-approval';
 import { cn } from '@/lib/utils';
 
 /* ─── Color Palette ──────────────────────────────────────────── */
@@ -215,7 +218,20 @@ const PAYMENT_TONE: Record<SignupPaymentTone, string> = {
   free: 'text-muted-foreground',
   pending: 'text-amber-600 dark:text-amber-400',
   lost: 'text-destructive',
+  manual: 'text-secondary',
 };
+
+/** "Aprovada manualmente" plus who and when (REA-34), small, under the label. */
+function ManualApprovalBadge({ label, note }: { label: string; note: string }) {
+  return (
+    <div title={note ? `Aprovada manualmente ${note}` : undefined}>
+      <span className="inline-flex items-center rounded-full bg-secondary/15 px-2 py-0.5 text-xs font-medium text-secondary">
+        {label}
+      </span>
+      {note && <span className="block text-[11px] font-normal text-muted-foreground mt-0.5">{note}</span>}
+    </div>
+  );
+}
 
 /* ─── Main Page ──────────────────────────────────────────────── */
 export default function EventAnalyticsPage() {
@@ -224,6 +240,8 @@ export default function EventAnalyticsPage() {
   const id = params?.id as string;
   const [trackingPeriod, setTrackingPeriod] = useState('all');
   const [isDownloading, setIsDownloading] = useState(false);
+  // Only an admin approves a signup by hand (REA-34); a community manager sees the badge.
+  const { isAdmin } = useAdminAccess();
 
   const { data, previousData, loading, error, networkStatus, refetch } =
     useQuery<EventAnalyticsResponse>(GET_EVENT_ANALYTICS, {
@@ -304,6 +322,8 @@ export default function EventAnalyticsPage() {
         'Valor pago',
         'Cupom',
         'Data de Inscrição',
+        'Aprovado por',
+        'Aprovado em',
       ];
       const rows = signups.map((s) => {
         const date = s.created_at
@@ -328,6 +348,8 @@ export default function EventAnalyticsPage() {
           payment.paid || '',
           payment.coupon || '',
           date,
+          s.manual_approved ? s.manual_approved_by?.trim() || '' : '',
+          s.manual_approved ? formatApprovalDate(s.manual_approved_at) : '',
         ];
       });
 
@@ -387,6 +409,7 @@ export default function EventAnalyticsPage() {
   const signupDistribution = [
     { name: 'Gratuitas', value: analytics.free_signups, color: COLORS.primary },
     { name: 'Pagas', value: analytics.paid_signups, color: COLORS.secondary },
+    { name: 'Aprovadas manualmente', value: analytics.manual_signups ?? 0, color: COLORS.accent },
   ].filter(d => d.value > 0);
 
   // Prepare timeline data with formatted labels
@@ -486,7 +509,11 @@ export default function EventAnalyticsPage() {
           <MetricCard
             title="Inscrições Pagas"
             value={analytics.paid_signups}
-            subtitle={paidSignupsSubtitle(paidRevenueCents, analytics.pending_paid_signups)}
+            subtitle={paidSignupsSubtitle(
+              paidRevenueCents,
+              analytics.pending_paid_signups,
+              analytics.manual_signups,
+            )}
             icon={DollarSign}
             color={COLORS.secondary}
             bgColor={COLORS.secondaryDim}
@@ -960,7 +987,23 @@ export default function EventAnalyticsPage() {
                             {signup.product_name || '—'}
                           </TableCell>
                           <TableCell className={cn('text-sm whitespace-nowrap font-medium', PAYMENT_TONE[payment.tone])}>
-                            {payment.status}
+                            {signup.manual_approved ? (
+                              <ManualApprovalBadge note={manualApprovalNote(signup)} label={payment.status} />
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                {payment.status}
+                                {isAdmin && canApproveSignup(signup) && (
+                                  <ApproveSignupButton
+                                    event={resolvedEventDocId}
+                                    signup={signup}
+                                    onApproved={() => {
+                                      refetch().catch(() => undefined);
+                                      refetchPayments().catch(() => undefined);
+                                    }}
+                                  />
+                                )}
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell className="text-sm whitespace-nowrap text-right tabular-nums">
                             {payment.paid ?? <span className="text-muted-foreground">—</span>}
