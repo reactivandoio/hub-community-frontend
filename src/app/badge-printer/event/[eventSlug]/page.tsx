@@ -1,5 +1,7 @@
 'use client';
 
+import { AdultDeclaration } from '@/components/adult-declaration';
+import { ADULT_DECLARATION_REQUIRED, STAFF_ADULT_DECLARATION_LABEL } from '@/lib/birth-date';
 import { useMutation, useQuery } from '@apollo/client';
 import { Check, Loader2, Printer, RefreshCw, Search, UserPlus } from 'lucide-react';
 import { useParams } from 'next/navigation';
@@ -79,9 +81,11 @@ interface WalkIn {
   email: string;
   phone: string;
   cpf: string;
+  /** REA-36: the person declared being 18+ (the staff ticks it). */
+  adult: boolean;
 }
 
-const EMPTY_WALK_IN: WalkIn = { name: '', email: '', phone: '', cpf: '' };
+const EMPTY_WALK_IN: WalkIn = { name: '', email: '', phone: '', cpf: '', adult: false };
 
 /**
  * Badge printing fed by the event's signups over plain HTTP — for venues where the
@@ -186,13 +190,19 @@ export default function EventBadgePrinterPage() {
       setWalkInError('Informe nome completo e e-mail.');
       return;
     }
+    if (!walkIn.adult) {
+      setWalkInError(ADULT_DECLARATION_REQUIRED);
+      return;
+    }
     if (!selectedBatchId) {
       setWalkInError('Este evento não tem lote disponível para inscrição.');
       return;
     }
     setWalkInBusy(true);
     try {
-      const input: Record<string, string> = { name: walkIn.name.trim(), email: walkIn.email.trim().toLowerCase() };
+      const input: Record<string, string | boolean> = {
+        name: walkIn.name.trim(), email: walkIn.email.trim().toLowerCase(), adult_declaration: true,
+      };
       if (walkIn.phone.trim()) input.phone_number = walkIn.phone.trim();
       if (walkIn.cpf.trim()) input.cpf = walkIn.cpf.trim();
       const { data: result } = await manualSignup({ variables: { eventSlug, batchId: selectedBatchId, input } });
@@ -321,6 +331,13 @@ export default function EventBadgePrinterPage() {
                           </Select>
                         </div>
                       )}
+                      <AdultDeclaration
+                        id="walkin-adult"
+                        label={STAFF_ADULT_DECLARATION_LABEL}
+                        checked={walkIn.adult}
+                        onCheckedChange={(adult) => setWalkIn((w) => ({ ...w, adult }))}
+                        disabled={walkInBusy}
+                      />
                       {walkInError && <p className="text-sm text-destructive">{walkInError}</p>}
                     </div>
                     <DialogFooter>

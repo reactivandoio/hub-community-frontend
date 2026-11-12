@@ -72,6 +72,7 @@ const batchesMock: MockedResponse = {
 
 const INPUT = {
   name: 'Caio Melo', email: 'caio@x.io', phone_number: '+55 62 99999-9999', cpf: '52998224725', date_of_birth: '1990-04-07',
+  adult_declaration: true,
 };
 
 const manualMock = (
@@ -100,6 +101,7 @@ const fillAndSubmit = async () => {
   await userEvent.type(screen.getByLabelText(/whatsapp/i), INPUT.phone_number);
   await userEvent.type(screen.getByLabelText(/cpf/i), '529.982.247-25');
   await userEvent.type(screen.getByLabelText(/data de nascimento/i), '07041990');
+  await userEvent.click(screen.getByRole('checkbox', { name: /18 anos ou mais/ }));
   await userEvent.click(screen.getByRole('button', { name: /inscrever e imprimir/i }));
 };
 
@@ -168,6 +170,23 @@ describe('LiveBadgePrinterPage — Inscrição Manual', () => {
     expect(birth).toHaveValue('31/02/1990');
     await userEvent.click(screen.getByRole('button', { name: /inscrever e imprimir/i }));
     expect(await screen.findByText(/data de nascimento válida/)).toBeInTheDocument();
+    expect(mockPrintBadge).not.toHaveBeenCalled();
+  });
+
+  it('REA-36: refuses a minor and asks the staff for the 18+ declaration', async () => {
+    renderPage([]);
+    await userEvent.click(await screen.findByRole('button', { name: /inscrição manual/i }));
+    await userEvent.type(screen.getByLabelText(/nome completo/i), INPUT.name);
+    await userEvent.type(screen.getByLabelText(/e-mail/i), INPUT.email);
+    await userEvent.type(screen.getByLabelText(/whatsapp/i), INPUT.phone_number);
+    await userEvent.type(screen.getByLabelText(/cpf/i), '52998224725');
+    await userEvent.type(screen.getByLabelText(/data de nascimento/i), '01012015');
+    await userEvent.click(screen.getByRole('button', { name: /inscrever e imprimir/i }));
+    expect(await screen.findByText('É preciso ter 18 anos ou mais.')).toBeInTheDocument();
+    await userEvent.clear(screen.getByLabelText(/data de nascimento/i));
+    await userEvent.type(screen.getByLabelText(/data de nascimento/i), '07041990');
+    await userEvent.click(screen.getByRole('button', { name: /inscrever e imprimir/i }));
+    expect(await screen.findByText('Confirme que você tem 18 anos ou mais.')).toBeInTheDocument();
     expect(mockPrintBadge).not.toHaveBeenCalled();
   });
 

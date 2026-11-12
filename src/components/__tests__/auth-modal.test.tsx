@@ -6,9 +6,10 @@ import { AuthModal } from '../auth-modal';
 
 const signIn = vi.fn();
 const forwardPassword = vi.fn();
+const signUp = vi.fn();
 
 vi.mock('@/contexts/auth-context', () => ({
-  useAuth: () => ({ signIn, signUp: vi.fn(), forwardPassword, isLoading: false }),
+  useAuth: () => ({ signIn, signUp, forwardPassword, isLoading: false }),
 }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -62,5 +63,34 @@ describe('AuthModal (REA-25: login in place)', () => {
     expect(JSON.parse(window.localStorage.getItem('login_return_to') || '{}').path).toBe(
       '/certificado?event=meetup',
     );
+  });
+});
+
+describe('AuthModal — cadastro (REA-36)', () => {
+  const fillSignUp = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByRole('tab', { name: 'Cadastrar' }));
+    await user.type(screen.getByPlaceholderText('Seu nome completo'), 'Ana Souza');
+    await user.type(screen.getByPlaceholderText('seu_username'), 'ana_souza');
+    await user.type(screen.getByPlaceholderText('seu@email.com'), 'ana@example.com');
+    await user.type(screen.getByPlaceholderText('Digite uma senha forte'), 'Senha-forte-1');
+  };
+
+  it('does not create the account without "18 anos ou mais"', async () => {
+    renderModal();
+    const user = userEvent.setup();
+    await fillSignUp(user);
+    await user.click(screen.getByRole('button', { name: 'Criar Conta' }));
+    expect(await screen.findByText('Confirme que você tem 18 anos ou mais.')).toBeInTheDocument();
+    expect(signUp).not.toHaveBeenCalled();
+  });
+
+  it('sends the declaration with the signup', async () => {
+    signUp.mockResolvedValue(undefined);
+    renderModal();
+    const user = userEvent.setup();
+    await fillSignUp(user);
+    await user.click(screen.getByRole('checkbox', { name: /18 anos ou mais/ }));
+    await user.click(screen.getByRole('button', { name: 'Criar Conta' }));
+    await waitFor(() => expect(signUp).toHaveBeenCalledWith(expect.objectContaining({ adult_declaration: true })));
   });
 });

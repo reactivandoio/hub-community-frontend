@@ -131,6 +131,21 @@ src/
   `manual`), R$ 0, out of the revenue (`summarizePayments` counts it in `manual`), with "por X em
   data" in the list and "Aprovado por" / "Aprovado em" in the CSV. The BFF checks the role.
 
+- **Maioridade (REA-36)** — the Hub is 18+ only. Every signup form has the required
+  `AdultDeclaration` checkbox (`components/adult-declaration.tsx`, "Declaro que tenho 18 anos ou
+  mais", never pre-checked) and sends `adult_declaration: true`: account signup (`AuthModal`), logged
+  and guest event signup, the three `MANUAL_SIGNUP` forms (badge-printer live/event and the admin
+  Inscrições tab; there the staff ticks "A pessoa declarou…"), both certificate forms and the
+  attendance list. `CompleteProfileModal` shows it while the account never declared
+  (`user.adult_declaration`, from `SIGN_IN`/`ME`). Dates of birth must be of an adult: `isAdult` /
+  `ageOn` in `lib/birth-date.ts` (São Paulo calendar day, same rule as the BFF and the backend).
+  The BFF refuses all of it again. `/admin/usuarios/idade` (admin only, sidebar "Idade (18+)",
+  `lib/age-review.ts`): accounts without a date of birth (select up to 50 → e-mail asking for it;
+  without a date 7 days after the e-mail the backend deactivates the account) and minors
+  ("Desativar e avisar" → `blocked` + e-mail with the reason; signups are kept). The e-mails share the
+  campaigns' daily quota; nothing runs without a click. `/completar-cadastro` is the e-mail's link
+  (login, then the profile modal). Campaigns only reach adults with a date of birth.
+
 ### Provider Hierarchy (layout.tsx)
 FirebaseProvider → ApolloProvider → AuthProvider → LoginPromptProvider → LogoutModalWrapper → AgendaProvider → FilterProvider → ThemeProvider → children
 

@@ -78,6 +78,8 @@ import {
   type GuestNotice,
 } from '@/lib/guest-signup';
 import { adjustToBrazilTimezone } from '@/utils/event';
+import { AdultDeclaration } from '@/components/adult-declaration';
+import { ADULT_DECLARATION_REQUIRED } from '@/lib/birth-date';
 
 interface Batch {
   id: string;
@@ -142,6 +144,14 @@ export default function EventSignupPage() {
   const [paymentAttempt, setPaymentAttempt] = useState(0);
   const [linkUnavailable, setLinkUnavailable] = useState(false);
   const lastSignupVars = useRef<Record<string, unknown> | null>(null);
+  // REA-36: required "Declaro que tenho 18 anos ou mais" (logged and guest forms).
+  const [adultDeclared, setAdultDeclared] = useState(false);
+  const [adultError, setAdultError] = useState<string | null>(null);
+  const checkAdultDeclaration = () => {
+    if (adultDeclared) return true;
+    setAdultError(ADULT_DECLARATION_REQUIRED);
+    return false;
+  };
   // REA-18: coupon of a ready-made link (#cupom=CODE). It only fills the field in;
   // the server still validates and prices it.
   const { code: linkCoupon, clear: clearLinkCoupon } = useCouponLink(slugOrId);
@@ -392,6 +402,10 @@ export default function EventSignupPage() {
       setStep('confirm');
       return;
     }
+    if (!checkAdultDeclaration()) {
+      setStep('confirm');
+      return;
+    }
 
     // If user has no phone and didn't provide one, show error
     if (!user.phone && !phoneInput.trim()) {
@@ -429,6 +443,7 @@ export default function EventSignupPage() {
         email: user.email,
         batch_id: selectedBatch.id,
         phone_number: phoneToSend || undefined,
+        adult_declaration: true,
       };
 
       if (couponCode && couponApplied) {
@@ -498,6 +513,7 @@ export default function EventSignupPage() {
   const handleInlineSignup = async (values: InlineSignupValues) => {
     if (!selectedBatch || inlineBusy) return;
     if (!checkCpf()) return;
+    if (!checkAdultDeclaration()) return;
 
     // Held only by a successful signup: any failure below releases it, so a
     // corrected retry goes through instead of hitting "em andamento".
@@ -523,6 +539,7 @@ export default function EventSignupPage() {
         email: values.email,
         batch_id: selectedBatch.id,
         phone_number: cleanedPhone || undefined,
+        adult_declaration: true,
       };
       if (couponCode && couponApplied) {
         variables.coupon_code = paymentsV2 ? appliedCoupon : couponCode;
@@ -1098,6 +1115,13 @@ export default function EventSignupPage() {
                 </div>
               )}
 
+              <AdultDeclaration
+                id="signup-adult"
+                checked={adultDeclared}
+                onCheckedChange={(value) => { setAdultDeclared(value); setAdultError(null); }}
+                error={adultError}
+              />
+
               <div className="flex gap-3">
                 <Button
                   variant="outline"
@@ -1237,6 +1261,13 @@ export default function EventSignupPage() {
                       </span>
                     </div>
                   </div>
+
+                  <AdultDeclaration
+                    id="guest-signup-adult"
+                    checked={adultDeclared}
+                    onCheckedChange={(value) => { setAdultDeclared(value); setAdultError(null); }}
+                    error={adultError}
+                  />
 
                   {errorMessage && (
                     <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-600 text-sm">

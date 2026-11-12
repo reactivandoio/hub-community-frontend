@@ -23,7 +23,7 @@ const baseUser: User = { id: '9', email: 'ana@x.io', username: 'ana-4f2k' };
 
 const meMock = (me: Partial<User> | null): MockedResponse => ({
   request: { query: ME },
-  result: { data: { me: me ? { id: '9', username: 'ana-4f2k', email: 'ana@x.io', name: null, phone: null, cpf: null, date_of_birth: null, ...me } : null } },
+  result: { data: { me: me ? { id: '9', username: 'ana-4f2k', email: 'ana@x.io', name: null, phone: null, cpf: null, date_of_birth: null, adult_declaration: null, ...me } : null } },
 });
 
 const renderModal = (mocks: MockedResponse[]) =>
@@ -106,6 +106,7 @@ describe('CompleteProfileModal — form', () => {
     await userEvent.type(screen.getByLabelText(/cpf/i), '11111111111');
     await userEvent.type(screen.getByLabelText(/data de nascimento/i), '1990-05-17');
     await userEvent.type(screen.getByLabelText(/whatsapp/i), '+55 62 99999-0000');
+    await userEvent.click(screen.getByRole('checkbox', { name: /18 anos ou mais/ }));
     await userEvent.click(screen.getByRole('button', { name: /salvar/i }));
     expect(await screen.findByText(/cpf inválido/i)).toBeInTheDocument();
     expect(auth.syncUser).not.toHaveBeenCalledWith(expect.objectContaining({ cpf: expect.anything() }));
@@ -115,7 +116,7 @@ describe('CompleteProfileModal — form', () => {
     const update: MockedResponse = {
       request: {
         query: UPDATE_PROFILE,
-        variables: { input: { name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17', phone: '+55 62 99999-0000' } },
+        variables: { input: { name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17', phone: '+55 62 99999-0000', adult_declaration: true } },
       },
       result: { data: { updateProfile: { id: '9', username: 'ana-4f2k', email: 'ana@x.io', name: 'Ana Souza', phone: null, cover_photo: null, twitter: null, linkedin: null, github: null, website: null, instagram: null } } },
     };
@@ -125,10 +126,11 @@ describe('CompleteProfileModal — form', () => {
     await userEvent.type(screen.getByLabelText(/cpf/i), '529.982.247-25');
     await userEvent.type(screen.getByLabelText(/data de nascimento/i), '1990-05-17');
     await userEvent.type(screen.getByLabelText(/whatsapp/i), '+55 62 99999-0000');
+    await userEvent.click(screen.getByRole('checkbox', { name: /18 anos ou mais/ }));
     await userEvent.click(screen.getByRole('button', { name: /salvar/i }));
     await waitFor(() =>
       expect(auth.syncUser).toHaveBeenCalledWith({
-        name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17', phone: '+55 62 99999-0000',
+        name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17', phone: '+55 62 99999-0000', adult_declaration: true,
       }),
     );
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -136,7 +138,7 @@ describe('CompleteProfileModal — form', () => {
 
   it('shows the server error and stays open', async () => {
     const failing: MockedResponse = {
-      request: { query: UPDATE_PROFILE, variables: { input: { name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17', phone: '+55 62 99999-0000' } } },
+      request: { query: UPDATE_PROFILE, variables: { input: { name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17', phone: '+55 62 99999-0000', adult_declaration: true } } },
       error: new Error('Error updating profile: boom'),
     };
     renderModal([meMock(null), failing]);
@@ -145,6 +147,7 @@ describe('CompleteProfileModal — form', () => {
     await userEvent.type(screen.getByLabelText(/cpf/i), '52998224725');
     await userEvent.type(screen.getByLabelText(/data de nascimento/i), '1990-05-17');
     await userEvent.type(screen.getByLabelText(/whatsapp/i), '+55 62 99999-0000');
+    await userEvent.click(screen.getByRole('checkbox', { name: /18 anos ou mais/ }));
     await userEvent.click(screen.getByRole('button', { name: /salvar/i }));
     expect(await screen.findByText(/boom/i)).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -159,5 +162,17 @@ describe('CompleteProfileModal — WhatsApp (REA-22)', () => {
     await userEvent.click(screen.getByRole('button', { name: /salvar/i }));
     expect(await screen.findByText(/whatsapp válido/i)).toBeInTheDocument();
     expect(auth.syncUser).not.toHaveBeenCalledWith(expect.objectContaining({ phone: expect.anything() }));
+  });
+});
+
+describe('CompleteProfileModal — 18 anos ou mais (REA-36)', () => {
+  it('refuses a date of birth under 18 and the missing declaration before calling the server', async () => {
+    renderModal([meMock({ name: 'Ana Souza', cpf: '52998224725', phone: '+55 62 99999-0000' })]);
+    await screen.findByRole('dialog');
+    await userEvent.type(screen.getByLabelText(/data de nascimento/i), '2015-05-17');
+    await userEvent.click(screen.getByRole('button', { name: /salvar/i }));
+    expect(await screen.findByText('É preciso ter 18 anos ou mais.')).toBeInTheDocument();
+    expect(screen.getByText('Confirme que você tem 18 anos ou mais.')).toBeInTheDocument();
+    expect(auth.syncUser).not.toHaveBeenCalledWith(expect.objectContaining({ date_of_birth: expect.anything() }));
   });
 });

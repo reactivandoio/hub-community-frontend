@@ -140,7 +140,7 @@ describe('EventBadgePrinterPage — walk-in', () => {
     const manual: MockedResponse = {
       request: {
         query: MANUAL_SIGNUP,
-        variables: { eventSlug: 'react-summit', batchId: '3', input: { name: 'Caio Melo', email: 'caio@x.io' } },
+        variables: { eventSlug: 'react-summit', batchId: '3', input: { name: 'Caio Melo', email: 'caio@x.io', adult_declaration: true } },
       },
       result: { data: { manualSignup: { success: true, message: 'ok', account_created: true, matched_by: null, signup: created } } },
     };
@@ -155,6 +155,7 @@ describe('EventBadgePrinterPage — walk-in', () => {
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText(/nome completo/i), 'Caio Melo');
     await userEvent.type(within(dialog).getByLabelText(/e-mail/i), 'caio@x.io');
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: /18 anos ou mais/ }));
     await userEvent.click(within(dialog).getByRole('button', { name: /inscrever e imprimir/i }));
 
     await waitFor(() => expect(mockPrintBadge).toHaveBeenCalledWith(expect.objectContaining({ fullName: 'Caio Melo' })));
@@ -166,7 +167,7 @@ describe('EventBadgePrinterPage — walk-in', () => {
     const failing: MockedResponse = {
       request: {
         query: MANUAL_SIGNUP,
-        variables: { eventSlug: 'react-summit', batchId: '3', input: { name: 'Caio Melo', email: 'caio@x.io' } },
+        variables: { eventSlug: 'react-summit', batchId: '3', input: { name: 'Caio Melo', email: 'caio@x.io', adult_declaration: true } },
       },
       result: { data: { manualSignup: { success: false, message: 'Lote esgotado.', account_created: false, matched_by: null, signup: null } } },
     };
@@ -176,6 +177,7 @@ describe('EventBadgePrinterPage — walk-in', () => {
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText(/nome completo/i), 'Caio Melo');
     await userEvent.type(within(dialog).getByLabelText(/e-mail/i), 'caio@x.io');
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: /18 anos ou mais/ }));
     await userEvent.click(within(dialog).getByRole('button', { name: /inscrever e imprimir/i }));
     expect(await within(dialog).findByText('Lote esgotado.')).toBeInTheDocument();
     expect(mockPrintBadge).not.toHaveBeenCalled();

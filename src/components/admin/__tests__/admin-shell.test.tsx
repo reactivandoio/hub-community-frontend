@@ -91,7 +91,7 @@ describe('AdminShell: general sidebar', () => {
     pathname = '/admin/events';
     renderShell();
     expect(linkNames(menu('Menu do admin'))).toEqual([
-      'Painel', 'Eventos', 'Comunidades', 'Palestrantes', 'Votações', 'Usuários',
+      'Painel', 'Eventos', 'Comunidades', 'Palestrantes', 'Votações', 'Usuários', 'Idade (18+)',
     ]);
     expect(within(menu('Menu do admin')).getByRole('link', { name: 'Eventos' })).toHaveAttribute('aria-current', 'page');
     expect(within(menu('Menu do admin')).getByRole('link', { name: 'Painel' })).not.toHaveAttribute('aria-current');

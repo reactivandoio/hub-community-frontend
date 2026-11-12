@@ -238,6 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           phone: result.data.signIn.phone || undefined,
           cpf: result.data.signIn.cpf || undefined,
           date_of_birth: result.data.signIn.date_of_birth || undefined,
+          adult_declaration: result.data.signIn.adult_declaration === true,
         };
 
         saveToStorage(user, result.data.signIn.token);

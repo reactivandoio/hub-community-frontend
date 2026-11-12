@@ -23,6 +23,8 @@ import { useAuth } from '@/contexts/auth-context';
 import { CREATE_ATTENDANCE, GET_EVENT_BY_SLUG_OR_ID } from '@/lib/queries';
 import { CreateAttendanceResponse } from '@/lib/types';
 import { LoginRequired } from '@/components/login-required';
+import { AdultDeclaration } from '@/components/adult-declaration';
+import { ADULT_DECLARATION_REQUIRED, isAdult } from '@/lib/birth-date';
 import Link from 'next/link';
 
 // CPF mask: 999.999.999-99
@@ -49,21 +51,6 @@ function isValidCpf(cpf: string): boolean {
   return clean.length === 11;
 }
 
-// Validate age >= 18
-function isAtLeast18(dateStr: string): boolean {
-  if (!dateStr) return false;
-  const birth = new Date(dateStr);
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const monthDiff = today.getMonth() - birth.getMonth();
-  if (
-    monthDiff < 0 ||
-    (monthDiff === 0 && today.getDate() < birth.getDate())
-  ) {
-    age--;
-  }
-  return age >= 18;
-}
 
 export default function AttendanceFormPage() {
   const params = useParams();
@@ -92,6 +79,8 @@ export default function AttendanceFormPage() {
 
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  // REA-36: required "Declaro que tenho 18 anos ou mais".
+  const [adultDeclared, setAdultDeclared] = useState(false);
 
   // Track which fields came pre-filled from user profile (these become readOnly)
   const [lockedFields, setLockedFields] = useState<Record<string, boolean>>({});
@@ -162,7 +151,8 @@ export default function AttendanceFormPage() {
       return;
     }
 
-    if (!isAtLeast18(formData.date_of_birth)) {
+    // REA-36: counted in São Paulo, like the BFF (the old helper was a day off in UTC-3).
+    if (!isAdult(formData.date_of_birth)) {
       setError('É necessário ter pelo menos 18 anos para assinar a presença.');
       return;
     }
@@ -170,6 +160,11 @@ export default function AttendanceFormPage() {
     const cleanPhone = formData.phone.replace(/\D/g, '');
     if (cleanPhone.length < 10) {
       setError('Telefone inválido. Digite o número completo com DDD.');
+      return;
+    }
+
+    if (!adultDeclared) {
+      setError(ADULT_DECLARATION_REQUIRED);
       return;
     }
 
@@ -189,6 +184,7 @@ export default function AttendanceFormPage() {
           date_of_birth: formData.date_of_birth,
           phone: cleanPhone,
           name: formData.name.trim(),
+          adult_declaration: true,
         },
       });
 
@@ -405,6 +401,13 @@ export default function AttendanceFormPage() {
                 </p>
               </div>
             </div>
+
+            <AdultDeclaration
+              id="attendance-adult"
+              checked={adultDeclared}
+              onCheckedChange={setAdultDeclared}
+              disabled={submitting}
+            />
 
             <Button
               type="submit"
