@@ -24,6 +24,7 @@ export type AdminNavIcon =
   | 'signups'
   | 'attendance'
   | 'certificates'
+  | 'share-art'
   | 'email'
   | 'checkin'
   | 'badge'
@@ -132,6 +133,8 @@ export const eventNavGroups = ({
   if (isAdmin && paymentsV2) {
     edit.push({ label: 'Cupons', href: eventHref(id, 'cupons'), icon: 'coupons' });
   }
+  // REA-43: fundo e área da foto da arte que o participante gera (admin e organizador).
+  edit.push({ label: 'Arte "Eu vou"', href: eventHref(id, 'arte'), icon: 'share-art' });
   return [
     { label: 'Edição', items: edit },
     {
@@ -179,6 +182,7 @@ const EVENT_SUB_LABELS: Record<string, string> = {
   'import-signups': 'Inscrições',
   attendance: 'Presenças',
   certificados: 'Certificados',
+  arte: 'Arte "Eu vou"',
 };
 
 const readable = (segment: string) => {

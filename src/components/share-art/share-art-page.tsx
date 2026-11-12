@@ -11,7 +11,12 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/auth-context';
 import { useLoginPrompt } from '@/contexts/login-prompt-context';
-import { GET_EVENT_BY_SLUG_OR_ID, IS_USER_SIGNED_UP } from '@/lib/queries';
+import {
+  GET_EVENT_BY_SLUG_OR_ID,
+  GET_SHARE_ART_CONFIG,
+  IS_USER_SIGNED_UP,
+} from '@/lib/queries';
+import type { ShareArtConfig } from '@/lib/share-art-config';
 
 function GeneratorSkeleton() {
   return (
@@ -66,9 +71,19 @@ export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
   );
   const isSignedUp = Boolean(signupData?.isUserSignedUp?.is_signed_up);
 
+  // REA-43: the event's custom art, when the organizer set one. Any failure → the default art.
+  const { data: artData, loading: artLoading } = useQuery<{
+    shareArtConfig: ShareArtConfig | null;
+  }>(GET_SHARE_ART_CONFIG, {
+    variables: { eventId: slugOrId },
+    skip: !isSignedUp,
+    errorPolicy: 'all',
+  });
+
   // Signed out: the login opens over this page once (REA-25); the notice keeps a button.
   const askLogin = () => requestLogin({ reason: 'Entre para gerar sua arte' });
-  const needsLogin = !!isHydrated && !eventLoading && !!event && !isAuthenticated;
+  const needsLogin =
+    !!isHydrated && !eventLoading && !!event && !isAuthenticated;
   const askedLogin = useRef(false);
   useEffect(() => {
     if (!needsLogin || askedLogin.current) return;
@@ -78,7 +93,12 @@ export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
   }, [needsLogin]);
 
   let content: ReactNode;
-  if (!hydrated || eventLoading || (isAuthenticated && signupLoading)) {
+  if (
+    !hydrated ||
+    eventLoading ||
+    (isAuthenticated && signupLoading) ||
+    (isSignedUp && artLoading)
+  ) {
     content = <GeneratorSkeleton />;
   } else if (eventError || !event) {
     content = (
@@ -115,7 +135,11 @@ export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
     );
   } else {
     content = (
-      <ShareArtGenerator event={event} defaultName={user?.name || ''} />
+      <ShareArtGenerator
+        event={event}
+        defaultName={user?.name || ''}
+        customConfig={artData?.shareArtConfig ?? null}
+      />
     );
   }
 

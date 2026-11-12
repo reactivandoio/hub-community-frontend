@@ -146,6 +146,22 @@ src/
   campaigns' daily quota; nothing runs without a click. `/completar-cadastro` is the e-mail's link
   (login, then the profile modal). Campaigns only reach adults with a date of birth.
 
+- **Arte "Eu vou" do evento (REA-43)** — the participant's art (`/events/<slug>/arte`,
+  `components/share-art/`) has two renderers per format (Stories 9:16, Feed 1:1): the default Hub
+  template (`share-art-template.tsx`, html-to-image) and, when the event has one, the organizer's art:
+  a background image with the photo area on top, drawn on a canvas by `drawCustomArt`
+  (`lib/share-art-custom.ts`), the same function the admin preview uses. `/admin/events/<id>/arte`
+  (sidebar "Arte \"Eu vou\"", admin and organizer; the BFF checks it) picks the background per format
+  and the area with `ShareArtAreaEditor` (drag to move, handles to resize, arrows; "Área quadrada"),
+  radius from square corners to a circle, and a live preview with a sample photo (or a local test
+  photo, never uploaded). The area is stored in fractions of the background (`x`, `y`, `width`,
+  `height`, `radius` 0–1; radius × half of the smaller side) — pure rules in `lib/share-art-config.ts`,
+  same numbers as the BFF (`resolvers/ShareArt/rules.js`): background ratio within 1% and at least
+  1080px wide, checked before the upload and again by the BFF. A format without a complete config, or
+  whose background fails to load (`/api/og-image` proxy, needed for canvas pixels), keeps the default
+  art. The custom art has no role/name: those steps are hidden for that format, and the photo is
+  cropped to the area's ratio.
+
 ### Provider Hierarchy (layout.tsx)
 FirebaseProvider → ApolloProvider → AuthProvider → LoginPromptProvider → LogoutModalWrapper → AgendaProvider → FilterProvider → ThemeProvider → children
 
