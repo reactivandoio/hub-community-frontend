@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, History, Search, Users } from 'lucide-react'
 import { useState } from 'react';
 
 import { AdminPage, AdminPageHeader } from '@/components/admin/admin-page';
+import { GuardedLink } from '@/components/admin/unsaved-guard';
 import { FadeIn } from '@/components/animations';
 import {
   AlertDialog,
@@ -229,6 +230,12 @@ export default function UsersAdminPage() {
         <AdminPageHeader
           title="Usuários e Roles"
           description="Admin vê e faz tudo e define as roles. Community Manager gerencia só as comunidades em que está como organizador e os eventos delas. Os demais são usuários comuns."
+          actions={
+            // REA-36: accounts without a date of birth and minors.
+            <Button asChild variant="outline">
+              <GuardedLink href="/admin/usuarios/idade">Idade (18+)</GuardedLink>
+            </Button>
+          }
         />
 
         <section className="space-y-4">

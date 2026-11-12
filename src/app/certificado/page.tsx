@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useLazyQuery, useMutation, useQuery } from '@apollo/client';
 import { AlertCircle, Clock, Loader2, Search } from 'lucide-react';
+import { AdultDeclaration } from '@/components/adult-declaration';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -19,6 +20,7 @@ import type {
   RequestCertificateResponse,
 } from '@/lib/types';
 import { formatCpf, isValidCpf, normalizeIdentifier } from '@/lib/certificate';
+import { ADULT_DECLARATION_REQUIRED } from '@/lib/birth-date';
 import { useAuth } from '@/contexts/auth-context';
 import { useLoginPrompt } from '@/contexts/login-prompt-context';
 import {
@@ -95,6 +97,8 @@ function CertificadoContent() {
     setIncomplete(registrationIncomplete(err));
   };
   const [form, setForm] = useState({ name: '', email: '', phone_number: '' });
+  // REA-36: required "Declaro que tenho 18 anos ou mais".
+  const [adultDeclared, setAdultDeclared] = useState(false);
 
   const [lookup, { loading: lookingUp }] = useLazyQuery<LookupCertificateResponse>(LOOKUP_CERTIFICATE, {
     fetchPolicy: 'network-only',
@@ -130,6 +134,10 @@ function CertificadoContent() {
     e.preventDefault();
     setError('');
     setIncomplete(null);
+    if (!adultDeclared) {
+      setError(ADULT_DECLARATION_REQUIRED);
+      return;
+    }
     try {
       const { data } = await requestCertificate({
         variables: {
@@ -138,6 +146,7 @@ function CertificadoContent() {
           identifier: normalizeIdentifier(cpf),
           email: form.email.trim(),
           phone: form.phone_number.replace(/\D/g, ''),
+          adult_declaration: true,
         },
       });
       if (data?.requestCertificate) setCertificate(data.requestCertificate);
@@ -295,6 +304,12 @@ function CertificadoContent() {
                 <Label htmlFor="phone_number" className="text-sm font-semibold">WhatsApp</Label>
                 <Input id="phone_number" type="tel" value={form.phone_number} onChange={(e) => setForm({ ...form, phone_number: e.target.value })} disabled={requesting} className="h-12" maxLength={15} />
               </div>
+              <AdultDeclaration
+                id="certificate-adult"
+                checked={adultDeclared}
+                onCheckedChange={setAdultDeclared}
+                disabled={requesting}
+              />
               <div className="flex gap-3">
                 <Button type="button" variant="outline" className="h-12" onClick={() => { setLookupState('idle'); setError(''); }} disabled={requesting}>Voltar</Button>
                 <Button type="submit" className="flex-1 h-12 text-lg font-medium" disabled={requesting}>

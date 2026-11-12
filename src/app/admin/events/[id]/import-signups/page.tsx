@@ -1,5 +1,7 @@
 'use client';
 
+import { AdultDeclaration } from '@/components/adult-declaration';
+import { STAFF_ADULT_DECLARATION_LABEL } from '@/lib/birth-date';
 import { useMutation, useQuery } from '@apollo/client';
 import {
   AlertCircle,
@@ -137,6 +139,8 @@ export default function ImportSignupsPage() {
     email: '',
     cpf: '',
     phone: '',
+    // REA-36: the person declared being 18+ (the staff ticks it).
+    adult: false,
   });
   const [manualBatchId, setManualBatchId] = useState<string>('');
   const [manualLoading, setManualLoading] = useState(false);
@@ -294,7 +298,7 @@ export default function ImportSignupsPage() {
   // ── Manual Signup Handler ──
   const handleManualSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manualForm.name || !manualForm.email || !manualBatchId) return;
+    if (!manualForm.name || !manualForm.email || !manualBatchId || !manualForm.adult) return;
 
     setManualLoading(true);
     try {
@@ -307,6 +311,7 @@ export default function ImportSignupsPage() {
             email: manualForm.email,
             cpf: manualForm.cpf.replace(/\D/g, '') || null,
             phone_number: manualForm.phone || null,
+            adult_declaration: true,
           },
         },
       });
@@ -329,7 +334,7 @@ export default function ImportSignupsPage() {
           description: result.message,
         });
         // Reset form but keep batch
-        setManualForm({ name: '', email: '', cpf: '', phone: '' });
+        setManualForm({ name: '', email: '', cpf: '', phone: '', adult: false });
       } else {
         toast({
           variant: 'destructive',
@@ -530,13 +535,21 @@ export default function ImportSignupsPage() {
                       </div>
                     </div>
 
+                    <AdultDeclaration
+                      id="import-manual-adult"
+                      label={STAFF_ADULT_DECLARATION_LABEL}
+                      checked={manualForm.adult}
+                      onCheckedChange={(adult) => setManualForm((f) => ({ ...f, adult }))}
+                    />
+
                     <Button
                       type="submit"
                       disabled={
                         manualLoading ||
                         !manualForm.name ||
                         !manualForm.email ||
-                        !manualBatchId
+                        !manualBatchId ||
+                        !manualForm.adult
                       }
                       className="w-full gap-2"
                     >

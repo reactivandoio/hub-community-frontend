@@ -180,6 +180,8 @@ export interface User {
   cpf?: string;
   /** ISO yyyy-mm-dd */
   date_of_birth?: string;
+  /** REA-36: the account ticked "Declaro que tenho 18 anos ou mais". */
+  adult_declaration?: boolean;
 }
 
 export interface SignUpInput {
@@ -190,6 +192,8 @@ export interface SignUpInput {
   phone?: string;
   /** "Quero receber novidades e convites de eventos por e-mail" (REA-29). Only recorded. */
   marketing_opt_in?: boolean;
+  /** REA-36: the "18 anos ou mais" checkbox; required by the BFF. */
+  adult_declaration?: boolean;
 }
 
 export interface SignInInput {
@@ -206,6 +210,7 @@ export interface SignInResponse {
     phone: string;
     cpf?: string | null;
     date_of_birth?: string | null;
+    adult_declaration?: boolean | null;
     id: string;
   };
 }
@@ -1031,4 +1036,57 @@ export interface EmailCampaignAudience {
   estimated_days: number | null;
   sending_enabled: boolean;
   redirect_to: string | null;
+}
+
+// ─── REA-36: age review (admin only) ───────────────────────────────
+
+export type AgeReviewKind = 'NO_BIRTH_DATE' | 'MINOR';
+export type AgeReviewStatus = 'dob_requested' | 'dob_blocked' | 'minor_blocked';
+
+export interface AgeReviewUser {
+  id: string;
+  username: string | null;
+  email: string | null;
+  name: string | null;
+  blocked: boolean;
+  createdAt: string | null;
+  dateOfBirth: string | null;
+  age: number | null;
+  adultDeclaredAt: string | null;
+  status: AgeReviewStatus | null;
+  requestedAt: string | null;
+  deadline: string | null;
+  blockedAt: string | null;
+}
+
+export interface AgeReviewPage {
+  items: AgeReviewUser[];
+  total: number;
+  page: number;
+  pageSize: number;
+  emailsLeftToday: number;
+}
+
+export interface AgeReviewSummary {
+  noBirthDate: number;
+  notRequested: number;
+  requested: number;
+  minors: number;
+  minorsBlocked: number;
+  emailsLeftToday: number;
+}
+
+export interface AgeReviewRequestBatch {
+  sent: number;
+  failed: number;
+  skipped: number;
+  emailsLeftToday: number;
+  results: { userId: string; outcome: string; message: string | null }[];
+}
+
+export interface AgeReviewBlockResult {
+  emailSent: boolean;
+  message: string;
+  emailsLeftToday: number;
+  user: AgeReviewUser;
 }

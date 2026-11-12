@@ -15,6 +15,7 @@ export type AdminNavIcon =
   | 'speakers'
   | 'voting'
   | 'users'
+  | 'age'
   | 'general'
   | 'schedule'
   | 'products'
@@ -55,7 +56,9 @@ const MAIN_ITEMS: AdminNavItem[] = [
   { label: 'Comunidades', href: '/admin/communities', icon: 'communities' },
   { label: 'Palestrantes', href: '/admin/speakers', icon: 'speakers' },
   { label: 'Votações', href: '/admin/voting-sessions', icon: 'voting' },
-  { label: 'Usuários', href: '/admin/usuarios', icon: 'users' },
+  { label: 'Usuários', href: '/admin/usuarios', icon: 'users', exact: true },
+  // REA-36: accounts without a date of birth and minors (admin only, under /admin/usuarios).
+  { label: 'Idade (18+)', href: '/admin/usuarios/idade', icon: 'age' },
 ];
 
 /** The general admin sidebar: a community-manager does not see the admin-only areas. */
@@ -220,6 +223,11 @@ export const adminBreadcrumbs = (
 
   if (area === 'voting-sessions') {
     crumbs.push({ label: item === 'new' ? 'Nova sessão' : 'Editar sessão', href: itemHref });
+    return crumbs;
+  }
+
+  if (area === 'usuarios' && item === 'idade') {
+    crumbs.push({ label: 'Idade (18+)', href: itemHref });
     return crumbs;
   }
 

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery } from '@apollo/client';
 import { AlertCircle, CheckCircle2, Loader2, Send } from 'lucide-react';
+import { AdultDeclaration } from '@/components/adult-declaration';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { GET_CERTIFICATE_REQUEST_FORM, SUBMIT_CERTIFICATE_REQUEST } from '@/lib/queries';
 import type { CertificateRequestFormResponse, SubmitCertificateRequestResponse } from '@/lib/types';
 import { formatCpf, isValidCpf, normalizeIdentifier } from '@/lib/certificate';
+import { ADULT_DECLARATION_REQUIRED, MINOR_MESSAGE, isAdult } from '@/lib/birth-date';
 
 function errorMessage(err: unknown): string {
   const graphQLErrors = (err as { graphQLErrors?: { message: string }[] } | undefined)?.graphQLErrors;
@@ -50,6 +52,8 @@ export default function SolicitarCertificadoPage() {
   const today = new Date().toISOString().slice(0, 10);
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
+  // REA-36: required "Declaro que tenho 18 anos ou mais".
+  const [adultDeclared, setAdultDeclared] = useState(false);
 
   const requestForm = data?.certificateRequestForm;
 
@@ -58,6 +62,14 @@ export default function SolicitarCertificadoPage() {
     setError('');
     if (!isValidCpf(form.cpf)) {
       setError('CPF inválido.');
+      return;
+    }
+    if (form.date_of_birth && !isAdult(form.date_of_birth)) {
+      setError(MINOR_MESSAGE);
+      return;
+    }
+    if (!adultDeclared) {
+      setError(ADULT_DECLARATION_REQUIRED);
       return;
     }
     try {
@@ -69,6 +81,7 @@ export default function SolicitarCertificadoPage() {
           email: form.email.trim(),
           phone: form.phone_number.replace(/\D/g, ''),
           date_of_birth: form.date_of_birth || null,
+          adult_declaration: true,
         },
       });
       if (res?.submitCertificateRequest?.ok) setSent(true);
@@ -206,6 +219,12 @@ export default function SolicitarCertificadoPage() {
                 maxLength={15}
               />
             </div>
+            <AdultDeclaration
+              id="certificate-request-adult"
+              checked={adultDeclared}
+              onCheckedChange={setAdultDeclared}
+              disabled={submitting}
+            />
             <Button type="submit" className="w-full h-12 text-lg font-medium" disabled={submitting}>
               {submitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Send className="mr-2 h-5 w-5" />}
               Enviar solicitação

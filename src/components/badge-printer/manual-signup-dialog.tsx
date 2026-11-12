@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import { Loader2, Printer, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 
+import { AdultDeclaration } from '@/components/adult-declaration';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -17,7 +18,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { activeBatchId } from '@/lib/active-batch';
-import { maskBirthDate, parseBirthDate } from '@/lib/birth-date';
+import {
+  ADULT_DECLARATION_REQUIRED, MINOR_MESSAGE, STAFF_ADULT_DECLARATION_LABEL, isAdult, maskBirthDate, parseBirthDate,
+} from '@/lib/birth-date';
 import { formatCpf } from '@/lib/certificate';
 import { cleanSignupPhone } from '@/lib/inline-signup';
 import { EVENT_BATCHES, MANUAL_SIGNUP } from '@/lib/queries';
@@ -31,9 +34,11 @@ interface Form {
   phone: string;
   cpf: string;
   birthDate: string;
+  /** REA-36: the person declared being 18+ (the staff ticks it). */
+  adult: boolean;
 }
 
-const EMPTY_FORM: Form = { name: '', email: '', phone: '', cpf: '', birthDate: '' };
+const EMPTY_FORM: Form = { name: '', email: '', phone: '', cpf: '', birthDate: '', adult: false };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Same rule as the public signup form (lib/inline-signup.ts).
@@ -84,13 +89,15 @@ export function ManualSignupDialog({ eventSlug, open, onOpenChange, onRegistered
     if (cpfDigits.length !== 11) return setError('Informe o CPF com 11 dígitos.');
     const dateOfBirth = parseBirthDate(form.birthDate);
     if (!dateOfBirth) return setError('Informe uma data de nascimento válida (DD/MM/AAAA).');
+    if (!isAdult(dateOfBirth)) return setError(MINOR_MESSAGE);
+    if (!form.adult) return setError(ADULT_DECLARATION_REQUIRED);
     if (!batchId) {
       return setError(loadingBatches ? 'Carregando o lote do evento, tente de novo.' : 'Este evento não tem lote ativo para inscrição.');
     }
 
     setBusy(true);
     try {
-      const input = { name: form.name.trim(), email, phone_number: phone, cpf: cpfDigits, date_of_birth: dateOfBirth };
+      const input = { name: form.name.trim(), email, phone_number: phone, cpf: cpfDigits, date_of_birth: dateOfBirth, adult_declaration: true };
       const { data } = await manualSignup({ variables: { eventSlug, batchId, input } });
       const result = data?.manualSignup;
       if (!result?.success || !result.signup) {
@@ -176,6 +183,13 @@ export function ManualSignupDialog({ eventSlug, open, onOpenChange, onRegistered
                 disabled={busy}
               />
             </div>
+            <AdultDeclaration
+              id="manual-adult"
+              label={STAFF_ADULT_DECLARATION_LABEL}
+              checked={form.adult}
+              onCheckedChange={(adult) => setForm((f) => ({ ...f, adult }))}
+              disabled={busy}
+            />
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
           <DialogFooter>

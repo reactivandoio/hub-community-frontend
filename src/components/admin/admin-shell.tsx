@@ -29,6 +29,7 @@ import {
   Ticket,
   User,
   Users,
+  UserX,
   Vote,
   type LucideIcon,
 } from 'lucide-react';
@@ -95,6 +96,7 @@ const ICONS: Record<AdminNavIcon, LucideIcon> = {
   speakers: Mic,
   voting: Vote,
   users: Users,
+  age: UserX,
   general: Settings2,
   schedule: ListOrdered,
   products: Ticket,

@@ -3,6 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import EventSignupPage from '../page';
 
+// REA-36: every signup form needs the "18 anos ou mais" box ticked.
+const tickAdult = () => {
+  const box = screen.queryByRole('checkbox', { name: /18 anos ou mais/ });
+  if (box && box.getAttribute('aria-checked') !== 'true') fireEvent.click(box);
+};
+
+
 const signupV2 = vi.fn();
 const signupLegacy = vi.fn();
 const signupGuest = vi.fn();
@@ -124,10 +131,12 @@ describe('EventSignupPage (REA-6)', () => {
 
   it('requires a valid CPF before calling the server', async () => {
     await goToConfirm();
+    tickAdult();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar Inscrição' }));
     expect(await screen.findByText('Informe seu CPF.')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '52998224724' } });
     expect(screen.getByLabelText('CPF')).toHaveValue('529.982.247-24');
+    tickAdult();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar Inscrição' }));
     expect(await screen.findByText('Informe um CPF válido.')).toBeInTheDocument();
     expect(signupV2).not.toHaveBeenCalled();
@@ -146,6 +155,7 @@ describe('EventSignupPage (REA-6)', () => {
     });
     await goToConfirm();
     fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '529.982.247-25' } });
+    tickAdult();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar Inscrição' }));
     expect(await screen.findByText('Passo Opa Pingou 5000')).toBeInTheDocument();
     expect(signupV2.mock.calls[0][0].variables).toMatchObject({
@@ -161,6 +171,7 @@ describe('EventSignupPage (REA-6)', () => {
     signupV2.mockResolvedValue({ data: { signupToEvent: { success: false, message: 'Informe um CPF válido.' } } });
     await goToConfirm();
     fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '529.982.247-25' } });
+    tickAdult();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar Inscrição' }));
     await waitFor(() => expect(screen.getByLabelText('CPF')).toHaveAttribute('aria-invalid', 'true'));
     expect(screen.getByText('Informe um CPF válido.')).toBeInTheDocument();
@@ -171,6 +182,7 @@ describe('EventSignupPage (REA-6)', () => {
     signupLegacy.mockResolvedValue({ data: { signupToEvent: { success: true, is_free: false, signup_id: '42', payment: { qr_code: 'x' } } } });
     await goToConfirm();
     expect(screen.queryByLabelText('CPF')).not.toBeInTheDocument();
+    tickAdult();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar Inscrição' }));
     await waitFor(() => expect(signupLegacy).toHaveBeenCalled());
     expect(signupLegacy.mock.calls[0][0].variables).not.toHaveProperty('cpf');
@@ -210,6 +222,7 @@ describe('EventSignupPage (REA-16 meia-entrada)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Continuar para pagamento' }));
     fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '529.982.247-25' } });
+    tickAdult();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar Inscrição' }));
     expect(await screen.findByText('Passo Opa Pingou 2500')).toBeInTheDocument();
     expect(signupV2.mock.calls[0][0].variables).toMatchObject({ is_student: true });
@@ -237,6 +250,7 @@ describe('EventSignupPage (REA-16 meia-entrada)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Continuar para pagamento' }));
     fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '529.982.247-25' } });
+    tickAdult();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar Inscrição' }));
     await waitFor(() => expect(signupV2).toHaveBeenCalled());
     // The server picks the larger discount again at signup: both go.
@@ -278,6 +292,7 @@ describe('EventSignupPage (REA-18 cupom pelo link)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Continuar para pagamento' }));
     fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '529.982.247-25' } });
+    tickAdult();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar Inscrição' }));
     await waitFor(() => expect(signupV2).toHaveBeenCalled());
     expect(signupV2.mock.calls[0][0].variables).toMatchObject({ coupon_code: 'PROMO10' });
@@ -306,6 +321,7 @@ describe('EventSignupPage (REA-18 cupom pelo link)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Continuar para pagamento' }));
     fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '529.982.247-25' } });
+    tickAdult();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar Inscrição' }));
     expect(await screen.findByText('Passo Opa Pingou 5000')).toBeInTheDocument();
     expect(signupV2.mock.calls[0][0].variables).not.toHaveProperty('coupon_code');
@@ -388,6 +404,7 @@ describe('EventSignupPage (REA-22 inscrição sem login)', () => {
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'ana@example.com' } });
     fireEvent.change(screen.getByLabelText('WhatsApp'), { target: { value: '+55 62 99999-0000' } });
     fireEvent.change(screen.getByLabelText('CPF'), { target: { value: cpf } });
+    tickAdult();
     fireEvent.click(screen.getByRole('button', { name: 'Inscrever-se' }));
   };
   const guestReturns = (signupToEvent: Record<string, unknown>) =>
@@ -436,12 +453,15 @@ describe('EventSignupPage (REA-22 inscrição sem login)', () => {
     try {
       guestReturns({ outcome: 'EXISTING_ACCOUNT', confirmation_sent_to: 'ana@example.com', is_free: true, signup_id: '42', payment: null });
       render(<EventSignupPage />);
-      fireEvent.click(await screen.findByRole('button', { name: 'Confirmar Inscrição' }));
+      await screen.findByRole('button', { name: 'Confirmar Inscrição' });
+      tickAdult();
+      fireEvent.click(screen.getByRole('button', { name: 'Confirmar Inscrição' }));
       fireEvent.change(screen.getByLabelText('Nome completo'), { target: { value: 'Ana Souza' } });
       fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'ana@example.com' } });
       fireEvent.change(screen.getByLabelText('WhatsApp'), { target: { value: '+55 62 99999-0000' } });
       fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '529.982.247-25' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Inscrever-se' }));
+      tickAdult();
+    fireEvent.click(screen.getByRole('button', { name: 'Inscrever-se' }));
       const notice = await screen.findByTestId('guest-notice');
       expect(notice).toHaveTextContent('Enviamos a confirmação para ana@example.com');
       expect(notice).toHaveTextContent('conclua seu cadastro');
@@ -499,5 +519,20 @@ describe('EventSignupPage (REA-22 inscrição sem login)', () => {
     paymentStatus = null;
     render(<EventSignupPage />);
     expect(await screen.findByText('Pagamento não encontrado')).toBeInTheDocument();
+  });
+});
+
+describe('EventSignupPage (REA-36)', () => {
+  it('does not sign up without "18 anos ou mais" and sends the declaration once ticked', async () => {
+    signupV2.mockResolvedValue({ data: { signupToEvent: { success: true, is_free: true, signup_id: '1', payment: null } } });
+    await goToConfirm();
+    fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '529.982.247-25' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar Inscrição' }));
+    expect(await screen.findByText('Confirme que você tem 18 anos ou mais.')).toBeInTheDocument();
+    expect(signupV2).not.toHaveBeenCalled();
+    tickAdult();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar Inscrição' }));
+    await vi.waitFor(() => expect(signupV2).toHaveBeenCalled());
+    expect(signupV2.mock.calls[0][0].variables).toMatchObject({ adult_declaration: true });
   });
 });

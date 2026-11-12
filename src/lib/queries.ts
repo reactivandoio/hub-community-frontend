@@ -281,6 +281,7 @@ export const SIGNUP_TO_EVENT = gql`
     $coupon_code: String
     $is_student: Boolean
     $phone_number: String
+    $adult_declaration: Boolean
   ) {
     signupToEvent(
       eventId: $eventId
@@ -290,6 +291,7 @@ export const SIGNUP_TO_EVENT = gql`
       coupon_code: $coupon_code
       is_student: $is_student
       phone_number: $phone_number
+      adult_declaration: $adult_declaration
     ) {
       success
       message
@@ -342,6 +344,7 @@ export const SIGNUP_TO_EVENT_V2 = gql`
     $coupon_code: String
     $is_student: Boolean
     $phone_number: String
+    $adult_declaration: Boolean
     $cpf: String
     $kind: String
   ) {
@@ -353,6 +356,7 @@ export const SIGNUP_TO_EVENT_V2 = gql`
       coupon_code: $coupon_code
       is_student: $is_student
       phone_number: $phone_number
+      adult_declaration: $adult_declaration
       cpf: $cpf
       kind: $kind
     ) {
@@ -387,6 +391,7 @@ export const SIGNUP_TO_EVENT_GUEST = gql`
     $coupon_code: String
     $is_student: Boolean
     $phone_number: String
+    $adult_declaration: Boolean
     $cpf: String
     $kind: String
   ) {
@@ -398,6 +403,7 @@ export const SIGNUP_TO_EVENT_GUEST = gql`
       coupon_code: $coupon_code
       is_student: $is_student
       phone_number: $phone_number
+      adult_declaration: $adult_declaration
       cpf: $cpf
       kind: $kind
     ) {
@@ -559,6 +565,7 @@ export const SIGN_IN = gql`
       phone
       cpf
       date_of_birth
+      adult_declaration
       id
     }
   }
@@ -575,6 +582,7 @@ export const ME = gql`
       phone
       cpf
       date_of_birth
+      adult_declaration
     }
   }
 `;
@@ -1224,6 +1232,7 @@ export const CREATE_ATTENDANCE = gql`
     $date_of_birth: String!
     $phone: String!
     $name: String!
+    $adult_declaration: Boolean
   ) {
     createAttendance(
       eventDocumentId: $eventDocumentId
@@ -1231,6 +1240,7 @@ export const CREATE_ATTENDANCE = gql`
       date_of_birth: $date_of_birth
       phone: $phone
       name: $name
+      adult_declaration: $adult_declaration
     ) {
       success
       message
@@ -1409,6 +1419,7 @@ export const REQUEST_CERTIFICATE = gql`
     $identifier: String!
     $email: String!
     $phone: String
+    $adult_declaration: Boolean
   ) {
     requestCertificate(
       eventId: $eventId
@@ -1416,6 +1427,7 @@ export const REQUEST_CERTIFICATE = gql`
       identifier: $identifier
       email: $email
       phone: $phone
+      adult_declaration: $adult_declaration
     ) {
       ...CertificateFields
     }
@@ -1538,6 +1550,7 @@ export const SUBMIT_CERTIFICATE_REQUEST = gql`
     $email: String!
     $phone: String!
     $date_of_birth: String
+    $adult_declaration: Boolean
   ) {
     submitCertificateRequest(
       slug: $slug
@@ -1546,6 +1559,7 @@ export const SUBMIT_CERTIFICATE_REQUEST = gql`
       email: $email
       phone: $phone
       date_of_birth: $date_of_birth
+      adult_declaration: $adult_declaration
     ) {
       ok
       category
@@ -1768,5 +1782,75 @@ export const UPDATE_EMAIL_CAMPAIGN_STATUS = gql`
 export const UNSUBSCRIBE_EMAIL = gql`
   mutation UnsubscribeEmail($token: String!) {
     unsubscribeEmail(token: $token)
+  }
+`;
+
+// ─── REA-36: age review (admin only) ───────────────────────────────
+
+const AGE_REVIEW_USER_FIELDS = `
+  id
+  username
+  email
+  name
+  blocked
+  createdAt
+  dateOfBirth
+  age
+  adultDeclaredAt
+  status
+  requestedAt
+  deadline
+  blockedAt
+`;
+
+export const ADMIN_AGE_REVIEW = gql`
+  query AdminAgeReview($kind: AgeReviewKind!, $status: String, $page: Int, $pageSize: Int) {
+    adminAgeReview(kind: $kind, status: $status, page: $page, pageSize: $pageSize) {
+      total
+      page
+      pageSize
+      emailsLeftToday
+      items {${AGE_REVIEW_USER_FIELDS}}
+    }
+  }
+`;
+
+export const ADMIN_AGE_REVIEW_SUMMARY = gql`
+  query AdminAgeReviewSummary {
+    adminAgeReviewSummary {
+      noBirthDate
+      notRequested
+      requested
+      minors
+      minorsBlocked
+      emailsLeftToday
+    }
+  }
+`;
+
+export const ADMIN_REQUEST_DATE_OF_BIRTH = gql`
+  mutation AdminRequestDateOfBirth($userIds: [ID!]!) {
+    adminRequestDateOfBirth(userIds: $userIds) {
+      sent
+      failed
+      skipped
+      emailsLeftToday
+      results {
+        userId
+        outcome
+        message
+      }
+    }
+  }
+`;
+
+export const ADMIN_BLOCK_MINOR = gql`
+  mutation AdminBlockMinor($userId: ID!) {
+    adminBlockMinor(userId: $userId) {
+      emailSent
+      message
+      emailsLeftToday
+      user {${AGE_REVIEW_USER_FIELDS}}
+    }
   }
 `;

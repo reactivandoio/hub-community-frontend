@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
 
+import { AdultDeclaration } from '@/components/adult-declaration';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -16,13 +17,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/auth-context';
 import { formatCpf, isValidCpf, normalizeIdentifier } from '@/lib/certificate';
+import { ADULT_DECLARATION_REQUIRED, MINOR_MESSAGE, isAdult } from '@/lib/birth-date';
 import { cleanSignupPhone, isValidPhone } from '@/lib/inline-signup';
 import { missingCertificateFields, type CertificateField } from '@/lib/profile-completeness';
 import { ME, UPDATE_PROFILE } from '@/lib/queries';
 import type { User } from '@/lib/types';
 
 interface MeData {
-  me: Pick<User, 'id' | 'username' | 'email' | 'name' | 'phone' | 'cpf' | 'date_of_birth'> | null;
+  me: Pick<User, 'id' | 'username' | 'email' | 'name' | 'phone' | 'cpf' | 'date_of_birth' | 'adult_declaration'> | null;
 }
 
 type Values = Record<CertificateField, string>;
@@ -42,6 +44,9 @@ function validate(values: Values, fields: CertificateField[]): Errors {
     const date = new Date(`${values.date_of_birth}T00:00:00`);
     if (!values.date_of_birth || Number.isNaN(date.getTime()) || date > new Date()) {
       errors.date_of_birth = 'Informe uma data de nascimento válida.';
+    } else if (!isAdult(values.date_of_birth)) {
+      // REA-36
+      errors.date_of_birth = MINOR_MESSAGE;
     }
   }
   if (fields.includes('phone') && !isValidPhone(values.phone)) {
@@ -63,6 +68,9 @@ export function CompleteProfileModal() {
   const [values, setValues] = useState<Values>(EMPTY);
   const [errors, setErrors] = useState<Errors>({});
   const [serverError, setServerError] = useState('');
+  // REA-36: accounts that never ticked "18 anos ou mais" tick it here.
+  const [adultDeclared, setAdultDeclared] = useState(false);
+  const [adultError, setAdultError] = useState<string | null>(null);
 
   const storedMissing = user ? missingCertificateFields(user) : [];
   const shouldCheck = isAuthenticated && !isLoading && !!user && storedMissing.length > 0;
@@ -79,6 +87,7 @@ export function CompleteProfileModal() {
         if (me.cpf) fresh.cpf = me.cpf;
         if (me.date_of_birth) fresh.date_of_birth = me.date_of_birth;
         if (me.phone) fresh.phone = me.phone;
+        if (me.adult_declaration) fresh.adult_declaration = true;
         if (Object.keys(fresh).length > 0) syncUser?.(fresh);
       }
       setCheckedFor(user?.email ?? null);
@@ -91,6 +100,7 @@ export function CompleteProfileModal() {
 
   const missing = checked && user ? missingCertificateFields(user) : [];
   const open = missing.length > 0;
+  const needsDeclaration = user?.adult_declaration !== true;
 
   const setValue = (field: CertificateField, value: string) => {
     setValues((prev) => ({ ...prev, [field]: value }));
@@ -102,13 +112,16 @@ export function CompleteProfileModal() {
     setServerError('');
     const nextErrors = validate(values, missing);
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    const declarationMissing = needsDeclaration && !adultDeclared;
+    setAdultError(declarationMissing ? ADULT_DECLARATION_REQUIRED : null);
+    if (Object.keys(nextErrors).length > 0 || declarationMissing) return;
 
     const input: Partial<User> = {};
     if (missing.includes('name')) input.name = values.name.trim();
     if (missing.includes('cpf')) input.cpf = normalizeIdentifier(values.cpf);
     if (missing.includes('date_of_birth')) input.date_of_birth = values.date_of_birth;
     if (missing.includes('phone')) input.phone = cleanSignupPhone(values.phone).trim();
+    if (needsDeclaration) input.adult_declaration = true;
 
     try {
       await updateProfile({ variables: { input } });
@@ -198,6 +211,16 @@ export function CompleteProfileModal() {
               />
               {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
             </div>
+          )}
+
+          {needsDeclaration && (
+            <AdultDeclaration
+              id="complete-profile-adult"
+              checked={adultDeclared}
+              onCheckedChange={(value) => { setAdultDeclared(value); setAdultError(null); }}
+              disabled={saving}
+              error={adultError}
+            />
           )}
 
           {serverError && <p className="text-sm text-destructive">{serverError}</p>}

@@ -118,7 +118,7 @@ export function AuthModal({ isOpen, onClose, onSignedIn, reason }: AuthModalProp
   // Sign Up Form
   const signUpForm = useForm<SignUpFormValues>({
     resolver: zodResolver(signUpSchema),
-    defaultValues: { email: '', name: '', password: '', username: '', phone: '', marketing_opt_in: false },
+    defaultValues: { email: '', name: '', password: '', username: '', phone: '', marketing_opt_in: false, adult_declaration: false },
   });
 
   // Reset Password Form
@@ -425,6 +425,29 @@ export function AuthModal({ isOpen, onClose, onSignedIn, reason }: AuthModalProp
                             <Eye className="h-4 w-4" />
                           )}
                         </button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* REA-36: required, never pre-checked; recorded with its date by the backend. */}
+                <FormField
+                  control={signUpForm.control}
+                  name="adult_declaration"
+                  render={({ field }) => (
+                    <FormItem className="space-y-1">
+                      <div className="flex flex-row items-start gap-3">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value === true}
+                            onCheckedChange={(checked) => field.onChange(checked === true)}
+                            aria-required="true"
+                          />
+                        </FormControl>
+                        <FormLabel className="text-sm font-normal leading-snug text-foreground">
+                          Declaro que tenho 18 anos ou mais. <span className="text-destructive" aria-hidden="true">*</span>
+                        </FormLabel>
                       </div>
                       <FormMessage />
                     </FormItem>

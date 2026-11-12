@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { maskBirthDate, parseBirthDate } from '../birth-date';
+import { ageOn, isAdult, maskBirthDate, parseBirthDate } from '../birth-date';
 
 const NOW = new Date('2026-10-08T12:00:00Z');
 
@@ -27,5 +27,23 @@ describe('parseBirthDate', () => {
     expect(parseBirthDate('01/01/1899', NOW)).toBeNull();
     expect(parseBirthDate('07/04/90', NOW)).toBeNull();
     expect(parseBirthDate('', NOW)).toBeNull();
+  });
+});
+
+describe('ageOn / isAdult (REA-36)', () => {
+  const noon = new Date('2026-11-12T15:00:00.000Z');
+  const lateNight = new Date('2026-11-12T02:00:00.000Z'); // still the 11th in São Paulo
+
+  it('turns 18 on the birthday, in São Paulo', () => {
+    expect(ageOn('2008-11-12', noon)).toBe(18);
+    expect(ageOn('2008-11-13', noon)).toBe(17);
+    expect(ageOn('2008-11-12', lateNight)).toBe(17);
+  });
+
+  it('isAdult is false for minors and for anything that is not a date', () => {
+    expect(isAdult('1990-01-01', noon)).toBe(true);
+    expect(isAdult('2010-01-01', noon)).toBe(false);
+    expect(isAdult('', noon)).toBe(false);
+    expect(isAdult(undefined, noon)).toBe(false);
   });
 });

@@ -44,6 +44,7 @@ const submitMock = (dateOfBirth: string | null): MockedResponse => ({
       email: 'ana@x.io',
       phone: '62999990000',
       date_of_birth: dateOfBirth,
+      adult_declaration: true,
     },
   },
   result: {
@@ -89,9 +90,20 @@ describe('página pública de solicitação de certificado', () => {
 
     await screen.findByLabelText('Data de nascimento');
     await fillForm();
+    await userEvent.click(screen.getByRole('checkbox', { name: /18 anos ou mais/ }));
     await userEvent.click(screen.getByRole('button', { name: /Enviar solicitação/ }));
 
     expect(await screen.findByText('Solicitação enviada')).toBeInTheDocument();
+  });
+
+  it('REA-36: não envia sem a declaração de 18 anos ou mais', async () => {
+    renderIt([formMock]);
+
+    await screen.findByLabelText('Data de nascimento');
+    await fillForm();
+    await userEvent.click(screen.getByRole('button', { name: /Enviar solicitação/ }));
+
+    expect(await screen.findByText('Confirme que você tem 18 anos ou mais.')).toBeInTheDocument();
   });
 
   it('barra um CPF inválido antes de chamar o servidor', async () => {

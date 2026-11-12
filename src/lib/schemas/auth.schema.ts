@@ -42,6 +42,10 @@ export const signUpSchema = z.object({
   phone: z.string().optional(),
   // REA-29: e-mail marketing opt-in, optional and off by default.
   marketing_opt_in: z.boolean().optional(),
+  // REA-36: required "Declaro que tenho 18 anos ou mais".
+  adult_declaration: z.boolean().refine((value) => value === true, {
+    message: 'Confirme que você tem 18 anos ou mais.',
+  }),
 });
 
 export type SignUpFormValues = z.infer<typeof signUpSchema>;
