@@ -12,13 +12,15 @@ const toast = vi.fn();
 const users = [
   { id: '1', username: 'root', email: 'root@x.io', name: 'Root', blocked: false, role: { type: 'admin', name: 'Admin' }, communities: [] },
   { id: '5', username: 'bia', email: 'bia@x.io', name: 'Bia', blocked: false, role: { type: 'authenticated', name: 'Usuário' }, communities: [{ id: 'c-1', title: 'Comunidade Teste' }] },
+  // REA-48: an event-manager of one event.
+  { id: '7', username: 'eva', email: 'eva@x.io', name: 'Eva', blocked: false, role: { type: 'event-manager', name: 'Event Manager' }, communities: [], events: [{ id: 'ev-1', title: 'Meetup' }] },
 ];
 const roles = [
   { type: 'authenticated', name: 'Usuário' },
   { type: 'community-manager', name: 'Community Manager' },
   { type: 'admin', name: 'Admin' },
 ];
-const usersResult = { data: { adminUsers: { items: users, total: 2, page: 1, pageSize: 20 } }, loading: false, refetch };
+const usersResult = { data: { adminUsers: { items: users, total: 3, page: 1, pageSize: 20 } }, loading: false, refetch };
 const rolesResult = { data: { adminRoles: roles }, loading: false };
 const historyResult = {
   data: {
@@ -109,5 +111,20 @@ describe('UsersAdminPage', () => {
     await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Confirmar' }));
     await waitFor(() =>
       expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'destructive', description: 'O sistema precisa de pelo menos um admin ativo.' })));
+  });
+});
+
+// REA-48: communities and events of each user, and when the role does not match them.
+describe('UsuariosPage — comunidades e eventos (REA-48)', () => {
+  it('shows the events a user manages and warns when the role does not open what they are linked to', async () => {
+    const { default: Page } = await import('../page');
+    render(<Page />);
+    expect(screen.getByText('Comunidades e eventos')).toBeInTheDocument();
+    expect(screen.getByText('Meetup')).toBeInTheDocument();
+    // Bia is listed as organizer but is a plain user.
+    expect(screen.getByTestId('access-warning-5')).toHaveTextContent('mude para Community Manager');
+    // Eva manages an event as Event Manager: fine.
+    expect(screen.queryByTestId('access-warning-7')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('access-warning-1')).not.toBeInTheDocument();
   });
 });

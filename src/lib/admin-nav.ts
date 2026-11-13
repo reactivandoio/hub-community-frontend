@@ -5,7 +5,7 @@
  * The sidebar has two contexts: the general admin, and one event (`/admin/events/<id>` and
  * below), whose items are the sections of that event. Each item has its own URL.
  */
-import { isAdminOnlyPath, type AdminAccess } from '@/lib/admin-access';
+import { isAdminOnlyPath, isOnlyEventManager, type AdminAccess } from '@/lib/admin-access';
 import { raffleUrl } from '@/lib/raffle';
 
 export type AdminNavIcon =
@@ -63,8 +63,14 @@ const MAIN_ITEMS: AdminNavItem[] = [
 ];
 
 /** The general admin sidebar: a community-manager does not see the admin-only areas. */
-export const mainNavItems = (access: Pick<AdminAccess, 'isAdmin'>): AdminNavItem[] =>
-  access.isAdmin ? MAIN_ITEMS : MAIN_ITEMS.filter((item) => !isAdminOnlyPath(item.href));
+export const mainNavItems = (
+  access: Pick<AdminAccess, 'isAdmin'> & Partial<Pick<AdminAccess, 'isCommunityManager' | 'isEventManager'>>
+): AdminNavItem[] => {
+  if (access.isAdmin) return MAIN_ITEMS;
+  const items = MAIN_ITEMS.filter((item) => !isAdminOnlyPath(item.href));
+  // REA-48: an event-manager has no community to manage.
+  return isOnlyEventManager(access) ? items.filter((item) => item.href !== '/admin/communities') : items;
+};
 
 /** The event id (or slug) when the path is inside one event; null elsewhere, `new` included. */
 export const eventIdFromPath = (pathname: string | null | undefined): string | null => {

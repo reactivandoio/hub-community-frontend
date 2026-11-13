@@ -97,6 +97,7 @@ export function AdminGuard({
     error: !!error,
     access: data?.adminAccess,
     requireAdmin: requireAdmin || isAdminOnlyPath(pathname),
+    pathname,
   });
 
   // A saved token the BFF no longer accepts (expired, revoked): drop it and ask for a login.
@@ -123,7 +124,7 @@ export function AdminGuard({
       return (
         <Blocked
           title="Sem acesso"
-          text="Sua conta não tem permissão para esta área. Se você organiza uma comunidade, peça a um admin do Hub para liberar o seu acesso."
+          text="Sua conta não tem permissão para esta área. Se você organiza uma comunidade ou gere um evento, peça a quem organiza para liberar o seu acesso."
         />
       );
     case 'error':

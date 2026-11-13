@@ -1583,8 +1583,14 @@ export const ADMIN_ACCESS = gql`
       role
       isAdmin
       isCommunityManager
+      isEventManager
       canAccessAdmin
       communities {
+        id
+        title
+        slug
+      }
+      events {
         id
         title
         slug
@@ -1610,6 +1616,10 @@ export const ADMIN_USERS = gql`
           name
         }
         communities {
+          id
+          title
+        }
+        events {
           id
           title
         }
@@ -1900,6 +1910,116 @@ export const UPSERT_SHARE_ART_CONFIG = gql`
   mutation UpsertShareArtConfig($eventId: String!, $data: ShareArtConfigInput!) {
     upsertShareArtConfig(eventId: $eventId, data: $data) {
       ...ShareArtConfigFields
+    }
+  }
+`;
+
+// ─── REA-48: organizers of a community and managers of an event, by invite ─────────────────
+const MANAGEMENT_FIELDS = gql`
+  fragment ManagementPersonFields on ManagementPerson {
+    id
+    name
+    email
+  }
+  fragment ManagementInviteFields on ManagementInvite {
+    id
+    kind
+    email
+    status
+    expiresAt
+    invitedByEmail
+    createdAt
+  }
+`;
+
+export const COMMUNITY_ORGANIZERS = gql`
+  ${MANAGEMENT_FIELDS}
+  query CommunityOrganizers($communityId: String!) {
+    communityOrganizers(communityId: $communityId) {
+      organizers {
+        ...ManagementPersonFields
+      }
+      invites {
+        ...ManagementInviteFields
+      }
+    }
+  }
+`;
+
+export const EVENT_MANAGERS = gql`
+  ${MANAGEMENT_FIELDS}
+  query EventManagers($eventId: String!) {
+    eventManagers(eventId: $eventId) {
+      canManage
+      managers {
+        ...ManagementPersonFields
+      }
+      invites {
+        ...ManagementInviteFields
+      }
+    }
+  }
+`;
+
+export const INVITE_COMMUNITY_ORGANIZER = gql`
+  mutation InviteCommunityOrganizer($communityId: String!, $email: String!) {
+    inviteCommunityOrganizer(communityId: $communityId, email: $email) {
+      id
+      email
+    }
+  }
+`;
+
+export const REMOVE_COMMUNITY_ORGANIZER = gql`
+  mutation RemoveCommunityOrganizer($communityId: String!, $userId: ID!) {
+    removeCommunityOrganizer(communityId: $communityId, userId: $userId)
+  }
+`;
+
+export const INVITE_EVENT_MANAGER = gql`
+  mutation InviteEventManager($eventId: String!, $email: String!) {
+    inviteEventManager(eventId: $eventId, email: $email) {
+      id
+      email
+    }
+  }
+`;
+
+export const REMOVE_EVENT_MANAGER = gql`
+  mutation RemoveEventManager($eventId: String!, $userId: ID!) {
+    removeEventManager(eventId: $eventId, userId: $userId)
+  }
+`;
+
+export const REVOKE_MANAGEMENT_INVITE = gql`
+  mutation RevokeManagementInvite($id: ID!) {
+    revokeManagementInvite(id: $id)
+  }
+`;
+
+export const MANAGEMENT_INVITE = gql`
+  query ManagementInvite($token: String!) {
+    managementInvite(token: $token) {
+      kind
+      status
+      maskedEmail
+      communityTitle
+      eventTitle
+      expiresAt
+    }
+  }
+`;
+
+export const ACCEPT_MANAGEMENT_INVITE = gql`
+  mutation AcceptManagementInvite($token: String!) {
+    acceptManagementInvite(token: $token) {
+      kind
+      role
+      communityId
+      communityTitle
+      eventId
+      eventSlug
+      eventTitle
     }
   }
 `;

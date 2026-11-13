@@ -74,7 +74,7 @@ src/
 
 - **Admin access (REA-10)** — `/admin`, `/badge-printer`, `/checkin` and `/sorteio` have a layout with
   `AdminGuard` (`components/admin/admin-guard.tsx`): signed in (else "Entre para continuar" + login modal on the same URL, REA-25) with the
-  `admin` or `community-manager` role, read from the BFF `adminAccess` query. Admin-only paths
+  `admin`, `community-manager` or `event-manager` (REA-48) role, read from the BFF `adminAccess` query. Admin-only paths
   (`ADMIN_ONLY_PATHS` in `lib/admin-access.ts`: usuários, palestrantes, votações) refuse a
   community-manager, and lists are scoped with `visibleEvents` / `visibleCommunities`. Pages read the
   access with `useAdminAccess()`. This only shapes the UI: the BFF checks the role on every operation.
@@ -207,6 +207,26 @@ src/
   feed is now **4:5 (1080×1350)** everywhere (default template 360×450, crop, export, "Feed (4:5)"); a
   feed background saved in 1:1 comes back as null with `retired_formats: ['feed']` — default art in
   that format and a notice in the admin until a new one is sent.
+
+- **Organizadores, gestores e convites (REA-48)** — roles: `admin`, `community-manager` (its
+  communities and their events), **`event-manager`** (only the events it manages) and `authenticated`.
+  A role alone grants nothing: a community-manager needs to be in `community.organizers`, an
+  event-manager in `event.managers`. `adminAccess` brings `isEventManager` and `events` (the events
+  it manages); `lib/admin-access.ts` keeps an event-manager (`isOnlyEventManager`) to them —
+  `eventManagerMayOpen`: no `/admin/communities`, no `/admin/events/new`, no other event (by id or
+  slug) — `visibleEvents` lists its events, `mainNavItems` drops Comunidades, and the events list
+  hides "Novo Evento" and "Excluir". Invites are e-mails with a link `/convite?t=` (7 days, used
+  once, only for the invited e-mail; the BFF keeps just the token's hash):
+  `components/admin/management-people.tsx` — `CommunityOrganizersDialog` (button "Organizadores"
+  per row of `/admin/communities`, admin only) and `EventManagersCard` (section "Gestores" under the
+  event form, Geral; owners invite/remove, managers only see the list). The invite becomes access on
+  the next login by code of that e-mail (the BFF accepts pending invites in `verifyLoginCode`) or on
+  `/convite` already logged in (`ACCEPT_MANAGEMENT_INVITE`; another account gets "foi enviado para
+  m***@…", with "Entrar com outro e-mail"), and the person goes to the event (`inviteDestination`,
+  `lib/management-invite.ts`). Accepting raises the role (community-manager / event-manager) and never
+  lowers it; removing someone never changes their role — `/admin/usuarios` shows "Comunidades e
+  eventos" per user and a warning when role and links do not match (`accessMismatch`,
+  `lib/access-links.ts`); the role can be picked there too (Event Manager included).
 
 ### Provider Hierarchy (layout.tsx)
 FirebaseProvider → ApolloProvider → AuthProvider → LoginPromptProvider → LogoutModalWrapper → AgendaProvider → FilterProvider → ThemeProvider → children

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery } from '@apollo/client';
-import { ChevronLeft, ChevronRight, History, Search, Users } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, ChevronRight, History, Search, Users } from 'lucide-react';
 import { useState } from 'react';
 
 import { AdminPage, AdminPageHeader } from '@/components/admin/admin-page';
@@ -39,6 +39,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useToast } from '@/hooks/use-toast';
 import { roleLabel } from '@/lib/admin-access';
+import { accessMismatch } from '@/lib/access-links';
 import { ADMIN_ROLES, ADMIN_USERS, ROLE_CHANGES, SET_USER_ROLE } from '@/lib/queries';
 
 // Admin only (ADMIN_ONLY_PATHS in lib/admin-access); the BFF checks it again on every call,
@@ -55,6 +56,8 @@ interface AdminUserRow {
   blocked: boolean;
   role: { type: string; name: string } | null;
   communities: { id: string; title: string | null }[];
+  /** REA-48: events the user manages. */
+  events?: { id: string; title: string | null }[];
 }
 
 interface RoleChangeRow {
@@ -76,7 +79,10 @@ const formatDate = (value: string | null) =>
   value ? new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
 
 const roleVariant = (type: string | undefined) =>
-  type === 'admin' ? 'default' : type === 'community-manager' ? 'secondary' : 'outline';
+  type === 'admin' ? 'default' : type === 'community-manager' || type === 'event-manager' ? 'secondary' : 'outline';
+
+const titles = (items: { title: string | null }[] | undefined) =>
+  (items || []).map((item) => item.title).filter(Boolean).join(', ');
 
 function Pager({
   page,
@@ -287,7 +293,7 @@ export default function UsersAdminPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Usuário</TableHead>
-                      <TableHead>Organiza</TableHead>
+                      <TableHead>Comunidades e eventos</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
@@ -308,9 +314,36 @@ export default function UsersAdminPage() {
                           {row.blocked && <Badge variant="destructive">Bloqueado</Badge>}
                         </TableCell>
                         <TableCell className="text-sm">
-                          {row.communities.length
-                            ? row.communities.map((c) => c.title).filter(Boolean).join(', ')
-                            : '—'}
+                          {/* REA-48: the communities it organizes and the events it manages. */}
+                          {row.communities.length > 0 && (
+                            <div>
+                              <span className="text-muted-foreground">Comunidades: </span>
+                              {titles(row.communities)}
+                            </div>
+                          )}
+                          {(row.events || []).length > 0 && (
+                            <div>
+                              <span className="text-muted-foreground">Eventos: </span>
+                              {titles(row.events)}
+                            </div>
+                          )}
+                          {row.communities.length === 0 && (row.events || []).length === 0 && '—'}
+                          {(() => {
+                            const warning = accessMismatch(
+                              row.role?.type,
+                              row.communities.length,
+                              (row.events || []).length,
+                            );
+                            return warning ? (
+                              <p
+                                className="mt-1 flex items-start gap-1 text-xs text-amber-600 dark:text-amber-400"
+                                data-testid={`access-warning-${row.id}`}
+                              >
+                                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                {warning}
+                              </p>
+                            ) : null;
+                          })()}
                         </TableCell>
                         <TableCell>
                           <Select
@@ -385,6 +418,9 @@ export default function UsersAdminPage() {
                 {pending?.roleType === 'community-manager' &&
                   pending.user.communities.length === 0 &&
                   ' Atenção: este usuário não organiza nenhuma comunidade, então não verá nada no admin até ser incluído como organizador.'}
+                {pending?.roleType === 'event-manager' &&
+                  (pending.user.events || []).length === 0 &&
+                  ' Atenção: este usuário não gere nenhum evento, então não verá nada no admin até ser convidado como gestor de um evento.'}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

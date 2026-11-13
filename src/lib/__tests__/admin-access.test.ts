@@ -78,3 +78,75 @@ describe('scoping', () => {
     expect(visibleEvents(MANAGER, events).map((e) => e.id)).toEqual(['e1']);
   });
 });
+
+// ─── REA-48: event managers ─────────────────────────────────────────────────────────────────
+import {
+  adminGate as gate48,
+  eventManagerMayOpen,
+  isOnlyEventManager,
+  managesEvent,
+  roleLabel as roleLabel48,
+  visibleEvents as visibleEvents48,
+} from '../admin-access';
+import { mainNavItems } from '../admin-nav';
+
+describe('event managers (REA-48)', () => {
+  const EVA: AdminAccess = {
+    role: 'event-manager',
+    isAdmin: false,
+    isCommunityManager: false,
+    isEventManager: true,
+    canAccessAdmin: true,
+    communities: [],
+    events: [{ id: 'ev-1', title: 'Meetup', slug: 'meetup' }],
+  };
+  const allow = (pathname: string, access = EVA) =>
+    gate48({ isHydrated: true, isAuthenticated: true, loading: false, error: false, access, requireAdmin: false, pathname }).status;
+
+  it('is only an event manager when it has no higher role', () => {
+    expect(isOnlyEventManager(EVA)).toBe(true);
+    expect(isOnlyEventManager({ ...EVA, isCommunityManager: true })).toBe(false);
+    expect(isOnlyEventManager({ ...EVA, isAdmin: true })).toBe(false);
+  });
+
+  it('opens its events (by id or slug), the list and the dashboard', () => {
+    expect(allow('/admin/events/ev-1')).toBe('allowed');
+    expect(allow('/admin/events/meetup/arte')).toBe('allowed');
+    expect(allow('/admin/events')).toBe('allowed');
+    expect(allow('/admin')).toBe('allowed');
+    expect(managesEvent(EVA, 'meetup')).toBe(true);
+  });
+
+  it('keeps it out of other events, of communities and of a new event', () => {
+    expect(allow('/admin/events/ev-2')).toBe('forbidden');
+    expect(allow('/admin/communities')).toBe('forbidden');
+    expect(allow('/admin/events/new')).toBe('forbidden');
+    expect(eventManagerMayOpen(EVA, '/admin/events/ev-2/analytics')).toBe(false);
+  });
+
+  it('does not restrict a community-manager that also manages an event', () => {
+    const lia = { ...EVA, role: 'community-manager', isCommunityManager: true };
+    expect(allow('/admin/communities', lia)).toBe('allowed');
+    expect(allow('/admin/events/ev-2', lia)).toBe('allowed');
+  });
+
+  it('lists the events it manages, plus those of its communities', () => {
+    const events = [
+      { id: 'ev-1', communities: [] },
+      { id: 'ev-2', communities: [{ id: 'c-9' }] },
+      { id: 'ev-3', communities: [{ id: 'c-1' }] },
+    ];
+    expect(visibleEvents48(EVA, events).map(e => e.id)).toEqual(['ev-1']);
+    const lia = { ...EVA, isCommunityManager: true, communities: [{ id: 'c-1' }] };
+    expect(visibleEvents48(lia, events).map(e => e.id)).toEqual(['ev-1', 'ev-3']);
+  });
+
+  it('has no Comunidades in its menu', () => {
+    expect(mainNavItems(EVA).map(item => item.href)).not.toContain('/admin/communities');
+    expect(mainNavItems({ isAdmin: false, isCommunityManager: true }).map(item => item.href)).toContain('/admin/communities');
+  });
+
+  it('is called Event Manager', () => {
+    expect(roleLabel48('event-manager')).toBe('Event Manager');
+  });
+});

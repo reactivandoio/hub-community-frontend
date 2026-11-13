@@ -12,6 +12,7 @@ import {
   Upload,
   Users,
   X,
+  UserCog,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -41,6 +42,7 @@ import {
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { visibleCommunities } from '@/lib/admin-access';
+import { CommunityOrganizersDialog } from '@/components/admin/management-people';
 import {
   CREATE_COMMUNITY,
   DELETE_COMMUNITY,
@@ -55,6 +57,8 @@ function CommunitiesContent() {
   const searchParams = useSearchParams();
   const [search, setSearch] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  // REA-48: the community whose organizers are open (admin only).
+  const [organizersOf, setOrganizersOf] = useState<{ id: string; title?: string | null } | null>(null);
   const [creating, setCreating] = useState(false);
 
   // Auto-open create dialog when ?new=true is in URL
@@ -326,6 +330,17 @@ function CommunitiesContent() {
                             <ExternalLink className="h-4 w-4" />
                           </Link>
                         </Button>
+                        {access.isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Organizadores"
+                            aria-label={`Organizadores de ${community.title}`}
+                            onClick={() => setOrganizersOf({ id: community.id, title: community.title })}
+                          >
+                            <UserCog className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -344,6 +359,11 @@ function CommunitiesContent() {
           </Table>
         </div>
       </AdminPage>
+
+      <CommunityOrganizersDialog
+        community={organizersOf}
+        onOpenChange={open => !open && setOrganizersOf(null)}
+      />
 
       {/* Create Community Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
