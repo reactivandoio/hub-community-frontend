@@ -32,7 +32,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { visibleEvents } from '@/lib/admin-access';
+import { isOnlyEventManager, visibleEvents } from '@/lib/admin-access';
 import { bulkEmailToast } from '@/lib/bulk-email';
 import { DELETE_EVENT, GET_EVENTS, SEND_IMPORTED_SIGNUP_CONFIRMATIONS } from '@/lib/queries';
 import {
@@ -121,14 +121,21 @@ export default function EventsAdminPage() {
     <AdminPage>
       <AdminPageHeader
         title="Eventos"
-        description="Crie, edite e gerencie os eventos da comunidade."
+        description={
+          isOnlyEventManager(access)
+            ? 'Os eventos que você gere.'
+            : 'Crie, edite e gerencie os eventos da comunidade.'
+        }
         actions={
-          <Button size="sm" asChild>
-            <Link href="/admin/events/new">
-              <Plus className="mr-2 h-4 w-4" />
-              Novo Evento
-            </Link>
-          </Button>
+          // REA-48: an event-manager creates no event.
+          isOnlyEventManager(access) ? undefined : (
+            <Button size="sm" asChild>
+              <Link href="/admin/events/new">
+                <Plus className="mr-2 h-4 w-4" />
+                Novo Evento
+              </Link>
+            </Button>
+          )
         }
       />
 
@@ -217,17 +224,20 @@ export default function EventsAdminPage() {
                           <Pencil className="h-4 w-4" />
                         </Button>
                       </Link>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-red-500 hover:text-red-600"
-                        title="Excluir"
-                        onClick={() =>
-                          event.documentId && handleDelete(event.documentId)
-                        }
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {/* REA-48: the event's managers do not delete it (the BFF refuses too). */}
+                      {!isOnlyEventManager(access) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-500 hover:text-red-600"
+                          title="Excluir"
+                          onClick={() =>
+                            event.documentId && handleDelete(event.documentId)
+                          }
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

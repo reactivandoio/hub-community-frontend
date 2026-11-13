@@ -1,5 +1,6 @@
 'use client';
 
+import { EventManagersCard } from '@/components/admin/management-people';
 import { EventForm } from '@/components/admin/event-form';
 import { useUnsavedChanges } from '@/components/admin/unsaved-guard';
 import { usePaymentsV2 } from '@/hooks/use-payments-v2';
@@ -238,6 +239,11 @@ export function EventEditor() {
           />
         )}
       </div>
+
+      {/* REA-48: who manages only this event (outside the form: each action is saved at once). */}
+      {section === 'general' && data?.eventBySlugOrId?.id && (
+        <EventManagersCard eventId={data.eventBySlugOrId.id} />
+      )}
     </AdminPage>
     </FadeIn>
   );

@@ -15,6 +15,10 @@ import type { EventOpaPingouAccount, OpaPingouConnection } from '@/lib/types';
 const toast = vi.fn();
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
 
+// REA-48: who is looking (null = outside the admin guard, as before).
+let adminAccess: any = null;
+vi.mock('@/components/admin/admin-guard', () => ({ useOptionalAdminAccess: () => adminAccess }));
+
 const KEY = `opk_live_${'k'.repeat(39)}wxyz`;
 
 const conn = (over: Partial<OpaPingouConnection> = {}): OpaPingouConnection => ({
@@ -194,5 +198,37 @@ describe('OpaPingouAccountCard: evento novo e estado da conta (REA-12)', () => {
       </MockedProvider>,
     );
     await waitFor(() => expect(onAccountChange).toHaveBeenCalledWith(false));
+  });
+});
+
+// REA-48: the account is where the ticket money goes — a manager of the event only sees it.
+describe('OpaPingouAccountCard — gestor do evento (REA-48)', () => {
+  const EVA = {
+    role: 'event-manager', isAdmin: false, isCommunityManager: false, isEventManager: true,
+    canAccessAdmin: true, communities: [], events: [{ id: 'ev1' }],
+  };
+
+  it('mostra a conta, sem trocar, remover nem conectar', async () => {
+    adminAccess = EVA;
+    try {
+      renderCard([load(account({ connection: conn() }))]);
+      expect(await screen.findByText(/Comunidade A LTDA/)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Trocar conta' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Remover' })).not.toBeInTheDocument();
+      expect(screen.getByText(/Só o admin e os organizadores da comunidade mudam a conta/)).toBeInTheDocument();
+    } finally {
+      adminAccess = null;
+    }
+  });
+
+  it('sem conta: não oferece o campo da chave', async () => {
+    adminAccess = EVA;
+    try {
+      renderCard([load(account())]);
+      expect(await screen.findByText(/Sem conta conectada/)).toBeInTheDocument();
+      expect(screen.queryByLabelText('Chave de API do Opa Pingou')).not.toBeInTheDocument();
+    } finally {
+      adminAccess = null;
+    }
   });
 });
