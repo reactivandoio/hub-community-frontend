@@ -116,7 +116,7 @@ function EventInfo({
   const details = (
     <div className={cn('flex min-w-0 flex-col', compact ? 'gap-1' : 'gap-0.5')}>
       <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-300">
-        Me inscrevi no
+        {event.headline ?? 'Me inscrevi no'}
       </span>
       <span
         className={cn(

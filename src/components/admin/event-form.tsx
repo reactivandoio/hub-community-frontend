@@ -49,6 +49,7 @@ import {
   Loader2,
   MapPin,
   Plus,
+  Share2,
   Trash2,
   Upload,
   User as UserIcon,
@@ -263,6 +264,7 @@ export function EventForm({
       is_online: false,
       call_link: '',
       unlisted: false,
+      share_art_open: false,
       description: [],
       location: undefined,
       communityId: undefined,
@@ -456,7 +458,7 @@ export function EventForm({
     <Form {...form}>
       <form id={EVENT_FORM_ID} onSubmit={form.handleSubmit(handleFormSubmit, (errors) => {
           // Auto-navigate to the tab that contains the first error
-          const generalFields = ['title', 'slug', 'start_date', 'end_date', 'max_slots', 'description', 'location', 'communityId', 'is_online', 'call_link', 'unlisted', 'images'];
+          const generalFields = ['title', 'slug', 'start_date', 'end_date', 'max_slots', 'description', 'location', 'communityId', 'is_online', 'call_link', 'unlisted', 'share_art_open', 'images'];
           const scheduleFields = ['talks'];
           const productFields = ['products'];
           const errorKeys = Object.keys(errors);
@@ -681,6 +683,41 @@ export function EventForm({
                     <FormItem>
                       <FormControl>
                         <Switch
+                          checked={field.value ?? false}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            {/* REA-45: the "eu vou" art (/events/<slug>/arte) also for people who are not signed up. */}
+            <div className="space-y-4 rounded-lg border p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-0.5">
+                  <Label
+                    htmlFor="share-art-open"
+                    className="text-base font-semibold flex items-center gap-2"
+                  >
+                    <Share2 className="h-4 w-4" />
+                    Arte &quot;Eu vou&quot; para quem não está inscrito
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Qualquer pessoa com o link do evento gera a arte, sem
+                    precisar de inscrição nem de conta. Desligada, só os
+                    inscritos geram.
+                  </p>
+                </div>
+                <FormField
+                  control={form.control}
+                  name="share_art_open"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Switch
+                          id="share-art-open"
                           checked={field.value ?? false}
                           onCheckedChange={field.onChange}
                         />

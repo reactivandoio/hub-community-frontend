@@ -22,6 +22,8 @@ export const createEventSchema = z.object({
   is_online: z.boolean().optional(),
   call_link: z.string().optional(),
   unlisted: z.boolean().optional(),
+  // REA-45: the "eu vou" art also for people who are not signed up.
+  share_art_open: z.boolean().optional(),
   description: z.any().optional(),
   location: z.any().optional(),
   images: z.array(z.any()).optional(),

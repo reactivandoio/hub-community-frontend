@@ -102,6 +102,7 @@ export function EventEditor() {
         is_online: event.is_online || false,
         call_link: event.call_link || '',
         unlisted: event.unlisted || false,
+        share_art_open: event.share_art_open || false,
         description: event.description,
         communityId: event.communities?.[0]?.id, // Get the first community ID if available
         location: event.location,
@@ -131,6 +132,7 @@ export function EventEditor() {
         is_online: formData.is_online || false,
         call_link: formData.call_link || '',
         unlisted: formData.unlisted || false,
+        share_art_open: formData.share_art_open || false,
         description: formData.description,
         images: formData.images,
         location: formData.location?.id || formData.location, // Send ID string

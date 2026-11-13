@@ -104,6 +104,8 @@ export interface Event {
   call_link?: string;
   /** Hidden from the public listings; still reachable by its direct link. */
   unlisted?: boolean;
+  /** REA-45: anyone may generate the "eu vou" art, not only the signups. */
+  share_art_open?: boolean;
   communities: {
     id: string;
     title: string;
@@ -327,6 +329,8 @@ export interface EventInput {
   is_online?: boolean;
   call_link?: string;
   unlisted?: boolean;
+  /** REA-45: anyone may generate the "eu vou" art, not only the signups. */
+  share_art_open?: boolean;
   products?: string[]; // IDs of products
   communities?: string[]; // IDs of communities
   location?: string; // ID of location

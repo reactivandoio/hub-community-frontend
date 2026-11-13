@@ -38,6 +38,7 @@ import {
   cleanShareArtName,
   sameOriginImageUrl,
   shareArtFileName,
+  shareArtHeadline,
   type ShareArtEventInput,
   type ShareArtFilter,
   type ShareArtFormat,
@@ -67,6 +68,11 @@ interface ShareArtGeneratorProps {
   defaultName?: string;
   /** REA-43: the event's custom art; a format without it keeps the default art. */
   customConfig?: ShareArtConfig | null;
+  /**
+   * REA-45: false for someone who is not signed up (the organizer opened the art to everyone): the
+   * default art then reads "Eu vou no" instead of "Me inscrevi no".
+   */
+  signedUp?: boolean;
 }
 
 /** Background of a custom format: its data URL, or 'failed' (→ default art for that format). */
@@ -131,8 +137,12 @@ export function ShareArtGenerator({
   event,
   defaultName = '',
   customConfig = null,
+  signedUp = true,
 }: ShareArtGeneratorProps) {
-  const artEvent = useMemo(() => buildShareArtEvent(event), [event]);
+  const artEvent = useMemo(
+    () => ({ ...buildShareArtEvent(event), headline: shareArtHeadline(signedUp) }),
+    [event, signedUp]
+  );
 
   const [format, setFormat] = useState<ShareArtFormat>('story');
   const [role, setRole] = useState<ShareArtRole>('Participante');

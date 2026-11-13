@@ -172,6 +172,22 @@ src/
   whose background fails to load (`/api/og-image` proxy, needed for canvas pixels), keeps the default
   art. The custom art has no role/name: those steps are hidden for that format, and the photo is
   cropped to the area's ratio.
+- **Arte para quem não está inscrito (REA-45)** — `Event.share_art_open` (off by default), the switch
+  "Arte "Eu vou" para quem não está inscrito" in the event form (Geral, `EventForm`). Off: `/events/<slug>/arte`
+  is as before (login, then signup only). On: anyone with the link gets the generator, without an
+  account and without the login prompt — the art is made in the browser and nothing is saved; a
+  logged-in person still gets their name filled in. Whoever is not signed up sees "Ainda não se
+  inscreveu? Ver evento" above it, and the default art reads "Eu vou no" instead of "Me inscrevi no"
+  (`shareArtHeadline`); the organizer's custom art (REA-43) is used as well. The event page shows
+  "Gerar arte "eu vou"" under "Participar do Evento". The BFF leaves the flag untouched when an update
+  does not send it.
+- **Recorte do fundo da arte (REA-45)** — in `/admin/events/<id>/arte`, a background in another ratio
+  opens `ShareArtBackgroundCropDialog` (react-easy-crop, ratio locked to the format, drag + zoom)
+  instead of an error; "Recortar imagem de fundo" crops the current one again, from the picked
+  original (or, for a saved one, its `/api/og-image` URL). The crop is scaled to exactly 1080×1920 /
+  1080×1080 JPEG and uploaded already cropped; it is never enlarged — a crop under 1080 px of the
+  original's width cannot be confirmed (`cropProblem`), and an image too small even at zoom 1 is
+  refused before the dialog (`cropSourceProblem`). The BFF still checks the uploaded file's ratio.
 
 ### Provider Hierarchy (layout.tsx)
 FirebaseProvider → ApolloProvider → AuthProvider → LoginPromptProvider → LogoutModalWrapper → AgendaProvider → FilterProvider → ThemeProvider → children

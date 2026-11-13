@@ -6,7 +6,8 @@ export async function getCroppedImg(
   imageSrc: string,
   pixelCrop: { x: number; y: number; width: number; height: number },
   outputWidth = 1200,
-  outputHeight = 630
+  outputHeight = 630,
+  fileName = 'cover.jpg'
 ): Promise<File> {
   const image = await createImage(imageSrc);
   const canvas = document.createElement('canvas');
@@ -36,7 +37,7 @@ export async function getCroppedImg(
         reject(new Error('Canvas is empty'));
         return;
       }
-      const file = new File([blob], 'cover.jpg', { type: 'image/jpeg' });
+      const file = new File([blob], fileName, { type: 'image/jpeg' });
       resolve(file);
     }, 'image/jpeg', 0.92);
   });

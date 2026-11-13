@@ -231,3 +231,27 @@ describe('EventEditor (REA-24 unsaved changes)', () => {
     expect(guard.request('/admin/events/meetup/analytics')).toBe(true);
   });
 });
+
+describe('EventEditor (REA-45 arte para não inscritos)', () => {
+  it('loads the flag into the form and sends it on save', async () => {
+    paymentsV2 = true;
+    (event as any).share_art_open = true;
+    try {
+      render(<EventEditor />);
+      fireEvent.click(await screen.findByText('Salvar Evento'));
+      expect(lastInitial.share_art_open).toBe(true);
+      await waitFor(() => expect(updateEvent).toHaveBeenCalled());
+      expect(updateEvent.mock.calls[0][0].variables.data.share_art_open).toBe(true);
+    } finally {
+      delete (event as any).share_art_open;
+    }
+  });
+
+  it('sends false for an event without it', async () => {
+    paymentsV2 = true;
+    render(<EventEditor />);
+    fireEvent.click(await screen.findByText('Salvar Evento'));
+    await waitFor(() => expect(updateEvent).toHaveBeenCalled());
+    expect(updateEvent.mock.calls[0][0].variables.data.share_art_open).toBe(false);
+  });
+});

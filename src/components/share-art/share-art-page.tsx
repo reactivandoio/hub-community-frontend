@@ -42,7 +42,11 @@ function Notice({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** `/events/[id]/arte` — only for a logged-in person signed up for the event. */
+/**
+ * `/events/[id]/arte` — for a logged-in person signed up for the event. When the organizer opens the
+ * art to everyone (`share_art_open`, REA-45), anyone with the link generates it, without a signup or
+ * an account: the art is made in the browser and nothing is saved.
+ */
 export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
   const { user, isAuthenticated, isHydrated } = useAuth();
   const { requestLogin } = useLoginPrompt();
@@ -70,20 +74,22 @@ export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
     }
   );
   const isSignedUp = Boolean(signupData?.isUserSignedUp?.is_signed_up);
+  const artOpen = event?.share_art_open === true;
+  const canGenerate = isSignedUp || artOpen;
 
   // REA-43: the event's custom art, when the organizer set one. Any failure → the default art.
   const { data: artData, loading: artLoading } = useQuery<{
     shareArtConfig: ShareArtConfig | null;
   }>(GET_SHARE_ART_CONFIG, {
     variables: { eventId: slugOrId },
-    skip: !isSignedUp,
+    skip: !canGenerate,
     errorPolicy: 'all',
   });
 
   // Signed out: the login opens over this page once (REA-25); the notice keeps a button.
   const askLogin = () => requestLogin({ reason: 'Entre para gerar sua arte' });
   const needsLogin =
-    !!isHydrated && !eventLoading && !!event && !isAuthenticated;
+    !!isHydrated && !eventLoading && !!event && !isAuthenticated && !artOpen;
   const askedLogin = useRef(false);
   useEffect(() => {
     if (!needsLogin || askedLogin.current) return;
@@ -97,7 +103,7 @@ export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
     !hydrated ||
     eventLoading ||
     (isAuthenticated && signupLoading) ||
-    (isSignedUp && artLoading)
+    (canGenerate && artLoading)
   ) {
     content = <GeneratorSkeleton />;
   } else if (eventError || !event) {
@@ -105,6 +111,30 @@ export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
       <Notice title="Evento não encontrado">
         <p className="text-muted-foreground">Confira o link e tente de novo.</p>
       </Notice>
+    );
+  } else if (canGenerate) {
+    content = (
+      <>
+        {!isSignedUp && (
+          <p
+            className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground"
+            data-testid="share-art-not-signed-up"
+          >
+            <span>
+              Ainda não se inscreveu em <strong>{event.title}</strong>?
+            </span>
+            <Link href={eventPath} className="font-semibold text-primary underline-offset-4 hover:underline">
+              Ver evento
+            </Link>
+          </p>
+        )}
+        <ShareArtGenerator
+          event={event}
+          defaultName={user?.name || ''}
+          customConfig={artData?.shareArtConfig ?? null}
+          signedUp={isSignedUp}
+        />
+      </>
     );
   } else if (!isAuthenticated) {
     content = (
@@ -119,7 +149,7 @@ export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
         </Button>
       </Notice>
     );
-  } else if (!isSignedUp) {
+  } else {
     content = (
       <Notice title="Você ainda não está inscrito">
         <p className="text-muted-foreground">
@@ -132,14 +162,6 @@ export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
           </Button>
         </Link>
       </Notice>
-    );
-  } else {
-    content = (
-      <ShareArtGenerator
-        event={event}
-        defaultName={user?.name || ''}
-        customConfig={artData?.shareArtConfig ?? null}
-      />
     );
   }
 
@@ -155,7 +177,9 @@ export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
           </Link>
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground">
-              Sua arte &quot;me inscrevi&quot;
+              {artOpen && !isSignedUp
+                ? 'Sua arte "eu vou"'
+                : 'Sua arte "me inscrevi"'}
             </h1>
             <p className="mt-2 max-w-2xl text-muted-foreground">
               Escolha uma foto, o formato e o seu papel. Baixe ou compartilhe

@@ -22,6 +22,21 @@ vi.mock('@/lib/share-art-custom', async importOriginal => ({
   readImageSize: (file: File) => mockImageSize(file),
 }));
 
+// REA-45: the crop needs a real canvas; the stub shows what it got and hands back a cropped file.
+const croppedFile = new File(['cropped'], 'fundo-feed-1080x1080.jpg', { type: 'image/jpeg' });
+vi.mock('@/components/admin/share-art-background-crop-dialog', () => ({
+  ShareArtBackgroundCropDialog: ({ imageSrc, format, wrongRatio, onCancel, onCropped }: any) =>
+    imageSrc ? (
+      <div role="dialog" aria-label="Recorte">
+        <span data-testid="crop-src">{imageSrc}</span>
+        <span data-testid="crop-format">{format}</span>
+        <span data-testid="crop-wrong-ratio">{wrongRatio ? `${wrongRatio.width}x${wrongRatio.height}` : 'none'}</span>
+        <button type="button" onClick={() => onCropped(croppedFile)}>Usar recorte</button>
+        <button type="button" onClick={onCancel}>Cancelar recorte</button>
+      </div>
+    ) : null,
+}));
+
 beforeEach(() => {
   mockToast.mockReset();
   mockUpload.mockReset().mockResolvedValue(['42']);
@@ -85,15 +100,68 @@ describe('ShareArtConfigForm', () => {
     expect(screen.getByRole('button', { name: /Salvar arte/ })).toBeDisabled();
   });
 
-  it('refuses a background with the wrong ratio before uploading it', async () => {
+  it('opens the crop, locked to the format, for a background in another ratio (REA-45)', async () => {
+    mockImageSize.mockResolvedValue({ width: 2251, height: 2814 });
+    renderForm(null);
+    await userEvent.click(screen.getByRole('tab', { name: /Feed/ }));
+    pickBackground(/Imagem de fundo Feed/, png());
+
+    const dialog = await screen.findByRole('dialog', { name: 'Recorte' });
+    expect(dialog).toHaveTextContent('feed');
+    expect(screen.getByTestId('crop-wrong-ratio')).toHaveTextContent('2251x2814');
+    expect(screen.getByTestId('crop-src')).toHaveTextContent('blob:local-bg');
+    expect(screen.queryByText(/precisa ter proporção/)).not.toBeInTheDocument();
+    expect(mockUpload).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Usar recorte' }));
+    await waitFor(() => expect(mockUpload).toHaveBeenCalledWith(croppedFile));
+    expect(screen.queryByRole('dialog', { name: 'Recorte' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('group', { name: /Área da foto/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Salvar arte/ })).toBeEnabled();
+  });
+
+  it('uploads nothing when the crop is cancelled', async () => {
+    mockImageSize.mockResolvedValue({ width: 2251, height: 2814 });
+    renderForm(null);
+    pickBackground(/Imagem de fundo Stories/, png());
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancelar recorte' }));
+    expect(screen.queryByRole('dialog', { name: 'Recorte' })).not.toBeInTheDocument();
+    expect(mockUpload).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /Salvar arte/ })).toBeDisabled();
+  });
+
+  it('refuses, without the crop, an image too small to give 1080 px in the format', async () => {
     mockImageSize.mockResolvedValue({ width: 1080, height: 1350 });
     renderForm(null);
     pickBackground(/Imagem de fundo Stories/, png());
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'O fundo do Stories (9:16) precisa ter proporção 9:16 (a enviada tem 1080×1350).'
+      'A imagem 1080×1350 é pequena demais para o Stories (9:16): cortada nessa proporção, fica com 759 px de largura, e o fundo precisa de ao menos 1080 px.'
     );
+    expect(screen.queryByRole('dialog', { name: 'Recorte' })).not.toBeInTheDocument();
     expect(mockUpload).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: /Salvar arte/ })).toBeDisabled();
+  });
+
+  it('crops again a background in the right ratio, from the picked original', async () => {
+    mockImageSize.mockResolvedValue({ width: 1080, height: 1920 });
+    renderForm(null);
+    pickBackground(/Imagem de fundo Stories/, png());
+    await screen.findByRole('group', { name: /Área da foto/ });
+    expect(mockUpload).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(screen.getByRole('button', { name: /Recortar imagem de fundo/ }));
+    expect(screen.getByTestId('crop-src')).toHaveTextContent('blob:local-bg');
+    expect(screen.getByTestId('crop-wrong-ratio')).toHaveTextContent('none');
+    await userEvent.click(screen.getByRole('button', { name: 'Usar recorte' }));
+    await waitFor(() => expect(mockUpload).toHaveBeenCalledTimes(2));
+    expect(mockUpload).toHaveBeenLastCalledWith(croppedFile);
+  });
+
+  it('crops a saved background through the same-origin proxy', async () => {
+    renderForm(saved(storyFormat()) as ShareArtConfig);
+    await userEvent.click(screen.getByRole('button', { name: /Recortar imagem de fundo/ }));
+    expect(screen.getByTestId('crop-src')).toHaveTextContent(
+      `/api/og-image?url=${encodeURIComponent('https://manager.hubcommunity.io/uploads/story.png')}`
+    );
   });
 
   it('uploads a 9:16 background, starts with a centered circle and saves it', async () => {

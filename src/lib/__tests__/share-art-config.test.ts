@@ -15,6 +15,9 @@ import {
   resizeArea,
   squareArea,
   type ShareArtPhotoArea,
+  cropProblem,
+  cropSourceProblem,
+  maxCropWidth,
 } from '../share-art-config';
 
 const STORY = 9 / 16;
@@ -182,5 +185,28 @@ describe('formatInput', () => {
     });
     expect(formatInput({ backgroundId: null, area: defaultPhotoArea('feed') })).toBeNull();
     expect(formatInput(null)).toBeNull();
+  });
+});
+
+describe('background crop (REA-45)', () => {
+  it('widest crop in the format ratio', () => {
+    expect(maxCropWidth('feed', 2251, 2814)).toBe(2251);
+    expect(maxCropWidth('story', 2251, 2814)).toBe(1582);
+    expect(maxCropWidth('story', 1080, 1350)).toBe(759);
+  });
+
+  it('refuses an image that is too small even cropped', () => {
+    expect(cropSourceProblem('feed', 2251, 2814)).toBeNull();
+    expect(cropSourceProblem('story', 1080, 1350)).toBe(
+      'A imagem 1080×1350 é pequena demais para o Stories (9:16): cortada nessa proporção, fica com 759 px de largura, e o fundo precisa de ao menos 1080 px.'
+    );
+  });
+
+  it('needs at least 1080 px of width after the crop', () => {
+    expect(cropProblem('feed', 1080)).toBeNull();
+    expect(cropProblem('story', 1079.6)).toBeNull();
+    expect(cropProblem('feed', 1000)).toBe(
+      'O recorte tem 1000 px de largura; o fundo do Feed precisa de ao menos 1080 px. Diminua o zoom.'
+    );
   });
 });
