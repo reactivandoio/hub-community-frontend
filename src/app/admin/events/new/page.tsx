@@ -35,6 +35,7 @@ export default function NewEventPage() {
         is_online: data.is_online || false,
         call_link: data.call_link || '',
         unlisted: data.unlisted || false,
+        share_art_open: data.share_art_open || false,
         description: data.description, // Assuming it's compatible or handled by backend/form
         images: data.images,
         communities: data.communityId ? [data.communityId] : [],

@@ -236,3 +236,41 @@ describe('EventForm: lote pago exige conta Opa Pingou (REA-12)', () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 });
+
+describe('EventForm: arte "Eu vou" para quem não está inscrito (REA-45)', () => {
+  const renderGeneral = (data: Record<string, unknown> = {}) => {
+    const onSubmit = vi.fn().mockResolvedValue('evt-1');
+    render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <EventForm
+          initialData={{ ...initialData, id: 'evt-1', ...data }}
+          onSubmit={onSubmit}
+          section="general"
+        />
+      </MockedProvider>
+    );
+    return { onSubmit };
+  };
+  const toggle = () =>
+    screen.getByRole('switch', {
+      name: /Arte "Eu vou" para quem não está inscrito/,
+    });
+
+  it('is in the event settings, off by default, and saves it on', async () => {
+    const { onSubmit } = renderGeneral();
+    expect(toggle()).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(toggle());
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Evento/ }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0].share_art_open).toBe(true);
+  });
+
+  it('shows what the event has and saves it off', async () => {
+    const { onSubmit } = renderGeneral({ share_art_open: true });
+    expect(toggle()).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(toggle());
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Evento/ }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0].share_art_open).toBe(false);
+  });
+});

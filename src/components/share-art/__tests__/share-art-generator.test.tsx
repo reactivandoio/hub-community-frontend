@@ -38,6 +38,15 @@ describe('ShareArtGenerator', () => {
     expect(screen.queryByRole('img', { name: 'Prévia da sua arte' })).not.toBeInTheDocument();
   });
 
+  it('says "Me inscrevi" to a signup and "Eu vou" to everyone else (REA-45)', () => {
+    const { unmount } = render(<ShareArtGenerator event={EVENT} />);
+    expect(screen.getAllByText('Me inscrevi no').length).toBeGreaterThan(0);
+    unmount();
+    render(<ShareArtGenerator event={EVENT} signedUp={false} />);
+    expect(screen.queryByText('Me inscrevi no')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Eu vou no').length).toBeGreaterThan(0);
+  });
+
   it("uses the event's art on the configured format: background through the same-origin proxy", async () => {
     render(<ShareArtGenerator event={EVENT} defaultName="Ana" customConfig={CONFIG} />);
     expect(await screen.findByRole('img', { name: 'Prévia da sua arte' })).toBeInTheDocument();

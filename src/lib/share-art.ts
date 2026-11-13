@@ -77,7 +77,16 @@ export interface ShareArtEventInput {
   communities?: { title?: string | null }[] | null;
 }
 
+/**
+ * The line above the event title on the default art. "Me inscrevi" is only true for a signup; when
+ * the organizer opens the art to everyone (REA-45), whoever is not signed up gets "Eu vou".
+ */
+export const shareArtHeadline = (signedUp: boolean) =>
+  signedUp ? 'Me inscrevi no' : 'Eu vou no';
+
 export interface ShareArtEventData {
+  /** See shareArtHeadline. */
+  headline?: string;
   title: string;
   dateLabel: string;
   placeLabel: string;

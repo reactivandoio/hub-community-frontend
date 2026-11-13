@@ -543,6 +543,18 @@ export function EventDetails({ slugOrId }: EventDetailsProps) {
               <Calendar className="h-4 w-4 mr-2" />
               Participar do Evento
             </Button>
+            {/* REA-45: the organizer opened the "eu vou" art to people who are not signed up. */}
+            {event.share_art_open && (
+              <Button
+                size="lg"
+                variant="outline"
+                className="rounded-full w-full font-semibold border-primary/40 text-primary hover:bg-primary/10"
+                onClick={() => router.push(`/events/${event?.slug || slugOrId}/arte`)}
+              >
+                <ImagePlus className="h-4 w-4 mr-2" />
+                Gerar arte &quot;eu vou&quot;
+              </Button>
+            )}
           </>
         )}
       </div>

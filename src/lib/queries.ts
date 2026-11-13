@@ -222,6 +222,7 @@ export const GET_EVENT_BY_SLUG_OR_ID = gql`
       is_online
       call_link
       unlisted
+      share_art_open
       communities {
         id
         slug
