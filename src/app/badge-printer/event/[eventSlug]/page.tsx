@@ -263,7 +263,7 @@ export default function EventBadgePrinterPage() {
                       <DialogTitle>Credenciar na hora</DialogTitle>
                       <DialogDescription>
                         Inscreve a pessoa no evento, imprime o crachá e envia um e-mail para ela
-                        definir a senha e concluir o cadastro no HubCommunity.
+                        entrar com um código e concluir o cadastro no HubCommunity.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="py-4 space-y-4">

@@ -1,16 +1,10 @@
 export {
-  changePasswordSchema,
   emailSchema,
-  passwordSchema,
-  resetPasswordSchema,
-  signInSchema,
-  signUpSchema,
-  strongPasswordSchema,
+  loginCodeSchema,
+  loginEmailSchema,
   usernameSchema,
-  type ChangePasswordFormValues,
-  type ResetPasswordFormValues,
-  type SignInFormValues,
-  type SignUpFormValues,
+  type LoginCodeFormValues,
+  type LoginEmailFormValues,
 } from './auth.schema';
 
 // User schemas

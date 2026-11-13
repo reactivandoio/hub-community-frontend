@@ -531,8 +531,8 @@ export default function EventSignupPage() {
     const cleanedPhone = cleanSignupPhone(values.phone);
 
     try {
-      // No account step: the BFF creates it (password pending) and e-mails
-      // the ticket with a "Crie sua senha" link.
+      // No account step: the BFF creates it (registration pending) and e-mails
+      // the ticket with a "Conclua seu cadastro" link (REA-26: login by code).
       const variables: any = {
         eventId: slugOrId,
         name: values.name,

@@ -186,50 +186,22 @@ export interface User {
   adult_declaration?: boolean;
 }
 
-export interface SignUpInput {
-  email: string;
-  name: string;
-  password: string;
-  username: string;
-  phone?: string;
-  /** "Quero receber novidades e convites de eventos por e-mail" (REA-29). Only recorded. */
-  marketing_opt_in?: boolean;
-  /** REA-36: the "18 anos ou mais" checkbox; required by the BFF. */
-  adult_declaration?: boolean;
+export interface RequestLoginCodeResponse {
+  requestLoginCode: { sent: boolean; resendIn: number };
 }
 
-export interface SignInInput {
-  identifier: string;
-  password: string;
-}
-
-export interface SignInResponse {
-  signIn: {
+export interface VerifyLoginCodeResponse {
+  verifyLoginCode: {
     token: string;
     email: string;
     username: string;
-    name: string;
-    phone: string;
+    name?: string | null;
+    phone?: string | null;
     cpf?: string | null;
     date_of_birth?: string | null;
     adult_declaration?: boolean | null;
     id: string;
   };
-}
-
-export interface SignUpResponse {
-  signUp: {
-    email: string;
-    username: string;
-  };
-}
-
-export interface ForwardPasswordResponse {
-  forwardPassword: boolean;
-}
-
-export interface ResetPasswordResponse {
-  resetPassword: boolean;
 }
 
 export interface AuthState {
@@ -243,11 +215,11 @@ export interface AuthState {
 }
 
 export interface AuthContextType extends AuthState {
-  signIn: (input: SignInInput) => Promise<void>;
-  signUp: (input: SignUpInput) => Promise<void>;
+  /** REA-26: e-mails a login code. Resolves the seconds before another one can be asked for. */
+  requestLoginCode: (email: string) => Promise<{ resendIn: number }>;
+  /** REA-26: checks the code and opens the session (a new e-mail gets its account now). */
+  verifyLoginCode: (email: string, code: string) => Promise<void>;
   signOut: () => void;
-  forwardPassword: (email: string) => Promise<void>;
-  resetPassword: (code: string, password: string, passwordConfirmation: string) => Promise<void>;
   updatePhone: (phone: string) => Promise<void>;
   syncUser: (data: Partial<User>) => void;
   validateToken: () => boolean;

@@ -1,6 +1,7 @@
 /**
- * REA-22: the certificate only goes out with the registration finished — password
- * created and CPF, date of birth and WhatsApp on the profile. The BFF refuses with
+ * REA-22: the certificate only goes out with the registration finished — e-mail
+ * verified by a login code (REA-26; `passwordPending` keeps the old name) and CPF,
+ * date of birth and WhatsApp on the profile. The BFF refuses with
  * the code REGISTRATION_INCOMPLETE; `missing` only comes to the account's own
  * signed-in owner.
  */

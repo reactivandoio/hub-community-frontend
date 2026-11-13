@@ -10,17 +10,13 @@ import {
 } from 'react';
 
 import { isTokenExpired } from '@/lib/jwt';
-import { FORWARD_PASSWORD, RESET_PASSWORD, SIGN_IN, SIGN_UP, UPDATE_USER_PHONE } from '@/lib/queries';
+import { REQUEST_LOGIN_CODE, UPDATE_USER_PHONE, VERIFY_LOGIN_CODE } from '@/lib/queries';
 import type {
   AuthContextType,
   AuthState,
-  ForwardPasswordResponse,
-  ResetPasswordResponse,
-  SignInInput,
-  SignInResponse,
-  SignUpInput,
-  SignUpResponse,
+  RequestLoginCodeResponse,
   User,
+  VerifyLoginCodeResponse,
 } from '@/lib/types';
 
 const STORAGE_KEYS = {
@@ -109,20 +105,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  const [signInMutation] = useMutation<SignInResponse>(SIGN_IN, {
-    errorPolicy: 'all',
-  });
-  const [signUpMutation] = useMutation<SignUpResponse>(SIGN_UP, {
-    errorPolicy: 'all',
-  });
-  const [forwardPasswordMutation] = useMutation<ForwardPasswordResponse>(
-    FORWARD_PASSWORD,
-    { errorPolicy: 'all' }
-  );
-  const [resetPasswordMutation] = useMutation<ResetPasswordResponse>(
-    RESET_PASSWORD,
-    { errorPolicy: 'all' }
-  );
+  const [requestLoginCodeMutation] = useMutation<RequestLoginCodeResponse>(REQUEST_LOGIN_CODE);
+  const [verifyLoginCodeMutation] = useMutation<VerifyLoginCodeResponse>(VERIFY_LOGIN_CODE);
   const [updateUserPhoneMutation] = useMutation(UPDATE_USER_PHONE, {
     errorPolicy: 'none',
   });
@@ -220,55 +204,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'HIDE_LOGOUT_ALERT' });
   };
 
-  const signIn = async (input: SignInInput) => {
-    dispatch({ type: 'AUTH_START' });
-    try {
-      const result = await signInMutation({ variables: input });
-
-      if (result.errors && result.errors.length > 0) {
-        throw new Error(result.errors[0].message);
-      }
-
-      if (result.data?.signIn?.token) {
-        const user: User = {
-          id: result.data.signIn.id || undefined,
-          email: result.data.signIn.email || input.identifier,
-          username: result.data.signIn.username || input.identifier.split('@')[0],
-          name: result.data.signIn.name || undefined,
-          phone: result.data.signIn.phone || undefined,
-          cpf: result.data.signIn.cpf || undefined,
-          date_of_birth: result.data.signIn.date_of_birth || undefined,
-          adult_declaration: result.data.signIn.adult_declaration === true,
-        };
-
-        saveToStorage(user, result.data.signIn.token);
-        dispatch({
-          type: 'AUTH_SUCCESS',
-          payload: { user, token: result.data.signIn.token },
-        });
-      } else {
-        throw new Error('Invalid response');
-      }
-    } catch (error) {
-      dispatch({ type: 'AUTH_ERROR' });
-      throw error;
-    }
+  // REA-26: login by a code sent to the e-mail. Errors keep the BFF's pt-BR message and code
+  // (ApolloError), so the modal can show the cooldown or the tries left.
+  const requestLoginCode = async (email: string) => {
+    const result = await requestLoginCodeMutation({ variables: { email: email.trim().toLowerCase() } });
+    return { resendIn: result.data?.requestLoginCode?.resendIn ?? 60 };
   };
 
-  const signUp = async (input: SignUpInput) => {
+  const verifyLoginCode = async (email: string, code: string) => {
     dispatch({ type: 'AUTH_START' });
     try {
-      const result = await signUpMutation({ variables: { input } });
+      const result = await verifyLoginCodeMutation({
+        variables: { email: email.trim().toLowerCase(), code: code.replace(/\D/g, '') },
+      });
+      const session = result.data?.verifyLoginCode;
+      if (!session?.token) throw new Error('Não foi possível entrar. Tente novamente.');
 
-      if (result.errors && result.errors.length > 0) {
-        throw new Error(result.errors[0].message);
-      }
+      const user: User = {
+        id: session.id || undefined,
+        email: session.email || email,
+        username: session.username || email.split('@')[0],
+        name: session.name || undefined,
+        phone: session.phone || undefined,
+        cpf: session.cpf || undefined,
+        date_of_birth: session.date_of_birth || undefined,
+        adult_declaration: session.adult_declaration === true,
+      };
 
-      if (result.data?.signUp) {
-        dispatch({ type: 'AUTH_ERROR' });
-      } else {
-        throw new Error('Erro ao criar conta. Tente novamente.');
-      }
+      saveToStorage(user, session.token);
+      dispatch({ type: 'AUTH_SUCCESS', payload: { user, token: session.token } });
     } catch (error) {
       dispatch({ type: 'AUTH_ERROR' });
       throw error;
@@ -280,28 +244,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SIGN_OUT' });
     if (showAlert) {
       dispatch({ type: 'SHOW_LOGOUT_ALERT' });
-    }
-  };
-
-  const forwardPassword = async (email: string) => {
-    try {
-      const result = await forwardPasswordMutation({ variables: { email } });
-      if (result.errors && result.errors.length > 0) {
-        throw new Error(result.errors[0].message);
-      }
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  const resetPassword = async (code: string, password: string, passwordConfirmation: string) => {
-    try {
-      const result = await resetPasswordMutation({ variables: { code, password, passwordConfirmation } });
-      if (result.errors && result.errors.length > 0) {
-        throw new Error(result.errors[0].message);
-      }
-    } catch (error) {
-      throw error;
     }
   };
 
@@ -343,11 +285,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value: AuthContextType = {
     ...state,
-    signIn,
-    signUp,
+    requestLoginCode,
+    verifyLoginCode,
     signOut,
-    forwardPassword,
-    resetPassword,
     updatePhone,
     syncUser,
     validateToken,

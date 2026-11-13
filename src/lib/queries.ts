@@ -544,21 +544,20 @@ export const VALIDATE_COUPON = gql`
   }
 `;
 
-// Authentication Mutations
-export const SIGN_UP = gql`
-  mutation SignUp($input: UserInput!) {
-    signUp(input: $input) {
-      email
-      username
-      name
-      phone
+// Authentication (REA-26): the only login is a code sent to the e-mail. A new e-mail gets its
+// account when the code is confirmed.
+export const REQUEST_LOGIN_CODE = gql`
+  mutation RequestLoginCode($email: String!) {
+    requestLoginCode(email: $email) {
+      sent
+      resendIn
     }
   }
 `;
 
-export const SIGN_IN = gql`
-  mutation SignIn($identifier: String!, $password: String!) {
-    signIn(identifier: $identifier, password: $password) {
+export const VERIFY_LOGIN_CODE = gql`
+  mutation VerifyLoginCode($email: String!, $code: String!) {
+    verifyLoginCode(email: $email, code: $code) {
       token
       email
       username
@@ -585,18 +584,6 @@ export const ME = gql`
       date_of_birth
       adult_declaration
     }
-  }
-`;
-
-export const FORWARD_PASSWORD = gql`
-  mutation ForwardPassword($email: String!) {
-    forwardPassword(email: $email)
-  }
-`;
-
-export const RESET_PASSWORD = gql`
-  mutation ResetPassword($code: String!, $password: String!, $passwordConfirmation: String!) {
-    resetPassword(code: $code, password: $password, passwordConfirmation: $passwordConfirmation)
   }
 `;
 
