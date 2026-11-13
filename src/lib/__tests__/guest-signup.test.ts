@@ -20,7 +20,7 @@ describe('guest-signup (REA-22)', () => {
     expect(guestNotice({ outcome: 'ALREADY_SIGNED_UP', confirmation_sent_to: 'glad****@***ail.com' }, 'x@y.io').ownSignup).toBe(false);
     expect(guestNotice({ outcome: 'NEW_ACCOUNT', confirmation_sent_to: 'x@y.io' }, 'x@y.io')).toMatchObject({
       ownSignup: true,
-      body: expect.stringContaining('criar sua senha para x@y.io'),
+      body: expect.stringContaining('concluir seu cadastro para x@y.io'),
     });
     expect(guestNotice({ outcome: 'EXISTING_ACCOUNT' }, 'x@y.io').body).toContain('x@y.io');
   });

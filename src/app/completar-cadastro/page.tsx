@@ -9,9 +9,10 @@ import { useAuth } from '@/contexts/auth-context';
 import { missingCertificateFields } from '@/lib/profile-completeness';
 
 /**
- * REA-36: the link of the "informe sua data de nascimento" e-mail. Signed in, the
- * CompleteProfileModal (root layout) opens by itself while anything is missing; this page only
- * says when the data is complete. Signed out, the login opens here.
+ * REA-36/REA-26: the link of the "informe sua data de nascimento" and "conclua seu cadastro"
+ * e-mails (and of the old password links). Signed out, the login by code opens here. Signed in,
+ * the CompleteProfileModal (root layout) opens by itself while anything is missing; this page only
+ * says when the data is complete.
  */
 export default function CompletarCadastroPage() {
   const { user, isAuthenticated, isHydrated } = useAuth();
@@ -27,9 +28,9 @@ export default function CompletarCadastroPage() {
   if (!isAuthenticated || !user) {
     return (
       <LoginRequired
-        title="Atualize seus dados"
-        reason="Entre para informar sua data de nascimento"
-        description="Entre na sua conta para informar sua data de nascimento e manter sua conta ativa."
+        title="Conclua seu cadastro"
+        reason="Entre com seu e-mail para concluir seu cadastro"
+        description="Enviamos um código de acesso para o seu e-mail, sem senha. Depois, é só completar seus dados."
       />
     );
   }

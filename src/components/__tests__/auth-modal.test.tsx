@@ -1,22 +1,28 @@
+import { ApolloError } from '@apollo/client';
+import { GraphQLError } from 'graphql';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AuthModal } from '../auth-modal';
+import { AuthModal, loginError } from '../auth-modal';
 
-const signIn = vi.fn();
-const forwardPassword = vi.fn();
-const signUp = vi.fn();
+const requestLoginCode = vi.fn();
+const verifyLoginCode = vi.fn();
 
 vi.mock('@/contexts/auth-context', () => ({
-  useAuth: () => ({ signIn, signUp, forwardPassword, isLoading: false }),
+  useAuth: () => ({ requestLoginCode, verifyLoginCode, isLoading: false }),
 }));
-vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const { toast } = vi.hoisted(() => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('sonner', () => ({ toast }));
+
+const apolloError = (message: string, extensions: Record<string, unknown>) =>
+  new ApolloError({ graphQLErrors: [new GraphQLError(message, { extensions })] });
 
 beforeEach(() => {
   vi.clearAllMocks();
-  window.localStorage.clear();
   window.history.replaceState(null, '', '/certificado?event=meetup');
+  requestLoginCode.mockResolvedValue({ resendIn: 60 });
+  verifyLoginCode.mockResolvedValue(undefined);
 });
 
 const renderModal = () => {
@@ -26,6 +32,12 @@ const renderModal = () => {
   return { onClose, onSignedIn };
 };
 
+const askCode = async (user: ReturnType<typeof userEvent.setup>, email = 'Ana@Example.com') => {
+  await user.type(screen.getByLabelText('Seu e-mail'), email);
+  await user.click(screen.getByRole('button', { name: 'Receber código' }));
+  await screen.findByLabelText('Código');
+};
+
 describe('AuthModal (REA-25: login in place)', () => {
   it('is an accessible dialog that says why the login is asked for', () => {
     renderModal();
@@ -33,64 +45,113 @@ describe('AuthModal (REA-25: login in place)', () => {
     expect(dialog).toHaveAccessibleDescription('Entre para continuar');
   });
 
-  it('signing in reports it to the page, with no navigation of its own', async () => {
-    signIn.mockResolvedValue(undefined);
-    const { onSignedIn, onClose } = renderModal();
-    const user = userEvent.setup();
-    await user.type(screen.getByLabelText('Email ou Username'), 'ana');
-    await user.type(screen.getByLabelText('Senha'), 'senha-forte-1');
-    await user.click(screen.getByRole('button', { name: 'Entrar' }));
-    await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
-    expect(signIn).toHaveBeenCalledWith({ identifier: 'ana', password: 'senha-forte-1' });
-    expect(onClose).not.toHaveBeenCalled();
-    expect(window.location.pathname).toBe('/certificado');
-  });
-
   it('closes with Esc', async () => {
     const { onClose } = renderModal();
     await userEvent.setup().keyboard('{Escape}');
     expect(onClose).toHaveBeenCalled();
   });
+});
 
-  it('"Recuperar" keeps this page, so the new-password page sends the person back here', async () => {
-    forwardPassword.mockResolvedValue(undefined);
+describe('AuthModal — login por código (REA-26)', () => {
+  it('has no password anywhere', () => {
+    renderModal();
+    expect(screen.queryByLabelText(/senha/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+  });
+
+  it('asks for the e-mail, then the code, and reports the login to the page without navigating', async () => {
+    const { onSignedIn, onClose } = renderModal();
+    const user = userEvent.setup();
+
+    await askCode(user);
+    expect(requestLoginCode).toHaveBeenCalledWith('Ana@Example.com');
+    expect(screen.getByText('ana@example.com')).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Código'), '012 345');
+    await user.click(screen.getByRole('button', { name: 'Entrar' }));
+
+    await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
+    expect(verifyLoginCode).toHaveBeenCalledWith('ana@example.com', '012345');
+    expect(onClose).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe('/certificado');
+  });
+
+  it('does not send an incomplete code', async () => {
     renderModal();
     const user = userEvent.setup();
-    await user.click(screen.getByRole('tab', { name: 'Recuperar' }));
-    await user.type(screen.getByLabelText('Email'), 'ana@example.com');
-    await user.click(screen.getByRole('button', { name: 'Enviar Email de Recuperação' }));
-    await waitFor(() => expect(forwardPassword).toHaveBeenCalledWith('ana@example.com'));
-    expect(JSON.parse(window.localStorage.getItem('login_return_to') || '{}').path).toBe(
-      '/certificado?event=meetup',
+    await askCode(user);
+    await user.type(screen.getByLabelText('Código'), '123');
+    await user.click(screen.getByRole('button', { name: 'Entrar' }));
+    expect(await screen.findByText('Digite os 6 números do código.')).toBeInTheDocument();
+    expect(verifyLoginCode).not.toHaveBeenCalled();
+  });
+
+  it('shows the BFF message on a wrong code and keeps the person on the code step', async () => {
+    verifyLoginCode.mockRejectedValue(
+      apolloError('Código incorreto. Você tem mais 4 tentativas.', { code: 'LOGIN_CODE_INVALID', attemptsLeft: 4 }),
     );
+    const { onSignedIn } = renderModal();
+    const user = userEvent.setup();
+    await askCode(user);
+    await user.type(screen.getByLabelText('Código'), '999999');
+    await user.click(screen.getByRole('button', { name: 'Entrar' }));
+    expect(await screen.findByText('Código incorreto. Você tem mais 4 tentativas.')).toBeInTheDocument();
+    expect(onSignedIn).not.toHaveBeenCalled();
+  });
+
+  it('waits before another code can be asked for', async () => {
+    renderModal();
+    const user = userEvent.setup();
+    await askCode(user);
+    expect(screen.getByRole('button', { name: /Reenviar em \d+s/ })).toBeDisabled();
+  });
+
+  it('tells when the code could not be sent (Mailgun refused) and stays on the e-mail step', async () => {
+    requestLoginCode.mockRejectedValue(
+      apolloError('Não conseguimos enviar o código agora. Tente de novo em 60 segundos.', {
+        code: 'LOGIN_CODE_NOT_SENT',
+        retryAfter: 60,
+      }),
+    );
+    renderModal();
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('Seu e-mail'), 'ana@example.com');
+    await user.click(screen.getByRole('button', { name: 'Receber código' }));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Não conseguimos enviar o código agora. Tente de novo em 60 segundos.'),
+    );
+    expect(screen.getByLabelText('Seu e-mail')).toBeInTheDocument();
+  });
+
+  it('goes on to the code step when a code was sent a moment ago (cooldown)', async () => {
+    requestLoginCode.mockRejectedValue(
+      apolloError('Enviamos um código há pouco. Peça outro em 40 segundos.', { code: 'LOGIN_CODE_COOLDOWN', retryAfter: 40 }),
+    );
+    renderModal();
+    const user = userEvent.setup();
+    await askCode(user);
+    expect(screen.getByRole('button', { name: 'Reenviar em 40s' })).toBeDisabled();
+  });
+
+  it('"Usar outro e-mail" goes back to the first step', async () => {
+    renderModal();
+    const user = userEvent.setup();
+    await askCode(user);
+    await user.click(screen.getByRole('button', { name: 'Usar outro e-mail' }));
+    expect(screen.getByLabelText('Seu e-mail')).toHaveValue('');
   });
 });
 
-describe('AuthModal — cadastro (REA-36)', () => {
-  const fillSignUp = async (user: ReturnType<typeof userEvent.setup>) => {
-    await user.click(screen.getByRole('tab', { name: 'Cadastrar' }));
-    await user.type(screen.getByPlaceholderText('Seu nome completo'), 'Ana Souza');
-    await user.type(screen.getByPlaceholderText('seu_username'), 'ana_souza');
-    await user.type(screen.getByPlaceholderText('seu@email.com'), 'ana@example.com');
-    await user.type(screen.getByPlaceholderText('Digite uma senha forte'), 'Senha-forte-1');
-  };
-
-  it('does not create the account without "18 anos ou mais"', async () => {
-    renderModal();
-    const user = userEvent.setup();
-    await fillSignUp(user);
-    await user.click(screen.getByRole('button', { name: 'Criar Conta' }));
-    expect(await screen.findByText('Confirme que você tem 18 anos ou mais.')).toBeInTheDocument();
-    expect(signUp).not.toHaveBeenCalled();
+describe('loginError', () => {
+  it('reads the message, the code and retryAfter of a GraphQL error', () => {
+    expect(loginError(apolloError('x', { code: 'LOGIN_CODE_COOLDOWN', retryAfter: 30 }), 'f')).toEqual({
+      message: 'x',
+      code: 'LOGIN_CODE_COOLDOWN',
+      retryAfter: 30,
+    });
   });
 
-  it('sends the declaration with the signup', async () => {
-    signUp.mockResolvedValue(undefined);
-    renderModal();
-    const user = userEvent.setup();
-    await fillSignUp(user);
-    await user.click(screen.getByRole('checkbox', { name: /18 anos ou mais/ }));
-    await user.click(screen.getByRole('button', { name: 'Criar Conta' }));
-    await waitFor(() => expect(signUp).toHaveBeenCalledWith(expect.objectContaining({ adult_declaration: true })));
+  it('falls back on anything else', () => {
+    expect(loginError(new Error('boom'), 'fallback')).toEqual({ message: 'fallback' });
   });
 });

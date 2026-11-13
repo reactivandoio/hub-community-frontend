@@ -6,6 +6,7 @@ import { useState } from 'react';
 
 import { AdultDeclaration } from '@/components/adult-declaration';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -71,6 +72,10 @@ export function CompleteProfileModal() {
   // REA-36: accounts that never ticked "18 anos ou mais" tick it here.
   const [adultDeclared, setAdultDeclared] = useState(false);
   const [adultError, setAdultError] = useState<string | null>(null);
+  // REA-29/REA-26: the optional "quero receber novidades" box, never pre-checked. It lived in the
+  // password signup; with the login by code, new accounts see it here. Only a tick is sent, so
+  // leaving it unticked never takes back an opt-in given before.
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
 
   const storedMissing = user ? missingCertificateFields(user) : [];
   const shouldCheck = isAuthenticated && !isLoading && !!user && storedMissing.length > 0;
@@ -124,9 +129,10 @@ export function CompleteProfileModal() {
     if (needsDeclaration) input.adult_declaration = true;
 
     try {
-      await updateProfile({ variables: { input } });
+      await updateProfile({ variables: { input: marketingOptIn ? { ...input, marketing_opt_in: true } : input } });
       syncUser?.(input);
       setValues(EMPTY);
+      setMarketingOptIn(false);
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Erro ao salvar. Tente novamente.');
     }
@@ -222,6 +228,22 @@ export function CompleteProfileModal() {
               error={adultError}
             />
           )}
+
+          <div className="flex flex-row items-start gap-3">
+            <Checkbox
+              id="complete-profile-marketing"
+              checked={marketingOptIn}
+              disabled={saving}
+              onCheckedChange={(value) => setMarketingOptIn(value === true)}
+              className="mt-0.5"
+            />
+            <label
+              htmlFor="complete-profile-marketing"
+              className="text-sm leading-snug text-muted-foreground cursor-pointer"
+            >
+              Quero receber por e-mail convites e novidades de eventos do Hub Community (opcional).
+            </label>
+          </div>
 
           {serverError && <p className="text-sm text-destructive">{serverError}</p>}
 

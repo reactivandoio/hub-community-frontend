@@ -2,7 +2,7 @@
  * REA-22: what the signup page says after a signup without login. The BFF decides
  * the case (`outcome`) and where the e-mail went (`confirmation_sent_to`: the
  * e-mail typed, or another account's masked as glad****@***ail.com). The person is
- * never signed in: creating the password, from the e-mail, confirms the account.
+ * never signed in: logging in with the code sent to the e-mail confirms the account (REA-26).
  */
 export type GuestOutcome = 'NEW_ACCOUNT' | 'EXISTING_ACCOUNT' | 'CPF_OWNER' | 'ALREADY_SIGNED_UP';
 
@@ -24,7 +24,7 @@ export interface GuestNotice {
 }
 
 export const CERTIFICATE_NOTE =
-  'Para receber o certificado do evento, conclua seu cadastro criando sua senha pelo link do e-mail.';
+  'Para receber o certificado do evento, conclua seu cadastro: entre com este e-mail (enviamos um código de acesso, sem senha) e complete seus dados.';
 
 /** Where the page goes next: the Pix step only for the person's own paid signup. */
 export function guestNextStep(result: GuestSignupResult): 'payment' | 'success' {
@@ -58,7 +58,7 @@ export function guestNotice(result: GuestSignupResult, typedEmail: string): Gues
     default:
       return {
         title: 'Inscrição Confirmada! 🎉',
-        body: `Enviamos seu ingresso e o link para criar sua senha para ${sentTo}. Verifique também a caixa de spam.`,
+        body: `Enviamos seu ingresso e o link para concluir seu cadastro para ${sentTo}. Verifique também a caixa de spam.`,
         ownSignup: true,
       };
   }

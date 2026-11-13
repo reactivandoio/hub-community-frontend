@@ -2,12 +2,12 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ApolloError } from '@apollo/client';
-import { useState } from 'react';
+import { ArrowLeft, KeyRound, Loader2, Mail } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -24,62 +24,35 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/auth-context';
 import {
-  resetPasswordSchema,
-  signInSchema,
-  signUpSchema,
-  type ResetPasswordFormValues,
-  type SignInFormValues,
-  type SignUpFormValues,
+  loginCodeSchema,
+  loginEmailSchema,
+  type LoginCodeFormValues,
+  type LoginEmailFormValues,
 } from '@/lib/schemas';
-import { currentPath, saveLoginReturn } from '@/lib/login-prompt';
-import { Eye, EyeOff, Loader2, Lock, Mail, Phone, User } from 'lucide-react';
 
-const ERROR_MESSAGES: Record<string, string> = {
-  'Email or Username are already taken': 'Email ou username já está em uso.',
-  'Invalid identifier or password': 'Email/username ou senha inválidos.',
-  'Error signing in: Invalid identifier or password': 'Email/username ou senha inválidos.',
-  'Your account email is not confirmed': 'Confirme seu email antes de fazer login.',
-  'Error signing in: Your account email is not confirmed': 'Confirme seu email antes de fazer login.',
-  'Too many attempts': 'Muitas tentativas. Aguarde alguns minutos.',
-  'Too many requests': 'Muitas tentativas. Aguarde alguns minutos.',
-  'User not found': 'Usuário não encontrado.',
-  'Invalid email': 'Email inválido.',
-  'Invalid password': 'Senha incorreta.',
-  'Invalid credentials': 'Credenciais inválidas.',
-  'Email already taken': 'Este email já está em uso.',
-  'Username already taken': 'Este username já está em uso.',
-  'Email not found': 'Email não encontrado.',
-  'Error on try POST': 'Erro ao processar. Tente novamente.',
-};
+interface LoginError {
+  message: string;
+  code?: string;
+  retryAfter?: number;
+}
 
-function getErrorMessage(error: unknown, fallback: string): string {
-  let message = '';
-
+/** The BFF answers in pt-BR with a code (LOGIN_CODE_COOLDOWN, LOGIN_CODE_INVALID…). */
+export function loginError(error: unknown, fallback: string): LoginError {
   if (error instanceof ApolloError) {
-    message = error.graphQLErrors?.[0]?.message || '';
-    if (!message && error.networkError) {
-      return 'Erro de conexão. Verifique sua internet.';
+    const first = error.graphQLErrors?.[0];
+    if (first) {
+      const ext = (first.extensions || {}) as Record<string, unknown>;
+      return {
+        message: first.message || fallback,
+        code: typeof ext.code === 'string' ? ext.code : undefined,
+        retryAfter: typeof ext.retryAfter === 'number' ? ext.retryAfter : undefined,
+      };
     }
-  } else if (error instanceof Error) {
-    message = error.message;
+    if (error.networkError) return { message: 'Erro de conexão. Verifique sua internet.' };
   }
-
-  if (!message) return fallback;
-
-  if (ERROR_MESSAGES[message]) {
-    return ERROR_MESSAGES[message];
-  }
-
-  for (const [key, value] of Object.entries(ERROR_MESSAGES)) {
-    if (message.includes(key)) {
-      return value;
-    }
-  }
-
-  return fallback;
+  return { message: fallback };
 }
 
 interface AuthModalProps {
@@ -93,95 +66,96 @@ interface AuthModalProps {
 }
 
 /**
- * The login modal, opened over the current page by the LoginPrompt provider (REA-25); pages
- * ask for it with useLoginPrompt, never by rendering it. Each way to get in (password today)
- * is a tab, so new methods (Google, code by e-mail) come in as new tabs.
+ * The login modal, opened over the current page by the LoginPrompt provider (REA-25); pages ask
+ * for it with useLoginPrompt, never by rendering it.
+ *
+ * REA-26: there is no password. The person types the e-mail, gets a 6-digit code and types it
+ * back; a new e-mail gets its account at that moment, and the CompleteProfileModal then asks for
+ * name, CPF, date of birth, WhatsApp and the 18+ declaration. "Continuar com o Google" comes in a
+ * second step, above the e-mail.
  */
 export function AuthModal({ isOpen, onClose, onSignedIn, reason }: AuthModalProps) {
-  const { signIn, signUp, forwardPassword, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState('signin');
+  const { requestLoginCode, verifyLoginCode } = useAuth();
+  const [step, setStep] = useState<'email' | 'code'>('email');
+  const [email, setEmail] = useState('');
+  const [sending, setSending] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
 
-  // Password visibility
-  const [showSignInPassword, setShowSignInPassword] = useState(false);
-  const [showSignUpPassword, setShowSignUpPassword] = useState(false);
-
-  // Email confirmation
-  const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
-  const [confirmationEmail, setConfirmationEmail] = useState('');
-
-  // Sign In Form
-  const signInForm = useForm<SignInFormValues>({
-    resolver: zodResolver(signInSchema),
-    defaultValues: { identifier: '', password: '' },
-  });
-
-  // Sign Up Form
-  const signUpForm = useForm<SignUpFormValues>({
-    resolver: zodResolver(signUpSchema),
-    defaultValues: { email: '', name: '', password: '', username: '', phone: '', marketing_opt_in: false, adult_declaration: false },
-  });
-
-  // Reset Password Form
-  const resetForm = useForm<ResetPasswordFormValues>({
-    resolver: zodResolver(resetPasswordSchema),
+  const emailForm = useForm<LoginEmailFormValues>({
+    resolver: zodResolver(loginEmailSchema),
     defaultValues: { email: '' },
   });
 
-  const handleSignIn = async (data: SignInFormValues) => {
+  const codeForm = useForm<LoginCodeFormValues>({
+    resolver: zodResolver(loginCodeSchema),
+    defaultValues: { code: '' },
+  });
+
+  // Counts down the seconds before another code can be asked for.
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = setTimeout(() => setResendIn((value) => Math.max(0, value - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [resendIn]);
+
+  const sendCode = async (address: string) => {
+    setSending(true);
     try {
-      await signIn(data);
-      toast.success('Bem-vindo(a) de volta!');
-      signInForm.reset();
-      setShowSignInPassword(false);
-      setActiveTab('signin');
+      const { resendIn: wait } = await requestLoginCode(address);
+      setEmail(address.trim().toLowerCase());
+      setResendIn(wait);
+      setStep('code');
+      codeForm.reset({ code: '' });
+      return true;
+    } catch (error) {
+      const failure = loginError(error, 'Não conseguimos enviar o código. Tente novamente.');
+      if (failure.retryAfter) setResendIn(failure.retryAfter);
+      // A code sent a moment ago is still valid: go on to type it.
+      if (failure.code === 'LOGIN_CODE_COOLDOWN') {
+        setEmail(address.trim().toLowerCase());
+        setStep('code');
+      }
+      toast.error(failure.message);
+      return false;
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleEmail = async (data: LoginEmailFormValues) => {
+    await sendCode(data.email);
+  };
+
+  const handleResend = async () => {
+    if (await sendCode(email)) toast.success('Enviamos um novo código.');
+  };
+
+  const handleCode = async (data: LoginCodeFormValues) => {
+    setVerifying(true);
+    try {
+      await verifyLoginCode(email, data.code);
+      toast.success('Você entrou!');
+      reset();
       onSignedIn();
     } catch (error) {
-      const message = getErrorMessage(error, 'Erro ao fazer login. Verifique suas credenciais.');
-      toast.error(message);
-      console.error('Sign in error:', error);
+      const failure = loginError(error, 'Não foi possível entrar. Tente novamente.');
+      codeForm.setError('code', { message: failure.message });
+      if (failure.code === 'LOGIN_CODE_EXPIRED') codeForm.setValue('code', '');
+    } finally {
+      setVerifying(false);
     }
   };
 
-  const handleSignUp = async (data: SignUpFormValues) => {
-    try {
-      await signUp(data);
-      // The confirmation link brings the person back to this page after the login.
-      saveLoginReturn(currentPath());
-      setConfirmationEmail(data.email);
-      setShowEmailConfirmation(true);
-      toast.success('Conta criada com sucesso!');
-    } catch (error) {
-      const message = getErrorMessage(error, 'Erro ao criar conta. Tente novamente.');
-      toast.error(message);
-      console.error('Sign up error:', error);
-    }
-  };
-
-  const handlePasswordReset = async (data: ResetPasswordFormValues) => {
-    try {
-      await forwardPassword(data.email);
-      // The new-password page sends the person back here after the login.
-      saveLoginReturn(currentPath());
-      toast.success('Email de recuperação enviado!');
-      setTimeout(() => {
-        resetForm.reset();
-      }, 2000);
-    } catch (error) {
-      const message = getErrorMessage(error, 'Erro ao enviar email de recuperação.');
-      toast.error(message);
-      console.error('Password reset error:', error);
-    }
+  const reset = () => {
+    setStep('email');
+    setEmail('');
+    emailForm.reset();
+    codeForm.reset();
   };
 
   const handleClose = () => {
-    setActiveTab('signin');
-    signInForm.reset();
-    signUpForm.reset();
-    resetForm.reset();
-    setShowEmailConfirmation(false);
-    setConfirmationEmail('');
-    setShowSignInPassword(false);
-    setShowSignUpPassword(false);
+    reset();
     onClose();
   };
 
@@ -191,342 +165,114 @@ export function AuthModal({ isOpen, onClose, onSignedIn, reason }: AuthModalProp
         <DialogHeader>
           <DialogTitle>Entrar na sua conta</DialogTitle>
           <DialogDescription>
-            {reason || 'Faça login, cadastre-se ou recupere sua senha'}
+            {reason || 'Entre ou crie sua conta com seu e-mail, sem senha.'}
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="signin">Entrar</TabsTrigger>
-            <TabsTrigger value="signup">Cadastrar</TabsTrigger>
-            <TabsTrigger value="reset">Recuperar</TabsTrigger>
-          </TabsList>
-
-          {/* Email Confirmation Message */}
-          {showEmailConfirmation && (
-            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-md">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <Mail className="h-5 w-5 text-green-400" />
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-green-800">
-                    Email de confirmação enviado!
-                  </h3>
-                  <div className="mt-2 text-sm text-green-700">
-                    <p>
-                      Enviamos um email para <strong>{confirmationEmail}</strong>{' '}
-                      com um link para confirmar sua conta. Verifique sua caixa
-                      de entrada e clique no link para ativar sua conta.
-                    </p>
-                    <p className="mt-2">
-                      Não esqueça de verificar também a pasta de spam/junk.
-                    </p>
-                  </div>
-                  <div className="mt-4">
-                    <Button
-                      onClick={() => {
-                        setShowEmailConfirmation(false);
-                        setActiveTab('signin');
-                        signUpForm.reset();
-                      }}
-                      variant="outline"
-                      size="sm"
-                    >
-                      Entendi
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Sign In Tab */}
-          <TabsContent value="signin" className="space-y-4">
-            <Form {...signInForm}>
-              <form onSubmit={signInForm.handleSubmit(handleSignIn)} className="space-y-4">
-                <FormField
-                  control={signInForm.control}
-                  name="identifier"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email ou Username</FormLabel>
-                      <div className="relative">
-                        <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <FormControl>
-                          <Input
-                            placeholder="seu@email.com ou username"
-                            className="pl-10"
-                            {...field}
-                          />
-                        </FormControl>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={signInForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Senha</FormLabel>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <FormControl>
-                          <Input
-                            type={showSignInPassword ? 'text' : 'password'}
-                            placeholder="Digite sua senha"
-                            className="pl-10 pr-10"
-                            {...field}
-                          />
-                        </FormControl>
-                        <button
-                          type="button"
-                          onClick={() => setShowSignInPassword(!showSignInPassword)}
-                          className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 transition-colors"
-                          aria-label={showSignInPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                        >
-                          {showSignInPassword ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Entrando...
-                    </>
-                  ) : (
-                    'Entrar'
-                  )}
-                </Button>
-              </form>
-            </Form>
-          </TabsContent>
-
-          {/* Sign Up Tab */}
-          <TabsContent value="signup" className="space-y-4">
-            <Form {...signUpForm}>
-              <form onSubmit={signUpForm.handleSubmit(handleSignUp)} className="space-y-4">
-                <FormField
-                  control={signUpForm.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nome Completo</FormLabel>
+        {step === 'email' ? (
+          <Form {...emailForm}>
+            <form onSubmit={emailForm.handleSubmit(handleEmail)} className="space-y-4">
+              <FormField
+                control={emailForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Seu e-mail</FormLabel>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <FormControl>
-                        <Input placeholder="Seu nome completo" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={signUpForm.control}
-                  name="username"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Username</FormLabel>
-                      <div className="relative">
-                        <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <FormControl>
-                          <Input
-                            placeholder="seu_username"
-                            className="pl-10"
-                            {...field}
-                          />
-                        </FormControl>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={signUpForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <FormControl>
-                          <Input
-                            type="email"
-                            placeholder="seu@email.com"
-                            className="pl-10"
-                            {...field}
-                          />
-                        </FormControl>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={signUpForm.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Telefone WhatsApp (opcional)</FormLabel>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <FormControl>
-                          <Input
-                            type="tel"
-                            placeholder="+55 11 98765-4321"
-                            className="pl-10"
-                            {...field}
-                          />
-                        </FormControl>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={signUpForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Senha</FormLabel>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <FormControl>
-                          <Input
-                            type={showSignUpPassword ? 'text' : 'password'}
-                            placeholder="Digite uma senha forte"
-                            className="pl-10 pr-10"
-                            {...field}
-                          />
-                        </FormControl>
-                        <button
-                          type="button"
-                          onClick={() => setShowSignUpPassword(!showSignUpPassword)}
-                          className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 transition-colors"
-                          aria-label={showSignUpPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                        >
-                          {showSignUpPassword ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* REA-36: required, never pre-checked; recorded with its date by the backend. */}
-                <FormField
-                  control={signUpForm.control}
-                  name="adult_declaration"
-                  render={({ field }) => (
-                    <FormItem className="space-y-1">
-                      <div className="flex flex-row items-start gap-3">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value === true}
-                            onCheckedChange={(checked) => field.onChange(checked === true)}
-                            aria-required="true"
-                          />
-                        </FormControl>
-                        <FormLabel className="text-sm font-normal leading-snug text-foreground">
-                          Declaro que tenho 18 anos ou mais. <span className="text-destructive" aria-hidden="true">*</span>
-                        </FormLabel>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* REA-29: optional, never pre-checked; recorded with its date by the backend. */}
-                <FormField
-                  control={signUpForm.control}
-                  name="marketing_opt_in"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start gap-3 space-y-0">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value === true}
-                          onCheckedChange={(checked) => field.onChange(checked === true)}
+                        <Input
+                          type="email"
+                          autoComplete="email"
+                          placeholder="seu@email.com"
+                          className="pl-10"
+                          autoFocus
+                          {...field}
                         />
                       </FormControl>
-                      <FormLabel className="text-sm font-normal leading-snug text-muted-foreground">
-                        Quero receber por e-mail convites e novidades de eventos do Hub Community (opcional).
-                      </FormLabel>
-                    </FormItem>
-                  )}
-                />
-
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Criando conta...
-                    </>
-                  ) : (
-                    'Criar Conta'
-                  )}
-                </Button>
-              </form>
-            </Form>
-          </TabsContent>
-
-          {/* Password Reset Tab */}
-          <TabsContent value="reset" className="space-y-4">
-            <Form {...resetForm}>
-              <form onSubmit={resetForm.handleSubmit(handlePasswordReset)} className="space-y-4">
-                <FormField
-                  control={resetForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <FormControl>
-                          <Input
-                            type="email"
-                            placeholder="seu@email.com"
-                            className="pl-10"
-                            {...field}
-                          />
-                        </FormControl>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Enviando...
-                    </>
-                  ) : (
-                    'Enviar Email de Recuperação'
-                  )}
-                </Button>
-              </form>
-            </Form>
-          </TabsContent>
-        </Tabs>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <p className="text-sm text-muted-foreground">
+                Enviamos um código de acesso para o seu e-mail. Primeira vez no Hub? Sua conta é
+                criada quando você confirmar o código.
+              </p>
+              <Button type="submit" className="w-full" disabled={sending}>
+                {sending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Enviando...
+                  </>
+                ) : (
+                  'Receber código'
+                )}
+              </Button>
+            </form>
+          </Form>
+        ) : (
+          <Form {...codeForm}>
+            <form onSubmit={codeForm.handleSubmit(handleCode)} className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Enviamos um código de 6 números para <strong className="text-foreground">{email}</strong>.
+                Ele vale por 10 minutos. Confira também a caixa de spam.
+              </p>
+              <FormField
+                control={codeForm.control}
+                name="code"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Código</FormLabel>
+                    <div className="relative">
+                      <KeyRound className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <FormControl>
+                        <Input
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          placeholder="000000"
+                          maxLength={7}
+                          className="pl-10 tracking-[0.3em]"
+                          autoFocus
+                          {...field}
+                        />
+                      </FormControl>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" className="w-full" disabled={verifying}>
+                {verifying ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Entrando...
+                  </>
+                ) : (
+                  'Entrar'
+                )}
+              </Button>
+              <div className="flex items-center justify-between text-sm">
+                <button
+                  type="button"
+                  onClick={reset}
+                  className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                >
+                  <ArrowLeft className="h-3 w-3" />
+                  Usar outro e-mail
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={sending || resendIn > 0}
+                  className="text-primary hover:underline disabled:cursor-not-allowed disabled:text-muted-foreground disabled:no-underline"
+                >
+                  {resendIn > 0 ? `Reenviar em ${resendIn}s` : 'Reenviar código'}
+                </button>
+              </div>
+            </form>
+          </Form>
+        )}
       </DialogContent>
     </Dialog>
   );

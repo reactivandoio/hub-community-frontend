@@ -1,8 +1,9 @@
 import * as z from 'zod';
 
 /**
- * Guest signup on the event page: no password. The BFF creates the account
- * (password pending) and e-mails the ticket plus a "Crie sua senha" link.
+ * Guest signup on the event page: no login. The BFF creates the account
+ * (registration pending) and e-mails the ticket plus a "Conclua seu cadastro" link
+ * (REA-26: login by a code sent to the e-mail).
  */
 const phoneRegex = /^\+?[\d\s()-]{8,20}$/;
 
@@ -25,5 +26,5 @@ export function cleanSignupPhone(phone: string): string {
 }
 
 export function guestSignupSuccessMessage(email: string): string {
-  return `Enviamos seu ingresso e o link para criar sua senha para ${email}`;
+  return `Enviamos seu ingresso e o link para concluir seu cadastro para ${email}`;
 }
