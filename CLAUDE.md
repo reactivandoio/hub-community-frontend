@@ -170,6 +170,13 @@ src/
   (`shareArtHeadline`); the organizer's custom art (REA-43) is used as well. The event page shows
   "Gerar arte "eu vou"" under "Participar do Evento". The BFF leaves the flag untouched when an update
   does not send it.
+- **Recorte do fundo da arte (REA-45)** — in `/admin/events/<id>/arte`, a background in another ratio
+  opens `ShareArtBackgroundCropDialog` (react-easy-crop, ratio locked to the format, drag + zoom)
+  instead of an error; "Recortar imagem de fundo" crops the current one again, from the picked
+  original (or, for a saved one, its `/api/og-image` URL). The crop is scaled to exactly 1080×1920 /
+  1080×1080 JPEG and uploaded already cropped; it is never enlarged — a crop under 1080 px of the
+  original's width cannot be confirmed (`cropProblem`), and an image too small even at zoom 1 is
+  refused before the dialog (`cropSourceProblem`). The BFF still checks the uploaded file's ratio.
 
 ### Provider Hierarchy (layout.tsx)
 FirebaseProvider → ApolloProvider → AuthProvider → LoginPromptProvider → LogoutModalWrapper → AgendaProvider → FilterProvider → ThemeProvider → children

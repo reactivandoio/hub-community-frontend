@@ -2,6 +2,7 @@
 
 import { useMutation } from '@apollo/client';
 import {
+  Crop,
   ImagePlus,
   Loader2,
   RotateCcw,
@@ -13,6 +14,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { AdminPageActions } from '@/components/admin/page-actions';
 import { ShareArtAreaEditor } from '@/components/admin/share-art-area-editor';
+import { ShareArtBackgroundCropDialog } from '@/components/admin/share-art-background-crop-dialog';
 import { useUnsavedChanges } from '@/components/admin/unsaved-guard';
 import { CustomArtCanvas } from '@/components/share-art/custom-art-canvas';
 import { Button } from '@/components/ui/button';
@@ -29,15 +31,21 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { UPSERT_SHARE_ART_CONFIG } from '@/lib/queries';
-import { SHARE_ART_FORMATS, type ShareArtFormat } from '@/lib/share-art';
+import {
+  SHARE_ART_FORMATS,
+  sameOriginImageUrl,
+  type ShareArtFormat,
+} from '@/lib/share-art';
 import {
   SHARE_ART_FORMAT_KEYS,
   backgroundProblem,
+  cropSourceProblem,
   customFormatOf,
   defaultPhotoArea,
   formatInput,
   imageRatioOf,
   isSquareArea,
+  ratioMatches,
   squareArea,
   type ShareArtConfig,
   type ShareArtPhotoArea,
@@ -125,6 +133,14 @@ export function ShareArtConfigForm({
   >({});
   const sampleInput = useRef<HTMLInputElement>(null);
   const blobUrls = useRef<string[]>([]);
+  // REA-45: the image each background was cropped from, so "Recortar" starts again from the original
+  // instead of cropping a crop. Unset for a background saved earlier (then its proxied URL is used).
+  const originals = useRef<Partial<Record<ShareArtFormat, string>>>({});
+  const [cropping, setCropping] = useState<{
+    format: ShareArtFormat;
+    src: string;
+    wrongRatio: { width: number; height: number } | null;
+  } | null>(null);
 
   useEffect(() => {
     const next = toFormState(initialConfig);
@@ -150,30 +166,23 @@ export function ShareArtConfigForm({
   const update = (key: ShareArtFormat, patch: Partial<FormatState>) =>
     setState(prev => ({ ...prev, [key]: { ...prev[key], ...patch } }));
 
-  const handleBackground = async (
+  const objectUrl = (file: Blob) => {
+    const url = URL.createObjectURL(file);
+    blobUrls.current.push(url);
+    return url;
+  };
+
+  /** Uploads a background already in the format's ratio and size (checked by the caller). */
+  const uploadBackground = async (
     key: ShareArtFormat,
-    file: File | undefined
+    file: File,
+    original: string
   ) => {
-    if (!file) return;
-    setProblems(prev => ({ ...prev, [key]: undefined }));
-    if (!file.type.startsWith('image/')) {
-      setProblems(prev => ({
-        ...prev,
-        [key]: 'Escolha um arquivo de imagem (PNG ou JPG).',
-      }));
-      return;
-    }
     setUploading(key);
     try {
-      const { width, height } = await readImageSize(file);
-      const problem = backgroundProblem(key, width, height);
-      if (problem) {
-        setProblems(prev => ({ ...prev, [key]: problem }));
-        return;
-      }
       const [id] = await uploadFiles(file);
-      const url = URL.createObjectURL(file);
-      blobUrls.current.push(url);
+      const url = objectUrl(file);
+      originals.current[key] = original;
       setState(prev => ({
         ...prev,
         [key]: {
@@ -191,6 +200,64 @@ export function ShareArtConfigForm({
     } finally {
       setUploading(null);
     }
+  };
+
+  const handleBackground = async (
+    key: ShareArtFormat,
+    file: File | undefined
+  ) => {
+    if (!file) return;
+    setProblems(prev => ({ ...prev, [key]: undefined }));
+    if (!file.type.startsWith('image/')) {
+      setProblems(prev => ({
+        ...prev,
+        [key]: 'Escolha um arquivo de imagem (PNG ou JPG).',
+      }));
+      return;
+    }
+    let size: { width: number; height: number };
+    try {
+      size = await readImageSize(file);
+    } catch (err) {
+      setProblems(prev => ({ ...prev, [key]: errorMessage(err) }));
+      return;
+    }
+    const { width, height } = size;
+    if (!ratioMatches(width, height, imageRatioOf(key))) {
+      // Another ratio: crop it to the format (REA-45) — unless even the widest crop is too narrow.
+      const tooSmall = cropSourceProblem(key, width, height);
+      if (tooSmall) {
+        setProblems(prev => ({ ...prev, [key]: tooSmall }));
+        return;
+      }
+      setCropping({ format: key, src: objectUrl(file), wrongRatio: size });
+      return;
+    }
+    const problem = backgroundProblem(key, width, height);
+    if (problem) {
+      setProblems(prev => ({ ...prev, [key]: problem }));
+      return;
+    }
+    await uploadBackground(key, file, objectUrl(file));
+  };
+
+  /** "Recortar": crops the current background again, from its original image when there is one. */
+  const recrop = (key: ShareArtFormat) => {
+    const src =
+      originals.current[key] ??
+      (state[key].backgroundUrl
+        ? sameOriginImageUrl(state[key].backgroundUrl!)
+        : null);
+    if (!src) return;
+    setProblems(prev => ({ ...prev, [key]: undefined }));
+    setCropping({ format: key, src, wrongRatio: null });
+  };
+
+  const handleCropped = async (file: File) => {
+    if (!cropping) return;
+    const { format: key, src } = cropping;
+    setCropping(null);
+    await uploadBackground(key, file, src);
   };
 
   const handleSamplePhoto = async (file: File | undefined) => {
@@ -316,6 +383,17 @@ export function ShareArtConfigForm({
                         ? 'Trocar imagem de fundo'
                         : 'Escolher imagem de fundo'}
                     </Button>
+                    {value.backgroundUrl && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={uploading !== null}
+                        onClick={() => recrop(key)}
+                      >
+                        <Crop className="mr-2 h-4 w-4" />
+                        Recortar imagem de fundo
+                      </Button>
+                    )}
                     {value.backgroundId && (
                       <Button
                         type="button"
@@ -489,6 +567,14 @@ export function ShareArtConfigForm({
           e.target.value = '';
           handleSamplePhoto(file);
         }}
+      />
+
+      <ShareArtBackgroundCropDialog
+        imageSrc={cropping?.src ?? null}
+        format={cropping?.format ?? format}
+        wrongRatio={cropping?.wrongRatio}
+        onCancel={() => setCropping(null)}
+        onCropped={handleCropped}
       />
     </form>
   );

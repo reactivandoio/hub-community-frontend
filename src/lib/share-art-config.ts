@@ -80,6 +80,44 @@ export function backgroundProblem(
   return null;
 }
 
+/**
+ * Widest crop of a `width`×`height` image in the format's ratio, in pixels of the image (zoom 1 of
+ * the crop dialog). An image in another ratio is cropped to the format before the upload.
+ */
+export function maxCropWidth(
+  format: ShareArtFormat,
+  width: number,
+  height: number
+): number {
+  return Math.floor(Math.min(width, height * imageRatioOf(format)));
+}
+
+/** Why an image cannot be cropped into a background of `format` at all (too small), or null. */
+export function cropSourceProblem(
+  format: ShareArtFormat,
+  width: number,
+  height: number
+): string | null {
+  const spec = SHARE_ART_FORMATS[format];
+  const widest = maxCropWidth(format, width, height);
+  if (widest >= spec.width) return null;
+  return `A imagem ${width}×${height} é pequena demais para o ${spec.label} (${spec.ratio}): cortada nessa proporção, fica com ${widest} px de largura, e o fundo precisa de ao menos ${spec.width} px.`;
+}
+
+/**
+ * Why a crop `cropWidth` pixels wide (of the original image) cannot be the background, or null.
+ * The crop is never enlarged: below the format's width it would be blurry.
+ */
+export function cropProblem(
+  format: ShareArtFormat,
+  cropWidth: number
+): string | null {
+  const spec = SHARE_ART_FORMATS[format];
+  const width = Math.round(cropWidth);
+  if (width >= spec.width) return null;
+  return `O recorte tem ${width} px de largura; o fundo do ${spec.label} precisa de ao menos ${spec.width} px. Diminua o zoom.`;
+}
+
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
