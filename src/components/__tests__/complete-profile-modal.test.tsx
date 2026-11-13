@@ -154,6 +154,40 @@ describe('CompleteProfileModal — form', () => {
   });
 });
 
+describe('CompleteProfileModal — quero receber novidades (REA-29/REA-26)', () => {
+  const fill = async () => {
+    await screen.findByRole('dialog');
+    await userEvent.type(screen.getByLabelText(/nome completo/i), 'Ana Souza');
+    await userEvent.type(screen.getByLabelText(/cpf/i), '52998224725');
+    await userEvent.type(screen.getByLabelText(/data de nascimento/i), '1990-05-17');
+    await userEvent.type(screen.getByLabelText(/whatsapp/i), '+55 62 99999-0000');
+    await userEvent.click(screen.getByRole('checkbox', { name: /18 anos ou mais/ }));
+  };
+  const profile = { name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17', phone: '+55 62 99999-0000', adult_declaration: true };
+  const saved = { data: { updateProfile: { id: '9', username: 'ana-4f2k', email: 'ana@x.io', name: 'Ana Souza', phone: null, cover_photo: null, twitter: null, linkedin: null, github: null, website: null, instagram: null } } };
+
+  it('is optional and never pre-checked', async () => {
+    renderModal([meMock(null)]);
+    await screen.findByRole('dialog');
+    const box = screen.getByRole('checkbox', { name: /novidades de eventos/ });
+    expect(box).not.toBeChecked();
+    expect(box).not.toHaveAttribute('aria-required');
+  });
+
+  it('sends marketing_opt_in only when ticked, and never keeps it in the session', async () => {
+    const update: MockedResponse = {
+      request: { query: UPDATE_PROFILE, variables: { input: { ...profile, marketing_opt_in: true } } },
+      result: saved,
+    };
+    renderModal([meMock(null), update]);
+    await fill();
+    await userEvent.click(screen.getByRole('checkbox', { name: /novidades de eventos/ }));
+    await userEvent.click(screen.getByRole('button', { name: /salvar/i }));
+    await waitFor(() => expect(auth.syncUser).toHaveBeenCalledWith(profile));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+});
+
 describe('CompleteProfileModal — WhatsApp (REA-22)', () => {
   it('rejects a too short WhatsApp before calling the server', async () => {
     renderModal([meMock({ name: 'Ana Souza', cpf: '52998224725', date_of_birth: '1990-05-17' })]);
