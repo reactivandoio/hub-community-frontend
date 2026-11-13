@@ -15,6 +15,19 @@ export const SHARE_ART_ROLES = [
 
 export type ShareArtRole = (typeof SHARE_ART_ROLES)[number];
 
+/**
+ * REA-49: the roles the generator offers, in SHARE_ART_ROLES order. `configured` is the event's
+ * choice (`ShareArtConfig.roles`): null — nothing configured — offers every role, and so does an
+ * empty list (allowed only while no format draws the role text, so the default art still needs one).
+ */
+export function offeredRoles(
+  configured?: readonly string[] | null
+): ShareArtRole[] {
+  if (!configured?.length) return [...SHARE_ART_ROLES];
+  const picked = SHARE_ART_ROLES.filter(role => configured.includes(role));
+  return picked.length ? picked : [...SHARE_ART_ROLES];
+}
+
 export type ShareArtFormat = 'story' | 'feed';
 
 export const SHARE_ART_FORMATS: Record<
