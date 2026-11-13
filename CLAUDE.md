@@ -208,6 +208,16 @@ src/
   feed background saved in 1:1 comes back as null with `retired_formats: ['feed']` — default art in
   that format and a notice in the admin until a new one is sent.
 
+- **Papéis oferecidos no gerador (REA-49)** — `ShareArtConfig.roles` (one list per event, not per
+  format): which of `SHARE_ART_ROLES` the generator offers in "Seu papel no evento", always in that
+  order (`offeredRoles` in `lib/share-art.ts`). Null — nothing configured — offers every role (and so
+  does an empty list, which only exists while no format draws the role text, so the default art still
+  gets one). With one role it is picked alone and the step is not shown (the name becomes step 3), on
+  the default art and on the organizer's art. In `/admin/events/<id>/arte` the card "Papéis no gerador"
+  has one checkbox per role, all marked by default; the save sends `roles` (`rolesInput`: null when
+  every role is marked). While a format with a background places the role text (`placesRoleText`),
+  the last marked role cannot be unmarked and the save is blocked with no role; the BFF refuses it too.
+  The admin preview shows the first marked role.
 - **Organizadores, gestores e convites (REA-48)** — roles: `admin`, `community-manager` (its
   communities and their events), **`event-manager`** (only the events it manages) and `authenticated`.
   A role alone grants nothing: a community-manager needs to be in `community.organizers`, an

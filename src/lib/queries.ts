@@ -1893,6 +1893,7 @@ export const SHARE_ART_CONFIG_FIELDS = gql`
       ...ShareArtFormatFields
     }
     retired_formats
+    roles
   }
 `;
 

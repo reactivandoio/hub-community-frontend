@@ -33,9 +33,9 @@ import {
   SHARE_ART_FORMATS,
   SHARE_ART_LAYOUT,
   SHARE_ART_NAME_MAX,
-  SHARE_ART_ROLES,
   buildShareArtEvent,
   cleanShareArtName,
+  offeredRoles,
   sameOriginImageUrl,
   shareArtFileName,
   shareArtHeadline,
@@ -152,7 +152,15 @@ export function ShareArtGenerator({
   );
 
   const [format, setFormat] = useState<ShareArtFormat>('story');
-  const [role, setRole] = useState<ShareArtRole>('Participante');
+  const [pickedRole, setRole] = useState<ShareArtRole>('Participante');
+  // REA-49: only the roles the organizer offers, in the usual order; a single one is picked alone
+  // and its step is not asked.
+  const roles = useMemo(
+    () => offeredRoles(customConfig?.roles),
+    [customConfig?.roles]
+  );
+  const role = roles.includes(pickedRole) ? pickedRole : roles[0];
+  const asksRole = roles.length > 1;
   const [name, setName] = useState(() => cleanShareArtName(defaultName));
   const [filter, setFilter] = useState<ShareArtFilter>('destaque');
 
@@ -488,10 +496,10 @@ export function ShareArtGenerator({
         )}
         {/* The role and the name: on the default art always; on the organizer's art (REA-47) when
             it placed them, drawn where it chose. */}
-        {(!custom || custom.roleText) && (
+        {asksRole && (!custom || custom.roleText) && (
           <Step index={3} title="Seu papel no evento">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {SHARE_ART_ROLES.map(r => (
+              {roles.map(r => (
                 <OptionButton
                   key={r}
                   selected={role === r}
@@ -504,7 +512,10 @@ export function ShareArtGenerator({
           </Step>
         )}
         {(!custom || custom.nameText) && (
-          <Step index={custom && !custom.roleText ? 3 : 4} title="Seu nome">
+          <Step
+            index={asksRole && (!custom || custom.roleText) ? 4 : 3}
+            title="Seu nome"
+          >
             <Input
               value={name}
               onChange={e => setName(cleanShareArtName(e.target.value))}

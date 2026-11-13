@@ -10,6 +10,8 @@ import {
   defaultPhotoArea,
   formatInput,
   isSquareArea,
+  placesRoleText,
+  rolesInput,
   moveArea,
   ratioMatches,
   resizeArea,
@@ -278,5 +280,21 @@ describe('name and role texts (REA-47)', () => {
     const resized = resizeArea(text, 's', 0, -0.04, { imageRatio: 9 / 16, minSide: SHARE_ART_MIN_TEXT_SIDE });
     expect(resized.height).toBeCloseTo(SHARE_ART_MIN_TEXT_SIDE);
     expect(resized).not.toHaveProperty('radius');
+  });
+});
+
+// REA-49: roles offered in the generator.
+describe('rolesInput / placesRoleText', () => {
+  const ALL = ['Participante', 'Líder', 'Mentor'];
+  it('sends null when every role is marked, else the marked ones in order', () => {
+    expect(rolesInput(['Mentor', 'Participante', 'Líder'], ALL)).toBeNull();
+    expect(rolesInput(['Mentor', 'Participante'], ALL)).toEqual(['Participante', 'Mentor']);
+    expect(rolesInput([], ALL)).toEqual([]);
+  });
+  it('counts the role text only on a format with a background', () => {
+    const text = defaultTextArea('story', 'role');
+    expect(placesRoleText([{ backgroundId: '7', roleText: text }])).toBe(true);
+    expect(placesRoleText([{ backgroundId: null, roleText: text }])).toBe(false);
+    expect(placesRoleText([{ backgroundId: '7', roleText: null }])).toBe(false);
   });
 });

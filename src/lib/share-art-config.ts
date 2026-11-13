@@ -65,6 +65,8 @@ export interface ShareArtConfig {
   feed: ShareArtFormatConfig | null;
   /** REA-47: formats whose saved background is in an old ratio (the 1:1 feed): default art for now. */
   retired_formats?: string[] | null;
+  /** REA-49: roles offered in the generator, in its order; null → every role. */
+  roles?: string[] | null;
 }
 
 export const SHARE_ART_FORMAT_KEYS: ShareArtFormat[] = ['story', 'feed'];
@@ -511,4 +513,25 @@ export function fitTextSize(
   const width = measure(px);
   if (width > areaWidth && width > 0) px = (px * areaWidth) / width;
   return Math.max(1, Math.floor(px * 100) / 100);
+}
+
+// ─── REA-49: roles offered in the generator ────────────────────────────────────────────────
+
+/** Does any complete format draw the role text? Then at least one role must stay offered. */
+export function placesRoleText(
+  formats: { backgroundId: string | null; roleText: ShareArtText | null }[]
+): boolean {
+  return formats.some(value => Boolean(value.backgroundId && value.roleText));
+}
+
+/**
+ * What the save sends as `roles`: null when every role is marked (nothing to restrict, and a role
+ * added later shows up too), otherwise the marked ones in the generator's order.
+ */
+export function rolesInput(
+  marked: readonly string[],
+  all: readonly string[]
+): string[] | null {
+  const picked = all.filter(role => marked.includes(role));
+  return picked.length === all.length ? null : picked;
 }
