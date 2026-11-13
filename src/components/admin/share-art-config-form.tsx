@@ -24,6 +24,7 @@ import { ShareArtBackgroundCropDialog } from '@/components/admin/share-art-backg
 import { useUnsavedChanges } from '@/components/admin/unsaved-guard';
 import { CustomArtCanvas } from '@/components/share-art/custom-art-canvas';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Card,
   CardContent,
@@ -47,8 +48,10 @@ import { useToast } from '@/hooks/use-toast';
 import { UPSERT_SHARE_ART_CONFIG } from '@/lib/queries';
 import {
   SHARE_ART_FORMATS,
+  SHARE_ART_ROLES,
   sameOriginImageUrl,
   type ShareArtFormat,
+  type ShareArtRole,
 } from '@/lib/share-art';
 import {
   SHARE_ART_FONTS,
@@ -63,7 +66,9 @@ import {
   formatInput,
   imageRatioOf,
   isSquareArea,
+  placesRoleText,
   ratioMatches,
+  rolesInput,
   squareArea,
   type ShareArtAlign,
   type ShareArtConfig,
@@ -96,9 +101,17 @@ const TEXT_FIELD: Record<TextKind, 'nameText' | 'roleText'> = {
 };
 const TEXT_LABEL: Record<TextKind, string> = { name: 'Nome', role: 'Papel' };
 
-/** The sample name and role of the admin preview (the person types/picks them in the generator). */
+/** The sample name of the admin preview (the person types it in the generator). */
 const SAMPLE_NAME = 'Maria Silva';
-const SAMPLE_ROLE = 'Participante';
+
+/** REA-49: the roles marked to be offered in the generator; nothing configured → all of them. */
+export function toRolesState(
+  config: ShareArtConfig | null | undefined
+): ShareArtRole[] {
+  const roles = config?.roles;
+  if (!roles) return [...SHARE_ART_ROLES];
+  return SHARE_ART_ROLES.filter(role => roles.includes(role));
+}
 
 export function toFormState(
   config: ShareArtConfig | null | undefined
@@ -128,8 +141,11 @@ const formatOf = (value: FormatState) =>
   });
 
 /** What the save sends: the local blob URL and the "square" switch are editor state only. */
-const savedShape = (state: FormState) =>
-  JSON.stringify(SHARE_ART_FORMAT_KEYS.map(format => formatOf(state[format])));
+const savedShape = (state: FormState, roles: ShareArtRole[]) =>
+  JSON.stringify([
+    ...SHARE_ART_FORMAT_KEYS.map(format => formatOf(state[format])),
+    rolesInput(roles, SHARE_ART_ROLES),
+  ]);
 
 function errorMessage(err: unknown): string {
   const apolloErr = err as {
@@ -160,6 +176,11 @@ export function ShareArtConfigForm({
   const { toast } = useToast();
   const [saved, setSaved] = useState(() => toFormState(initialConfig));
   const [state, setState] = useState(saved);
+  // REA-49: roles offered in the generator (one list for the event, not per format).
+  const [savedRoles, setSavedRoles] = useState(() =>
+    toRolesState(initialConfig)
+  );
+  const [roles, setRoles] = useState(savedRoles);
   // REA-47: which area of each format is being edited (the photo, the name or the role).
   const [active, setActive] = useState<Record<ShareArtFormat, EditorAreaKey>>({
     story: 'photo',
@@ -190,6 +211,9 @@ export function ShareArtConfigForm({
     const next = toFormState(initialConfig);
     setSaved(next);
     setState(next);
+    const nextRoles = toRolesState(initialConfig);
+    setSavedRoles(nextRoles);
+    setRoles(nextRoles);
   }, [initialConfig]);
 
   useEffect(
@@ -198,9 +222,18 @@ export function ShareArtConfigForm({
   );
 
   const dirty = useMemo(
-    () => savedShape(state) !== savedShape(saved),
-    [state, saved]
+    () => savedShape(state, roles) !== savedShape(saved, savedRoles),
+    [state, saved, roles, savedRoles]
   );
+  // REA-49: while a format draws the role text, some role must be left to pick.
+  const roleTextPlaced = placesRoleText(
+    SHARE_ART_FORMAT_KEYS.map(key => state[key])
+  );
+  const noRole = roleTextPlaced && roles.length === 0;
+  const toggleRole = (role: ShareArtRole, checked: boolean) =>
+    setRoles(prev =>
+      SHARE_ART_ROLES.filter(r => (r === role ? checked : prev.includes(r)))
+    );
   useUnsavedChanges(dirty, () => false);
 
   const [upsert, { loading: saving }] = useMutation<{
@@ -213,7 +246,7 @@ export function ShareArtConfigForm({
   // REA-47: the sample texts of the editor and the preview.
   const samples: Record<TextKind, string> = {
     name: SAMPLE_NAME,
-    role: SAMPLE_ROLE,
+    role: roles[0] ?? SHARE_ART_ROLES[0],
   };
   const textAreas = (value: FormatState) =>
     (['name', 'role'] as TextKind[]).flatMap(kind => {
@@ -353,6 +386,7 @@ export function ShareArtConfigForm({
           data: {
             story: formatOf(state.story),
             feed: formatOf(state.feed),
+            roles: rolesInput(roles, SHARE_ART_ROLES),
           },
         },
       });
@@ -379,7 +413,10 @@ export function ShareArtConfigForm({
             type="button"
             size="sm"
             variant="ghost"
-            onClick={() => setState(saved)}
+            onClick={() => {
+              setState(saved);
+              setRoles(savedRoles);
+            }}
             disabled={saving}
           >
             <RotateCcw className="mr-2 h-4 w-4" />
@@ -390,7 +427,7 @@ export function ShareArtConfigForm({
           type="submit"
           size="sm"
           form={FORM_ID}
-          disabled={!dirty || saving || uploading !== null}
+          disabled={!dirty || saving || uploading !== null || noRole}
         >
           {saving ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -696,6 +733,55 @@ export function ShareArtConfigForm({
         })}
       </Tabs>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Papéis no gerador</CardTitle>
+          <CardDescription>
+            Quais papéis o participante pode escolher em &quot;Seu papel no
+            evento&quot;, nos dois formatos e na arte padrão. Com um papel só,
+            ele já vem escolhido e o passo não aparece.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div
+            role="group"
+            aria-label="Papéis oferecidos no gerador"
+            className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+          >
+            {SHARE_ART_ROLES.map(role => {
+              const checked = roles.includes(role);
+              // The last role cannot be unmarked while the role text is on the art.
+              const locked = checked && roles.length === 1 && roleTextPlaced;
+              const id = `role-${role}`;
+              return (
+                <div key={role} className="flex items-center gap-2">
+                  <Checkbox
+                    id={id}
+                    checked={checked}
+                    disabled={locked}
+                    onCheckedChange={value => toggleRole(role, value === true)}
+                  />
+                  <Label htmlFor={id}>{role}</Label>
+                </div>
+              );
+            })}
+          </div>
+          {noRole ? (
+            <p role="alert" className="text-sm text-destructive">
+              Marque pelo menos um papel: o texto do papel está na arte.
+            </p>
+          ) : (
+            roleTextPlaced &&
+            roles.length === 1 && (
+              <p className="text-xs text-muted-foreground">
+                O texto do papel está na arte, então pelo menos um papel fica
+                marcado.
+              </p>
+            )
+          )}
+        </CardContent>
+      </Card>
+
       <input
         ref={sampleInput}
         type="file"
@@ -754,7 +840,7 @@ function TextControls({
           <p className="text-xs text-muted-foreground">
             {kind === 'name'
               ? 'O nome que a pessoa digita no gerador (quem está logado já vem preenchido).'
-              : 'O papel que a pessoa escolhe no gerador: Participante, Líder, Mentor, Voluntário, Palestrante ou Organizador.'}
+              : 'O papel que a pessoa escolhe no gerador, entre os marcados em "Papéis no gerador".'}
           </p>
         </div>
         <Switch

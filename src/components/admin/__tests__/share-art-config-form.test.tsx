@@ -65,6 +65,7 @@ const saved = (story: Record<string, unknown> | null, extra: Record<string, unkn
   story,
   feed: null,
   retired_formats: [],
+  roles: null,
   ...extra,
 });
 
@@ -80,7 +81,8 @@ const storyInput = (photo_area: typeof AREA, texts: Record<string, unknown> = {}
   role_text: null,
   ...texts,
 });
-const input = (story: unknown) => ({ story, feed: null });
+/** REA-49: the roles go with every save; null = every role. */
+const input = (story: unknown, roles: string[] | null = null) => ({ story, feed: null, roles });
 /** A first background starts with the name and the role under the photo. */
 const defaultTexts = (format: 'story' | 'feed') => ({
   name_text: rounded(defaultTextArea(format, 'name')),
@@ -317,5 +319,92 @@ describe('ShareArtConfigForm — the feed is 4:5 (REA-47)', () => {
     renderForm(saved(storyFormat(), { retired_formats: ['feed'] }) as ShareArtConfig);
     await userEvent.click(screen.getByRole('tab', { name: /Feed/ }));
     expect(screen.getByTestId('retired-feed')).toHaveTextContent('o Feed agora é 4:5 (1080×1350)');
+  });
+});
+
+// ─── REA-49: roles offered in the generator ──────────────────────────────────────────────
+
+describe('ShareArtConfigForm — roles offered in the generator (REA-49)', () => {
+  const ROLE = {
+    __typename: 'ShareArtText', x: 0.1, y: 0.78, width: 0.8, height: 0.04,
+    font: 'inter', size: 0.04, color: '#ffffff', align: 'center',
+  };
+  const withRole = () => ({ ...storyFormat(), role_text: ROLE });
+  const roleBox = (role: string) => screen.getByRole('checkbox', { name: role });
+  const ORDER = ['Participante', 'Líder', 'Mentor', 'Voluntário', 'Palestrante', 'Organizador'];
+
+  it('marks every role, in the usual order, when nothing is configured', () => {
+    renderForm(null);
+    const group = screen.getByRole('group', { name: 'Papéis oferecidos no gerador' });
+    expect(Array.from(group.querySelectorAll('label')).map(l => l.textContent)).toEqual(ORDER);
+    ORDER.forEach(role => expect(roleBox(role)).toBeChecked());
+  });
+
+  it('shows the saved choice', () => {
+    renderForm(saved(storyFormat(), { roles: ['Mentor', 'Palestrante'] }) as ShareArtConfig);
+    expect(roleBox('Mentor')).toBeChecked();
+    expect(roleBox('Palestrante')).toBeChecked();
+    expect(roleBox('Participante')).not.toBeChecked();
+  });
+
+  it('saves the marked roles in the usual order', async () => {
+    const mutation = upsertMock(
+      input({ ...storyInput(AREA), background: '7' }, ['Mentor', 'Organizador']),
+      saved(storyFormat(), { roles: ['Mentor', 'Organizador'] })
+    );
+    renderForm(saved(storyFormat()) as ShareArtConfig, [mutation]);
+    for (const role of ['Organizador', 'Participante', 'Líder', 'Voluntário', 'Palestrante']) {
+      // eslint-disable-next-line no-await-in-loop
+      await userEvent.click(roleBox(role));
+    }
+    await userEvent.click(roleBox('Organizador'));
+    await userEvent.click(screen.getByRole('button', { name: /Salvar arte/ }));
+    await waitFor(() => expect(mutation.newData).toHaveBeenCalled());
+  });
+
+  it('saves null when every role is marked again', async () => {
+    const mutation = upsertMock(input({ ...storyInput(AREA), background: '7' }, null), saved(storyFormat()));
+    renderForm(saved(storyFormat(), { roles: ORDER.slice(0, 5) }) as ShareArtConfig, [mutation]);
+    await userEvent.click(roleBox('Organizador'));
+    await userEvent.click(screen.getByRole('button', { name: /Salvar arte/ }));
+    await waitFor(() => expect(mutation.newData).toHaveBeenCalled());
+  });
+
+  it('keeps the last role marked while the role text is on the art', async () => {
+    renderForm(saved(withRole(), { roles: ['Mentor', 'Líder'] }) as ShareArtConfig);
+    await userEvent.click(roleBox('Mentor'));
+    expect(roleBox('Líder')).toBeChecked();
+    expect(roleBox('Líder')).toBeDisabled();
+    expect(screen.getByText(/pelo menos um papel fica marcado/)).toBeInTheDocument();
+    // The preview shows the first offered role.
+    expect(screen.getByRole('group', { name: /Área do papel/ })).toHaveTextContent('Líder');
+  });
+
+  it('lets every role be unmarked when the role text is not on the art', async () => {
+    const mutation = upsertMock(input({ ...storyInput(AREA), background: '7' }, []), saved(storyFormat()));
+    renderForm(saved(storyFormat(), { roles: ['Mentor'] }) as ShareArtConfig, [mutation]);
+    expect(roleBox('Mentor')).toBeEnabled();
+    await userEvent.click(roleBox('Mentor'));
+    await userEvent.click(screen.getByRole('button', { name: /Salvar arte/ }));
+    await waitFor(() => expect(mutation.newData).toHaveBeenCalled());
+  });
+
+  it('does not save the role text on the art with no role marked', async () => {
+    renderForm(saved(storyFormat(), { roles: [] }) as ShareArtConfig);
+    await userEvent.click(screen.getByRole('radio', { name: 'Papel' }));
+    await userEvent.click(screen.getByRole('switch', { name: /Mostrar o papel na arte/ }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Marque pelo menos um papel');
+    expect(screen.getByRole('button', { name: /Salvar arte/ })).toBeDisabled();
+    await userEvent.click(roleBox('Palestrante'));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Salvar arte/ })).toBeEnabled();
+  });
+
+  it('discards the role changes with the rest', async () => {
+    renderForm(saved(withRole()) as ShareArtConfig);
+    await userEvent.click(roleBox('Mentor'));
+    await userEvent.click(screen.getByRole('button', { name: /Descartar/ }));
+    expect(roleBox('Mentor')).toBeChecked();
+    expect(screen.getByRole('button', { name: /Salvar arte/ })).toBeDisabled();
   });
 });

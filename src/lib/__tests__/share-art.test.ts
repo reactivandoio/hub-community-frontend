@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   SHARE_ART_LAYOUT,
+  SHARE_ART_ROLES,
   buildShareArtEvent,
   cleanShareArtName,
   fitWithin,
   formatShareArtDate,
+  offeredRoles,
   sameOriginImageUrl,
   shareArtFileName,
 } from '../share-art';
@@ -115,5 +117,21 @@ describe('SHARE_ART_LAYOUT', () => {
     ).toBeCloseTo(16 / 9);
     // REA-47: the feed is 4:5 (1080×1350).
     expect(SHARE_ART_LAYOUT.feed.height / SHARE_ART_LAYOUT.feed.width).toBeCloseTo(5 / 4);
+  });
+});
+
+// REA-49: the organizer picks which roles the generator offers.
+describe('offeredRoles', () => {
+  it('offers every role, in the usual order, without configuration', () => {
+    expect(offeredRoles(null)).toEqual([...SHARE_ART_ROLES]);
+    expect(offeredRoles(undefined)).toEqual([...SHARE_ART_ROLES]);
+    expect(SHARE_ART_ROLES).toEqual(['Participante', 'Líder', 'Mentor', 'Voluntário', 'Palestrante', 'Organizador']);
+  });
+  it('keeps the usual order whatever the saved order', () => {
+    expect(offeredRoles(['Organizador', 'Líder'])).toEqual(['Líder', 'Organizador']);
+  });
+  it('falls back to every role on an empty or unknown list (the default art still needs one)', () => {
+    expect(offeredRoles([])).toEqual([...SHARE_ART_ROLES]);
+    expect(offeredRoles(['Patrocinador'])).toEqual([...SHARE_ART_ROLES]);
   });
 });
