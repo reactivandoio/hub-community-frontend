@@ -21,6 +21,7 @@ import {
 import type { Area } from 'react-easy-crop';
 import { toast } from 'sonner';
 
+import { CustomArtCanvas } from '@/components/share-art/custom-art-canvas';
 import { ShareArtCropper } from '@/components/share-art/share-art-cropper';
 import { ShareArtTemplate } from '@/components/share-art/share-art-template';
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,13 @@ import {
   type ShareArtRole,
 } from '@/lib/share-art';
 import {
+  areaAspect,
+  customFormatOf,
+  imageRatioOf,
+  type ShareArtConfig,
+} from '@/lib/share-art-config';
+import { exportCustomArt, loadArtImage } from '@/lib/share-art-custom';
+import {
   cropPhoto,
   downloadBlob,
   exportNodeToPng,
@@ -57,7 +65,12 @@ const HUB_LOGO = '/images/logo-horizontal-raw.png';
 interface ShareArtGeneratorProps {
   event: ShareArtEventInput & { slug: string };
   defaultName?: string;
+  /** REA-43: the event's custom art; a format without it keeps the default art. */
+  customConfig?: ShareArtConfig | null;
 }
+
+/** Background of a custom format: its data URL, or 'failed' (→ default art for that format). */
+type BackgroundState = Partial<Record<ShareArtFormat, string>>;
 
 interface GeneratedArt {
   blob: Blob;
@@ -117,6 +130,7 @@ function OptionButton({
 export function ShareArtGenerator({
   event,
   defaultName = '',
+  customConfig = null,
 }: ShareArtGeneratorProps) {
   const artEvent = useMemo(() => buildShareArtEvent(event), [event]);
 
@@ -148,6 +162,45 @@ export function ShareArtGenerator({
   const [previewScale, setPreviewScale] = useState(1);
 
   const layout = SHARE_ART_LAYOUT[format];
+
+  // REA-43: custom art of this format (organizer's background + photo area), once its background
+  // is loaded as a data URL (canvas export needs same-origin pixels). Until then, or if it fails,
+  // the default template is used.
+  const [backgrounds, setBackgrounds] = useState<BackgroundState>({});
+  const storyBackground = customFormatOf(customConfig, 'story')?.background;
+  const feedBackground = customFormatOf(customConfig, 'feed')?.background;
+  useEffect(() => {
+    let cancelled = false;
+    (
+      [
+        ['story', storyBackground],
+        ['feed', feedBackground],
+      ] as const
+    ).forEach(([key, url]) => {
+      if (!url) return;
+      imageToDataUrl(sameOriginImageUrl(url)).then(dataUrl => {
+        if (cancelled) return;
+        if (!dataUrl) console.warn('Arte do evento: fundo indisponível', key);
+        setBackgrounds(prev => ({ ...prev, [key]: dataUrl ?? 'failed' }));
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [storyBackground, feedBackground]);
+
+  const customFormat = customFormatOf(customConfig, format);
+  const customBackground = backgrounds[format];
+  const custom =
+    customFormat && customBackground && customBackground !== 'failed'
+      ? { area: customFormat.photo_area, background: customBackground }
+      : null;
+  const customPending = Boolean(customFormat) && !customBackground;
+  // The crop follows the configured area even before the background loads (a failed background
+  // falls back to the default frame, which covers any ratio).
+  const photoAspect = customFormat
+    ? areaAspect(customFormat.photo_area, imageRatioOf(format))
+    : layout.photo.width / layout.photo.height;
 
   // Event cover and Hub logo as data URLs, so html-to-image can embed them.
   useEffect(() => {
@@ -191,7 +244,7 @@ export function ShareArtGenerator({
     uploadRun.current += 1;
     setGenerated(null);
     setUpload({ status: 'idle' });
-  }, [format, role, name, photoUrl, coverUrl, logoUrl]);
+  }, [format, role, name, photoUrl, coverUrl, logoUrl, custom?.background]);
 
   // Fit the fixed-size template into the preview column.
   useEffect(() => {
@@ -248,17 +301,26 @@ export function ShareArtGenerator({
       downloadBlob(generated.blob, generated.fileName);
       return;
     }
-    if (!templateRef.current) return;
+    if (!custom && !templateRef.current) return;
     setIsExporting(true);
     try {
-      const blob = await exportNodeToPng(
-        templateRef.current,
-        layout,
-        SHARE_ART_FORMATS[format]
-      );
+      const output = SHARE_ART_FORMATS[format];
+      const blob = custom
+        ? await exportCustomArt({
+            width: output.width,
+            height: output.height,
+            background: await loadArtImage(custom.background),
+            photo: photoUrl ? await loadArtImage(photoUrl) : null,
+            area: custom.area,
+          })
+        : await exportNodeToPng(templateRef.current!, layout, output);
       const art = {
         blob,
-        fileName: shareArtFileName(event.slug, role, format),
+        fileName: shareArtFileName(
+          event.slug,
+          custom ? 'eu-vou' : role,
+          format
+        ),
       };
       setGenerated(art);
       downloadBlob(art.blob, art.fileName);
@@ -298,7 +360,7 @@ export function ShareArtGenerator({
               <ShareArtCropper
                 key={format}
                 imageSrc={source}
-                aspect={layout.photo.width / layout.photo.height}
+                aspect={photoAspect}
                 onConfirm={area => {
                   setCrop({ area, format });
                   setIsCropping(false);
@@ -388,32 +450,41 @@ export function ShareArtGenerator({
           </div>
         </Step>
 
-        <Step index={3} title="Seu papel no evento">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {SHARE_ART_ROLES.map(r => (
-              <OptionButton
-                key={r}
-                selected={role === r}
-                onClick={() => setRole(r)}
-              >
-                {r}
-              </OptionButton>
-            ))}
-          </div>
-        </Step>
-
-        <Step index={4} title="Seu nome">
-          <Input
-            value={name}
-            onChange={e => setName(cleanShareArtName(e.target.value))}
-            maxLength={SHARE_ART_NAME_MAX}
-            placeholder="Como você quer aparecer"
-            aria-label="Seu nome"
-          />
-          <p className="text-xs text-muted-foreground">
-            {name.length}/{SHARE_ART_NAME_MAX} caracteres
+        {custom ? (
+          <p className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">
+            Este formato usa a arte do evento: sua foto entra no espaço que a
+            organização preparou.
           </p>
-        </Step>
+        ) : (
+          <>
+            <Step index={3} title="Seu papel no evento">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {SHARE_ART_ROLES.map(r => (
+                  <OptionButton
+                    key={r}
+                    selected={role === r}
+                    onClick={() => setRole(r)}
+                  >
+                    {r}
+                  </OptionButton>
+                ))}
+              </div>
+            </Step>
+
+            <Step index={4} title="Seu nome">
+              <Input
+                value={name}
+                onChange={e => setName(cleanShareArtName(e.target.value))}
+                maxLength={SHARE_ART_NAME_MAX}
+                placeholder="Como você quer aparecer"
+                aria-label="Seu nome"
+              />
+              <p className="text-xs text-muted-foreground">
+                {name.length}/{SHARE_ART_NAME_MAX} caracteres
+              </p>
+            </Step>
+          </>
+        )}
       </div>
 
       {/* Preview + actions */}
@@ -435,21 +506,35 @@ export function ShareArtGenerator({
                 height: layout.height * previewScale,
               }}
             >
-              <div
-                className="origin-top-left"
-                style={{ transform: `scale(${previewScale})` }}
-              >
-                <ShareArtTemplate
-                  ref={templateRef}
-                  format={format}
-                  event={artEvent}
-                  role={role}
-                  name={name}
+              {custom ? (
+                <CustomArtCanvas
+                  backgroundUrl={custom.background}
                   photoUrl={photoUrl}
-                  coverUrl={coverUrl}
-                  logoUrl={logoUrl}
+                  area={custom.area}
+                  width={layout.width * previewScale}
+                  height={layout.height * previewScale}
+                  className="rounded-none shadow-none"
+                  label="Prévia da sua arte"
                 />
-              </div>
+              ) : customPending ? (
+                <div className="h-full w-full animate-pulse bg-muted" />
+              ) : (
+                <div
+                  className="origin-top-left"
+                  style={{ transform: `scale(${previewScale})` }}
+                >
+                  <ShareArtTemplate
+                    ref={templateRef}
+                    format={format}
+                    event={artEvent}
+                    role={role}
+                    name={name}
+                    photoUrl={photoUrl}
+                    coverUrl={coverUrl}
+                    logoUrl={logoUrl}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -457,7 +542,7 @@ export function ShareArtGenerator({
             <Button
               size="lg"
               className="w-full rounded-full font-semibold"
-              disabled={isExporting || isCropping}
+              disabled={isExporting || isCropping || customPending}
               onClick={handleDownload}
             >
               {isExporting ? (

@@ -267,7 +267,7 @@ describe('AdminShell: event context', () => {
 
     const nav = menu('Menu do evento');
     expect(linkNames(nav)).toEqual([
-      'Geral', 'Programação', 'Produtos & Lotes', 'Cupons',
+      'Geral', 'Programação', 'Produtos & Lotes', 'Cupons', 'Arte "Eu vou"',
       'Analytics', 'Inscrições', 'Presenças', 'Certificados', 'E-mail marketing',
       'Check-in', 'Credenciamento', 'Sorteio', 'Página pública',
     ]);

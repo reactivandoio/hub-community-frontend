@@ -1854,3 +1854,47 @@ export const ADMIN_BLOCK_MINOR = gql`
     }
   }
 `;
+
+// REA-43 — arte "eu vou" personalizada do evento (fundo e área da foto por formato).
+export const SHARE_ART_CONFIG_FIELDS = gql`
+  fragment ShareArtFormatFields on ShareArtFormatConfig {
+    background
+    background_id
+    background_width
+    background_height
+    photo_area {
+      x
+      y
+      width
+      height
+      radius
+    }
+  }
+  fragment ShareArtConfigFields on ShareArtConfig {
+    id
+    story {
+      ...ShareArtFormatFields
+    }
+    feed {
+      ...ShareArtFormatFields
+    }
+  }
+`;
+
+export const GET_SHARE_ART_CONFIG = gql`
+  ${SHARE_ART_CONFIG_FIELDS}
+  query GetShareArtConfig($eventId: String!) {
+    shareArtConfig(eventId: $eventId) {
+      ...ShareArtConfigFields
+    }
+  }
+`;
+
+export const UPSERT_SHARE_ART_CONFIG = gql`
+  ${SHARE_ART_CONFIG_FIELDS}
+  mutation UpsertShareArtConfig($eventId: String!, $data: ShareArtConfigInput!) {
+    upsertShareArtConfig(eventId: $eventId, data: $data) {
+      ...ShareArtConfigFields
+    }
+  }
+`;

@@ -82,6 +82,7 @@ describe('eventNavGroups', () => {
       ['Programação', '/admin/events/e1/programacao'],
       ['Produtos & Lotes', '/admin/events/e1/produtos'],
       ['Cupons', '/admin/events/e1/cupons'],
+      ['Arte "Eu vou"', '/admin/events/e1/arte'],
       ['Analytics', '/admin/events/e1/analytics'],
       ['Inscrições', '/admin/events/e1/import-signups'],
       ['Presenças', '/admin/events/e1/attendance'],
@@ -99,6 +100,11 @@ describe('eventNavGroups', () => {
     expect(labels(all({ isAdmin: false }))).not.toContain('Cupons');
     expect(labels(all({ paymentsV2: false }))).not.toContain('Cupons');
     expect(labels(all({ paymentsV2: null }))).not.toContain('Cupons');
+  });
+
+  it('shows the "Eu vou" art to the admin and to the organizer (REA-43)', () => {
+    expect(labels(all({ isAdmin: false, paymentsV2: false }))).toContain('Arte "Eu vou"');
+    expect(labels(all())).toContain('Arte "Eu vou"');
   });
 
   it('opens the tools that live outside the admin in a new tab', () => {
@@ -159,6 +165,7 @@ describe('adminBreadcrumbs', () => {
     expect(trail('/admin/events/e1/import-signups', 'Meetup')).toContain('Inscrições');
     expect(trail('/admin/events/e1/attendance', 'Meetup')).toContain('Presenças');
     expect(trail('/admin/events/e1/certificados', 'Meetup')).toContain('Certificados');
+    expect(trail('/admin/events/e1/arte', 'Meetup')).toContain('Arte "Eu vou"');
   });
 
   it('says "Evento" while the title is loading', () => {
