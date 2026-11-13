@@ -15,8 +15,12 @@ import {
   GET_EVENT_BY_SLUG_OR_ID,
   GET_SHARE_ART_CONFIG,
   IS_USER_SIGNED_UP,
+  MY_SHARE_ART_ROLE,
 } from '@/lib/queries';
-import type { ShareArtConfig } from '@/lib/share-art-config';
+import type {
+  ShareArtConfig,
+  ShareArtPersonRole,
+} from '@/lib/share-art-config';
 
 function GeneratorSkeleton() {
   return (
@@ -86,6 +90,18 @@ export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
     errorPolicy: 'all',
   });
 
+  // REA-47: the person's role on the organizer's art (organizer, speaker or by the product of the
+  // signup). Only asked when logged in; any failure → no role on the art.
+  const { data: roleData, loading: roleLoading } = useQuery<{
+    myShareArtRole: ShareArtPersonRole | null;
+  }>(MY_SHARE_ART_ROLE, {
+    variables: { eventId: slugOrId },
+    skip: !canGenerate || !isAuthenticated,
+    fetchPolicy: 'network-only',
+    errorPolicy: 'all',
+  });
+  const personRole = roleData?.myShareArtRole?.role ?? null;
+
   // Signed out: the login opens over this page once (REA-25); the notice keeps a button.
   const askLogin = () => requestLogin({ reason: 'Entre para gerar sua arte' });
   const needsLogin =
@@ -103,7 +119,7 @@ export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
     !hydrated ||
     eventLoading ||
     (isAuthenticated && signupLoading) ||
-    (canGenerate && artLoading)
+    (canGenerate && (artLoading || (isAuthenticated && roleLoading)))
   ) {
     content = <GeneratorSkeleton />;
   } else if (eventError || !event) {
@@ -133,6 +149,7 @@ export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
           defaultName={user?.name || ''}
           customConfig={artData?.shareArtConfig ?? null}
           signedUp={isSignedUp}
+          personRole={personRole}
         />
       </>
     );

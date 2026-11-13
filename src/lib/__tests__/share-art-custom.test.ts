@@ -78,3 +78,86 @@ describe('roundedRectPath', () => {
     expect(named('arcTo').every(c => c[5] === 20)).toBe(true);
   });
 });
+
+// ─── REA-47: name and role ───────────────────────────────────────────────────────────────
+import { artFont, drawArtText } from '../share-art-custom';
+import type { ShareArtText } from '../share-art-config';
+
+/** A recorder whose measureText gives 0.5 × font size per character (read from ctx.font). */
+function textRecorder() {
+  const base = recorder();
+  const ctx = base.ctx as unknown as Record<string, unknown>;
+  ctx.measureText = (text: string) => {
+    const px = Number(/ (\d+(?:\.\d+)?)px /.exec(String(ctx.font))?.[1] ?? 0);
+    return { width: text.length * px * 0.5 };
+  };
+  return base;
+}
+
+const NAME: ShareArtText = {
+  x: 0.1, y: 0.7, width: 0.8, height: 0.05, font: 'inter_bold', size: 0.05, color: '#ff0000', align: 'center',
+};
+
+describe('drawArtText (REA-47)', () => {
+  it('draws the text centered in its area, in its color, at its size (fraction of the width)', () => {
+    const { ctx, named } = textRecorder();
+    drawArtText(ctx, { text: 'Ana', style: NAME }, 1080, 1920);
+    // Area: x 108..972 (864 wide), y 1344..1440 → middle 1392. Size 0.05 × 1080 = 54px.
+    expect(named('fillText')).toEqual([['fillText', 'Ana', 540, 1392]]);
+    const c = ctx as unknown as Record<string, unknown>;
+    expect(c.fillStyle).toBe('#ff0000');
+    expect(c.textAlign).toBe('center');
+    expect(c.textBaseline).toBe('middle');
+    expect(String(c.font)).toMatch(/^800 54px /);
+  });
+
+  it('anchors left and right alignment on the edges of the area', () => {
+    const left = textRecorder();
+    drawArtText(left.ctx, { text: 'Ana', style: { ...NAME, align: 'left' } }, 1080, 1920);
+    expect(left.named('fillText')[0][2]).toBeCloseTo(108);
+    const right = textRecorder();
+    drawArtText(right.ctx, { text: 'Ana', style: { ...NAME, align: 'right' } }, 1080, 1920);
+    expect(right.named('fillText')[0][2]).toBeCloseTo(972);
+  });
+
+  it('shrinks a long text to fit the width of its area', () => {
+    const { ctx } = textRecorder();
+    const long = 'Maria Aparecida dos Santos Oliveira Silva'; // 41 chars: 41 × 27 = 1107px at 54px
+    drawArtText(ctx, { text: long, style: NAME }, 1080, 1920);
+    const px = Number(/ (\d+(?:\.\d+)?)px /.exec(String((ctx as unknown as Record<string, unknown>).font))![1]);
+    expect(px).toBeLessThan(54);
+    expect(long.length * px * 0.5).toBeLessThanOrEqual(864);
+  });
+
+  it('draws nothing for an empty text', () => {
+    const { ctx, named } = textRecorder();
+    drawArtText(ctx, { text: '   ', style: NAME }, 1080, 1920);
+    expect(named('fillText')).toEqual([]);
+  });
+
+  it('drawCustomArt draws the texts over the photo, after the clip is restored', () => {
+    const { ctx, calls } = textRecorder();
+    drawCustomArt(ctx, {
+      width: 1080,
+      height: 1920,
+      background,
+      photo,
+      area: { x: 0.25, y: 0.3, width: 0.5, height: 0.28125, radius: 1 },
+      texts: [
+        { text: 'Ana', style: NAME },
+        { text: 'Mentora', style: { ...NAME, y: 0.76, font: 'dancing_script' } },
+      ],
+    });
+    const order = calls.map(c => c[0]);
+    const firstText = order.indexOf('fillText');
+    expect(firstText).toBeGreaterThan(order.lastIndexOf('drawImage'));
+    expect(firstText).toBeGreaterThan(order.indexOf('restore'));
+    expect(calls.filter(c => c[0] === 'fillText').map(c => c[1])).toEqual(['Ana', 'Mentora']);
+  });
+
+  it('maps each font to a canvas font', () => {
+    expect(artFont('serif_bold', 40)).toBe('700 40px Georgia, "Times New Roman", serif');
+    expect(artFont('great_vibes', 40)).toBe('400 40px "GreatVibes", cursive');
+    expect(artFont('inter', 40)).toMatch(/^400 40px .*Inter/i);
+  });
+});

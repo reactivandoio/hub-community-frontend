@@ -10,6 +10,7 @@ let event: Record<string, unknown>;
 let signedUp = false;
 const skipped: Record<string, boolean> = {};
 let lastGenerator: any = null;
+let myRole: { role: string; source: string } | null = null;
 
 vi.mock('@/contexts/auth-context', () => ({ useAuth: () => auth }));
 vi.mock('@/contexts/login-prompt-context', () => ({
@@ -36,6 +37,7 @@ vi.mock('@apollo/client', async importOriginal => {
       if (op === 'GetEventBySlugOrId') return { data: { eventBySlugOrId: event }, loading: false };
       if (op === 'IsUserSignedUp') return { data: { isUserSignedUp: { is_signed_up: signedUp } }, loading: false };
       if (op === 'GetShareArtConfig') return { data: { shareArtConfig: null }, loading: false };
+      if (op === 'MyShareArtRole') return { data: { myShareArtRole: myRole }, loading: false };
       return { data: undefined, loading: false };
     },
   };
@@ -51,6 +53,7 @@ beforeEach(() => {
   event = { id: 'ev1', slug: 'meetup', title: 'Meetup', images: [] };
   signedUp = false;
   lastGenerator = null;
+  myRole = null;
   for (const key of Object.keys(skipped)) delete skipped[key];
 });
 
@@ -111,5 +114,32 @@ describe('ShareArtPage — art open to everyone (share_art_open)', () => {
     expect(lastGenerator).toMatchObject({ signedUp: true });
     expect(screen.queryByTestId('share-art-not-signed-up')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Sua arte "me inscrevi"' })).toBeInTheDocument();
+  });
+});
+
+// REA-47: the role on the organizer's art comes from the BFF, only for a logged-in person.
+describe('ShareArtPage — the role of the person (REA-47)', () => {
+  it('asks the BFF for the role of a logged-in signup and passes it on', () => {
+    auth = loggedIn();
+    signedUp = true;
+    myRole = { role: 'Mentora', source: 'PRODUCT' };
+    render(<ShareArtPage slugOrId="meetup" />);
+    expect(skipped.MyShareArtRole).toBe(false);
+    expect(lastGenerator).toMatchObject({ personRole: 'Mentora' });
+  });
+
+  it('does not ask without an account (the art is open): no role', () => {
+    event.share_art_open = true;
+    render(<ShareArtPage slugOrId="meetup" />);
+    expect(skipped.MyShareArtRole).toBe(true);
+    expect(lastGenerator).toMatchObject({ personRole: null });
+  });
+
+  it('gives the organizer their role even without a signup, when the art is open', () => {
+    event.share_art_open = true;
+    auth = loggedIn();
+    myRole = { role: 'Organizador', source: 'ORGANIZER' };
+    render(<ShareArtPage slugOrId="meetup" />);
+    expect(lastGenerator).toMatchObject({ signedUp: false, personRole: 'Organizador' });
   });
 });

@@ -3,7 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { ShareArtPhotoArea } from '@/lib/share-art-config';
-import { drawCustomArt, loadArtImage } from '@/lib/share-art-custom';
+import {
+  drawCustomArt,
+  loadArtFonts,
+  loadArtImage,
+  type ArtTextLayer,
+} from '@/lib/share-art-custom';
 import { cn } from '@/lib/utils';
 
 /** Loads an image for canvas drawing; null while loading or when it fails. */
@@ -31,6 +36,8 @@ interface CustomArtCanvasProps {
   backgroundUrl: string | null;
   photoUrl: string | null;
   area: ShareArtPhotoArea;
+  /** REA-47: the name and the role, each in its area. */
+  texts?: ArtTextLayer[];
   /** CSS size of the preview; drawn at the device pixel ratio. */
   width: number;
   height: number;
@@ -46,6 +53,7 @@ export function CustomArtCanvas({
   backgroundUrl,
   photoUrl,
   area,
+  texts,
   width,
   height,
   className,
@@ -54,6 +62,18 @@ export function CustomArtCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const background = useArtImage(backgroundUrl);
   const photo = useArtImage(photoUrl);
+  // Redraw once the fonts of the texts are loaded (a canvas draws with what is loaded now).
+  const fontsKey = (texts ?? []).map(layer => layer.style.font).join(',');
+  const [fontsLoaded, setFontsLoaded] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    loadArtFonts(fontsKey ? (fontsKey.split(',') as never[]) : []).then(
+      () => !cancelled && setFontsLoaded(fontsKey)
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [fontsKey]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -69,8 +89,9 @@ export function CustomArtCanvas({
       background,
       photo,
       area,
+      texts,
     });
-  }, [background, photo, area, width, height]);
+  }, [background, photo, area, texts, width, height, fontsLoaded]);
 
   return (
     <canvas

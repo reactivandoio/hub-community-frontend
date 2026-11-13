@@ -10,12 +10,17 @@ import {
 
 import {
   AREA_HANDLES,
+  SHARE_ART_MIN_AREA_SIDE,
+  SHARE_ART_MIN_TEXT_SIDE,
   areaToPixels,
   moveArea,
   resizeArea,
   type AreaHandle,
   type ShareArtPhotoArea,
+  type ShareArtRect,
+  type ShareArtText,
 } from '@/lib/share-art-config';
+import { artFont } from '@/lib/share-art-custom';
 import { cn } from '@/lib/utils';
 
 const HANDLE_POSITION: Record<AreaHandle, string> = {
@@ -40,13 +45,26 @@ const HANDLE_LABEL: Record<AreaHandle, string> = {
   w: 'borda esquerda',
 };
 
+/** Which area is being edited: the photo, or a text (REA-47: the name or the role). */
+export type EditorAreaKey = 'photo' | 'name' | 'role';
+
 interface Drag {
+  key: EditorAreaKey;
   mode: 'move' | AreaHandle;
   startX: number;
   startY: number;
-  start: ShareArtPhotoArea;
+  start: ShareArtRect & { radius?: number };
   width: number;
   height: number;
+}
+
+/** REA-47: a text area shown (and editable) over the background, with its text as a preview. */
+export interface EditorTextArea {
+  key: Exclude<EditorAreaKey, 'photo'>;
+  label: string;
+  style: ShareArtText;
+  /** The sample text shown inside it. */
+  preview: string;
 }
 
 interface ShareArtAreaEditorProps {
@@ -59,14 +77,55 @@ interface ShareArtAreaEditorProps {
   square: boolean;
   /** Sample photo shown inside the area, so the editor is a live preview too. */
   photoUrl: string | null;
+  /** REA-47: the name and role areas. */
+  texts?: EditorTextArea[];
+  onTextChange?: (key: EditorTextArea['key'], style: ShareArtText) => void;
+  /** The area with handles (the others are dimmed and get selected on a click). */
+  active?: EditorAreaKey;
+  onSelect?: (key: EditorAreaKey) => void;
   className?: string;
 }
 
 const pct = (value: number) => `${(value * 100).toFixed(4)}%`;
 
+const position = (area: ShareArtRect) => ({
+  left: pct(area.x),
+  top: pct(area.y),
+  width: pct(area.width),
+  height: pct(area.height),
+});
+
+const placement = (label: string, area: ShareArtRect) =>
+  `${label}: ${Math.round(area.x * 100)}% da esquerda, ${Math.round(area.y * 100)}% do topo, ${Math.round(area.width * 100)}% × ${Math.round(area.height * 100)}%. Arraste ou use as setas para mover.`;
+
+function Handles({
+  onStart,
+}: {
+  onStart: (handle: AreaHandle) => (event: PointerEvent<HTMLElement>) => void;
+}) {
+  return (
+    <>
+      {AREA_HANDLES.map(handle => (
+        <span
+          key={handle}
+          role="presentation"
+          aria-label={`Redimensionar pelo ${HANDLE_LABEL[handle]}`}
+          data-handle={handle}
+          className={cn(
+            'absolute z-10 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-sm border-2 border-primary bg-white shadow',
+            HANDLE_POSITION[handle]
+          )}
+          onPointerDown={onStart(handle)}
+        />
+      ))}
+    </>
+  );
+}
+
 /**
- * The background with the photo area on top: drag the area to move it, drag a handle to resize
- * it; arrow keys move it (Shift for bigger steps). Everything is in fractions of the image.
+ * The background with the photo area (and, REA-47, the name and role areas) on top: drag an area
+ * to move it, drag a handle of the selected one to resize it; arrow keys move the focused one
+ * (Shift for bigger steps). Everything is in fractions of the image.
  */
 export function ShareArtAreaEditor({
   backgroundUrl,
@@ -75,6 +134,10 @@ export function ShareArtAreaEditor({
   onChange,
   square,
   photoUrl,
+  texts = [],
+  onTextChange,
+  active = 'photo',
+  onSelect,
   className,
 }: ShareArtAreaEditorProps) {
   const boxRef = useRef<HTMLDivElement>(null);
@@ -92,34 +155,50 @@ export function ShareArtAreaEditor({
     return () => observer.disconnect();
   }, []);
 
-  const start = (mode: Drag['mode']) => (event: PointerEvent<HTMLElement>) => {
-    const box = boxRef.current;
-    if (!box || event.button !== 0) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const rect = box.getBoundingClientRect();
-    drag.current = {
-      mode,
-      startX: event.clientX,
-      startY: event.clientY,
-      start: area,
-      width: rect.width,
-      height: rect.height,
-    };
-    event.currentTarget.setPointerCapture?.(event.pointerId);
+  const areaOf = (key: EditorAreaKey) =>
+    key === 'photo' ? area : texts.find(text => text.key === key)?.style;
+
+  const emit = (key: EditorAreaKey, next: ShareArtRect) => {
+    if (key === 'photo') onChange(next as ShareArtPhotoArea);
+    else onTextChange?.(key, next as ShareArtText);
   };
+
+  const start =
+    (key: EditorAreaKey, mode: Drag['mode']) =>
+    (event: PointerEvent<HTMLElement>) => {
+      const box = boxRef.current;
+      const current = areaOf(key);
+      if (!box || !current || event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (key !== active) onSelect?.(key);
+      const rect = box.getBoundingClientRect();
+      drag.current = {
+        key,
+        mode,
+        startX: event.clientX,
+        startY: event.clientY,
+        start: current,
+        width: rect.width,
+        height: rect.height,
+      };
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    };
 
   const move = (event: PointerEvent<HTMLElement>) => {
     const current = drag.current;
     if (!current || !current.width || !current.height) return;
     const dx = (event.clientX - current.startX) / current.width;
     const dy = (event.clientY - current.startY) / current.height;
-    onChange(
+    const isPhoto = current.key === 'photo';
+    emit(
+      current.key,
       current.mode === 'move'
         ? moveArea(current.start, dx, dy)
         : resizeArea(current.start, current.mode, dx, dy, {
             imageRatio,
-            square,
+            square: isPhoto && square,
+            minSide: isPhoto ? SHARE_ART_MIN_AREA_SIDE : SHARE_ART_MIN_TEXT_SIDE,
           })
     );
   };
@@ -128,21 +207,24 @@ export function ShareArtAreaEditor({
     drag.current = null;
   };
 
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const step = event.shiftKey ? 0.05 : 0.01;
-    const delta: Record<string, [number, number]> = {
-      ArrowLeft: [-step, 0],
-      ArrowRight: [step, 0],
-      ArrowUp: [0, -step],
-      ArrowDown: [0, step],
+  const onKeyDown =
+    (key: EditorAreaKey) => (event: KeyboardEvent<HTMLDivElement>) => {
+      const step = event.shiftKey ? 0.05 : 0.01;
+      const delta: Record<string, [number, number]> = {
+        ArrowLeft: [-step, 0],
+        ArrowRight: [step, 0],
+        ArrowUp: [0, -step],
+        ArrowDown: [0, step],
+      };
+      const d = delta[event.key];
+      const current = areaOf(key);
+      if (!d || !current) return;
+      event.preventDefault();
+      emit(key, moveArea(current, d[0], d[1]));
     };
-    const d = delta[event.key];
-    if (!d) return;
-    event.preventDefault();
-    onChange(moveArea(area, d[0], d[1]));
-  };
 
   const radius = areaToPixels(area, size.width, size.height).radius;
+  const photoActive = active === 'photo';
 
   return (
     <div
@@ -164,45 +246,72 @@ export function ShareArtAreaEditor({
         draggable={false}
         className="pointer-events-none absolute inset-0 h-full w-full"
       />
-      <div
-        className="absolute"
-        style={{
-          left: pct(area.x),
-          top: pct(area.y),
-          width: pct(area.width),
-          height: pct(area.height),
-        }}
-      >
+      <div className={cn('absolute', photoActive && 'z-[5]')} style={position(area)}>
         <div
           role="group"
           tabIndex={0}
-          aria-label={`Área da foto: ${Math.round(area.x * 100)}% da esquerda, ${Math.round(area.y * 100)}% do topo, ${Math.round(area.width * 100)}% × ${Math.round(area.height * 100)}%. Arraste ou use as setas para mover.`}
-          className="absolute inset-0 cursor-move overflow-hidden outline-2 outline-offset-2 outline-dashed outline-white focus-visible:outline-primary"
+          aria-label={placement('Área da foto', area)}
+          aria-current={photoActive || undefined}
+          className={cn(
+            'absolute inset-0 cursor-move overflow-hidden outline-2 outline-offset-2 outline-dashed focus-visible:outline-primary',
+            photoActive ? 'outline-white' : 'outline-white/50'
+          )}
           style={{
             borderRadius: radius,
-            boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.35)',
+            boxShadow: photoActive ? '0 0 0 9999px rgba(0, 0, 0, 0.35)' : undefined,
             backgroundColor: 'rgba(15, 23, 42, 0.5)',
             backgroundImage: photoUrl ? `url("${photoUrl}")` : undefined,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
           }}
-          onPointerDown={start('move')}
-          onKeyDown={onKeyDown}
+          onPointerDown={start('photo', 'move')}
+          onKeyDown={onKeyDown('photo')}
         />
-        {AREA_HANDLES.map(handle => (
-          <span
-            key={handle}
-            role="presentation"
-            aria-label={`Redimensionar pelo ${HANDLE_LABEL[handle]}`}
-            data-handle={handle}
-            className={cn(
-              'absolute z-10 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-sm border-2 border-primary bg-white shadow',
-              HANDLE_POSITION[handle]
-            )}
-            onPointerDown={start(handle)}
-          />
-        ))}
+        {photoActive && <Handles onStart={handle => start('photo', handle)} />}
       </div>
+
+      {texts.map(text => {
+        const isActive = active === text.key;
+        const px = Math.min(
+          text.style.size * size.width,
+          (text.style.height * size.height) / 1.15
+        );
+        return (
+          <div
+            key={text.key}
+            className={cn('absolute', isActive && 'z-[6]')}
+            style={position(text.style)}
+          >
+            <div
+              role="group"
+              tabIndex={0}
+              aria-label={placement(text.label, text.style)}
+              aria-current={isActive || undefined}
+              data-text-area={text.key}
+              className={cn(
+                'absolute inset-0 flex cursor-move items-center overflow-hidden whitespace-nowrap outline-2 outline-offset-2 outline-dashed focus-visible:outline-primary',
+                isActive ? 'bg-black/20 outline-white' : 'outline-white/50'
+              )}
+              style={{
+                justifyContent:
+                  text.style.align === 'left'
+                    ? 'flex-start'
+                    : text.style.align === 'right'
+                      ? 'flex-end'
+                      : 'center',
+                color: text.style.color,
+                font: size.width ? artFont(text.style.font, px) : undefined,
+                lineHeight: 1,
+              }}
+              onPointerDown={start(text.key, 'move')}
+              onKeyDown={onKeyDown(text.key)}
+            >
+              {text.preview}
+            </div>
+            {isActive && <Handles onStart={handle => start(text.key, handle)} />}
+          </div>
+        );
+      })}
     </div>
   );
 }

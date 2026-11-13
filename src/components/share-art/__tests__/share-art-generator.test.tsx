@@ -61,7 +61,7 @@ describe('ShareArtGenerator', () => {
   it('keeps the default art on a format the organizer did not configure', async () => {
     render(<ShareArtGenerator event={EVENT} customConfig={CONFIG} />);
     await screen.findByRole('img', { name: 'Prévia da sua arte' });
-    await userEvent.click(screen.getByRole('button', { name: /Feed \(1:1\)/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Feed \(4:5\)/ }));
     expect(screen.queryByRole('img', { name: 'Prévia da sua arte' })).not.toBeInTheDocument();
     expect(screen.getByText('Seu papel no evento')).toBeInTheDocument();
   });
@@ -74,5 +74,42 @@ describe('ShareArtGenerator', () => {
     expect(screen.getByText('Seu papel no evento')).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: 'Prévia da sua arte' })).not.toBeInTheDocument();
     warn.mockRestore();
+  });
+});
+
+// ─── REA-47: name and role on the organizer's art ────────────────────────────────────────
+describe('ShareArtGenerator — name and role (REA-47)', () => {
+  const TEXT = {
+    x: 0.1, y: 0.7, width: 0.8, height: 0.05, font: 'inter_bold' as const, size: 0.05, color: '#ffffff', align: 'center' as const,
+  };
+  const WITH_TEXTS: ShareArtConfig = {
+    ...CONFIG,
+    story: { ...CONFIG.story!, name_text: TEXT, role_text: { ...TEXT, y: 0.77 } },
+  };
+
+  it('asks the name and shows the role given by the organization', async () => {
+    render(<ShareArtGenerator event={EVENT} defaultName="Ana" customConfig={WITH_TEXTS} personRole="Mentora" />);
+    await screen.findByRole('img', { name: 'Prévia da sua arte' });
+    expect(screen.getByRole('textbox', { name: 'Seu nome' })).toHaveValue('Ana');
+    expect(screen.getByTestId('share-art-person-role')).toHaveTextContent(
+      'Seu papel na arte: Mentora, definido pela organização do evento.'
+    );
+    // The role is not picked by the person on the organizer's art.
+    expect(screen.queryByText('Seu papel no evento')).not.toBeInTheDocument();
+  });
+
+  it('says the role is left out for someone not signed up', async () => {
+    render(<ShareArtGenerator event={EVENT} customConfig={WITH_TEXTS} signedUp={false} personRole={null} />);
+    await screen.findByRole('img', { name: 'Prévia da sua arte' });
+    expect(screen.getByTestId('share-art-person-role')).toHaveTextContent(
+      'Seu papel no evento não aparece na arte porque você não está inscrito.'
+    );
+  });
+
+  it('asks nothing when the organizer did not place the name nor the role', async () => {
+    render(<ShareArtGenerator event={EVENT} customConfig={CONFIG} personRole="Mentora" />);
+    await screen.findByRole('img', { name: 'Prévia da sua arte' });
+    expect(screen.queryByRole('textbox', { name: 'Seu nome' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('share-art-person-role')).not.toBeInTheDocument();
   });
 });

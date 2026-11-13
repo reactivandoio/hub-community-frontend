@@ -11,12 +11,44 @@
  */
 import { SHARE_ART_FORMATS, type ShareArtFormat } from '@/lib/share-art';
 
-export interface ShareArtPhotoArea {
+/** A rectangle in fractions of the background (0 to 1). */
+export interface ShareArtRect {
   x: number;
   y: number;
   width: number;
   height: number;
+}
+
+export interface ShareArtPhotoArea extends ShareArtRect {
   radius: number;
+}
+
+/** REA-47: fonts of the name and the role (same list as the BFF and the backend enum). */
+export type ShareArtFont =
+  | 'inter'
+  | 'inter_bold'
+  | 'serif'
+  | 'serif_bold'
+  | 'dancing_script'
+  | 'great_vibes'
+  | 'allura';
+
+export type ShareArtAlign = 'left' | 'center' | 'right';
+
+/**
+ * REA-47: where the person's name (or role) goes, and how it looks. `size` is the font size as a
+ * fraction of the image width (0.05 → 54px on 1080px); the text shrinks to fit its area.
+ */
+export interface ShareArtText extends ShareArtRect {
+  font: ShareArtFont;
+  size: number;
+  color: string;
+  align: ShareArtAlign;
+}
+
+export interface ShareArtProductRole {
+  product_id: string;
+  role: string;
 }
 
 export interface ShareArtFormatConfig {
@@ -25,12 +57,29 @@ export interface ShareArtFormatConfig {
   background_width?: number | null;
   background_height?: number | null;
   photo_area: ShareArtPhotoArea;
+  /** REA-47: null → the name is not on the art. */
+  name_text?: ShareArtText | null;
+  /** REA-47: null → the role is not on the art. */
+  role_text?: ShareArtText | null;
 }
 
 export interface ShareArtConfig {
   id?: string | null;
   story: ShareArtFormatConfig | null;
   feed: ShareArtFormatConfig | null;
+  /** REA-47: role of whoever signed up with each product of the Eventando. */
+  product_roles?: ShareArtProductRole[] | null;
+  default_role?: string | null;
+  /** REA-47: formats whose saved background is in an old ratio (the 1:1 feed): default art for now. */
+  retired_formats?: string[] | null;
+}
+
+/** REA-47: the person's role, from the BFF (`myShareArtRole`). */
+export type ShareArtRoleSource = 'ORGANIZER' | 'SPEAKER' | 'PRODUCT' | 'DEFAULT';
+
+export interface ShareArtPersonRole {
+  role: string;
+  source: ShareArtRoleSource;
 }
 
 export const SHARE_ART_FORMAT_KEYS: ShareArtFormat[] = ['story', 'feed'];
@@ -123,13 +172,19 @@ const clamp = (value: number, min: number, max: number) =>
 
 const round = (value: number) => Math.round(value * 1e6) / 1e6;
 
-const rounded = (area: ShareArtPhotoArea): ShareArtPhotoArea => ({
-  x: round(area.x),
-  y: round(area.y),
-  width: round(area.width),
-  height: round(area.height),
-  radius: round(area.radius),
-});
+/** Rounds the rectangle (and the radius or the font size, when there is one) to 6 places. */
+function rounded<T extends ShareArtRect>(area: T): T {
+  const out: Record<string, unknown> = {
+    ...(area as unknown as Record<string, unknown>),
+    x: round(area.x),
+    y: round(area.y),
+    width: round(area.width),
+    height: round(area.height),
+  };
+  if (typeof out.radius === 'number') out.radius = round(out.radius);
+  if (typeof out.size === 'number') out.size = round(out.size);
+  return out as unknown as T;
+}
 
 /** A centered circle covering 60% of the smaller side: where a new background starts. */
 export function defaultPhotoArea(format: ShareArtFormat): ShareArtPhotoArea {
@@ -188,11 +243,11 @@ export function areaAspect(
 }
 
 /** Moves the area by (dx, dy) fractions, keeping it inside the image. */
-export function moveArea(
-  area: ShareArtPhotoArea,
+export function moveArea<T extends ShareArtRect>(
+  area: T,
   dx: number,
   dy: number
-): ShareArtPhotoArea {
+): T {
   return rounded({
     ...area,
     x: clamp(area.x + dx, 0, 1 - area.width),
@@ -219,14 +274,18 @@ export const AREA_HANDLES: AreaHandle[] = [
  * area stays inside the image and never gets smaller than SHARE_ART_MIN_AREA_SIDE. With `square`,
  * the area stays square in pixels (the dragged dimension decides the size).
  */
-export function resizeArea(
-  area: ShareArtPhotoArea,
+export function resizeArea<T extends ShareArtRect>(
+  area: T,
   handle: AreaHandle,
   dx: number,
   dy: number,
-  { imageRatio, square = false }: { imageRatio: number; square?: boolean }
-): ShareArtPhotoArea {
-  const min = SHARE_ART_MIN_AREA_SIDE;
+  {
+    imageRatio,
+    square = false,
+    minSide = SHARE_ART_MIN_AREA_SIDE,
+  }: { imageRatio: number; square?: boolean; minSide?: number }
+): T {
+  const min = minSide;
   let left = area.x;
   let top = area.y;
   let right = area.x + area.width;
@@ -238,11 +297,11 @@ export function resizeArea(
 
   if (!square) {
     return rounded({
+      ...area,
       x: left,
       y: top,
       width: right - left,
       height: bottom - top,
-      radius: area.radius,
     });
   }
 
@@ -278,11 +337,11 @@ export function resizeArea(
       ? top
       : cy - height / 2;
   return rounded({
+    ...area,
     x: clamp(x, 0, 1 - width),
     y: clamp(y, 0, 1 - height),
     width,
     height,
-    radius: area.radius,
   });
 }
 
@@ -297,7 +356,7 @@ export interface PixelRect {
 
 /** The area in pixels of a `width`×`height` drawing (the editor, the preview or the 1080px export). */
 export function areaToPixels(
-  area: ShareArtPhotoArea,
+  area: ShareArtRect & { radius?: number },
   width: number,
   height: number
 ): PixelRect {
@@ -308,7 +367,7 @@ export function areaToPixels(
     top: area.y * height,
     width: w,
     height: h,
-    radius: (clamp(area.radius, 0, 1) * Math.min(w, h)) / 2,
+    radius: (clamp(area.radius ?? 0, 0, 1) * Math.min(w, h)) / 2,
   };
 }
 
@@ -325,10 +384,128 @@ export function coverSource(
   return { sx: (srcWidth - sw) / 2, sy: (srcHeight - sh) / 2, sw, sh };
 }
 
-/** GraphQL input of one format: the background media id and the area, or null (default art). */
+/**
+ * GraphQL input of one format: the background media id, the photo area and (REA-47) the name and
+ * role texts — null when off — or null for the whole format (default art).
+ */
 export function formatInput(
-  value: { backgroundId: string | null; area: ShareArtPhotoArea } | null
-): { background: string; photo_area: ShareArtPhotoArea } | null {
+  value: {
+    backgroundId: string | null;
+    area: ShareArtPhotoArea;
+    nameText?: ShareArtText | null;
+    roleText?: ShareArtText | null;
+  } | null
+): {
+  background: string;
+  photo_area: ShareArtPhotoArea;
+  name_text: ShareArtText | null;
+  role_text: ShareArtText | null;
+} | null {
   if (!value?.backgroundId) return null;
-  return { background: value.backgroundId, photo_area: rounded(value.area) };
+  // Only the fields of the input: a config read from Apollo carries __typename, which the BFF refuses.
+  const { x, y, width, height, radius } = value.area;
+  const text = (t: ShareArtText | null | undefined): ShareArtText | null =>
+    t
+      ? rounded({
+          x: t.x,
+          y: t.y,
+          width: t.width,
+          height: t.height,
+          font: t.font,
+          size: t.size,
+          color: t.color,
+          align: t.align,
+        })
+      : null;
+  return {
+    background: value.backgroundId,
+    photo_area: rounded({ x, y, width, height, radius }),
+    name_text: text(value.nameText),
+    role_text: text(value.roleText),
+  };
+}
+
+// ─── REA-47: name and role on the art ────────────────────────────────────────────────────
+
+export const SHARE_ART_DEFAULT_ROLE = 'Participante';
+export const SHARE_ART_ROLE_MAX = 40;
+/** Font size, as a fraction of the image width. */
+export const SHARE_ART_TEXT_SIZE_MIN = 0.01;
+export const SHARE_ART_TEXT_SIZE_MAX = 0.2;
+/** Smallest side of a text area (a line of text is thinner than a photo). */
+export const SHARE_ART_MIN_TEXT_SIDE = 0.02;
+
+export interface ShareArtFontSpec {
+  key: ShareArtFont;
+  label: string;
+  /** CSS font-family; 'inter' is resolved at runtime (next/font gives it a hashed name). */
+  family: 'inter' | string;
+  weight: number;
+}
+
+/** The fonts of the art: the Hub's Inter, a system serif and the self-hosted cursive ones. */
+export const SHARE_ART_FONTS: ShareArtFontSpec[] = [
+  { key: 'inter', label: 'Inter', family: 'inter', weight: 400 },
+  { key: 'inter_bold', label: 'Inter negrito', family: 'inter', weight: 800 },
+  { key: 'serif', label: 'Serifada', family: 'Georgia, "Times New Roman", serif', weight: 400 },
+  { key: 'serif_bold', label: 'Serifada negrito', family: 'Georgia, "Times New Roman", serif', weight: 700 },
+  { key: 'dancing_script', label: 'Dancing Script (cursiva)', family: '"DancingScript", cursive', weight: 400 },
+  { key: 'great_vibes', label: 'Great Vibes (cursiva)', family: '"GreatVibes", cursive', weight: 400 },
+  { key: 'allura', label: 'Allura (cursiva)', family: '"Allura", cursive', weight: 400 },
+];
+
+export const fontSpecOf = (font: ShareArtFont): ShareArtFontSpec =>
+  SHARE_ART_FONTS.find(spec => spec.key === font) ?? SHARE_ART_FONTS[1];
+
+/**
+ * Where the name and the role start on a new background: under the default photo circle, centered,
+ * white bold name and a smaller role.
+ */
+export function defaultTextArea(
+  format: ShareArtFormat,
+  kind: 'name' | 'role'
+): ShareArtText {
+  const story = format === 'story';
+  // Under the default circle: it ends at 0.67 of the height in 9:16 and at 0.74 in 4:5.
+  const top = story ? 0.7 : 0.77;
+  const name = { y: top, height: story ? 0.05 : 0.065, size: 0.06 };
+  const role = {
+    y: top + name.height + 0.01,
+    height: story ? 0.035 : 0.045,
+    size: 0.04,
+  };
+  const spec = kind === 'name' ? name : role;
+  return {
+    x: 0.1,
+    y: spec.y,
+    width: 0.8,
+    height: spec.height,
+    font: kind === 'name' ? 'inter_bold' : 'inter',
+    size: spec.size,
+    color: '#ffffff',
+    align: 'center',
+  };
+}
+
+/**
+ * Font size in pixels so that the text fits its area: the configured size, capped by the area's
+ * height and shrunk until `measure(px)` (the text width at px) fits the area's width.
+ */
+export function fitTextSize(
+  measure: (px: number) => number,
+  {
+    size,
+    areaWidth,
+    areaHeight,
+  }: { size: number; areaWidth: number; areaHeight: number }
+): number {
+  let px = Math.min(size, areaHeight / 1.15);
+  const width = measure(px);
+  if (width > areaWidth && width > 0) px = (px * areaWidth) / width;
+  return Math.max(1, Math.floor(px * 100) / 100);
+}
+
+/** The role shown in the admin preview (no person yet): the event's default role. */
+export function sampleRole(config: Pick<ShareArtConfig, 'default_role'> | null | undefined): string {
+  return config?.default_role?.trim() || SHARE_ART_DEFAULT_ROLE;
 }

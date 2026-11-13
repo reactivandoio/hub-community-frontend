@@ -17,7 +17,8 @@ import type { ShareArtConfig } from '@/lib/share-art-config';
 import type { EventResponse } from '@/lib/types';
 
 /**
- * `/admin/events/<id>/arte` (REA-43): background and photo area of the "eu vou" art per format.
+ * `/admin/events/<id>/arte` (REA-43): background and photo area of the "eu vou" art per format;
+ * REA-47: name and role areas, and the role per product.
  * Admin and organizer of the event; the BFF checks it again on save.
  */
 export default function ShareArtAdminPage() {
@@ -62,12 +63,16 @@ export default function ShareArtAdminPage() {
       <AdminPage>
         <AdminPageHeader
           title='Arte "Eu vou"'
-          description="A arte que cada participante gera com a própria foto. Escolha o fundo de cada formato e marque onde a foto aparece."
+          description="A arte que cada participante gera com a própria foto. Escolha o fundo de cada formato e marque onde ficam a foto, o nome e o papel da pessoa."
         />
         <ShareArtConfigForm
           eventId={eventId}
           initialConfig={config}
           onSaved={setSavedConfig}
+          products={(event.products ?? []).map(product => ({
+            id: String(product.id),
+            name: product.name,
+          }))}
         />
       </AdminPage>
     </FadeIn>

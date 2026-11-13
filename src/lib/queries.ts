@@ -1845,6 +1845,16 @@ export const ADMIN_BLOCK_MINOR = gql`
 
 // REA-43 — arte "eu vou" personalizada do evento (fundo e área da foto por formato).
 export const SHARE_ART_CONFIG_FIELDS = gql`
+  fragment ShareArtTextFields on ShareArtText {
+    x
+    y
+    width
+    height
+    font
+    size
+    color
+    align
+  }
   fragment ShareArtFormatFields on ShareArtFormatConfig {
     background
     background_id
@@ -1857,6 +1867,12 @@ export const SHARE_ART_CONFIG_FIELDS = gql`
       height
       radius
     }
+    name_text {
+      ...ShareArtTextFields
+    }
+    role_text {
+      ...ShareArtTextFields
+    }
   }
   fragment ShareArtConfigFields on ShareArtConfig {
     id
@@ -1866,6 +1882,12 @@ export const SHARE_ART_CONFIG_FIELDS = gql`
     feed {
       ...ShareArtFormatFields
     }
+    product_roles {
+      product_id
+      role
+    }
+    default_role
+    retired_formats
   }
 `;
 
@@ -1874,6 +1896,16 @@ export const GET_SHARE_ART_CONFIG = gql`
   query GetShareArtConfig($eventId: String!) {
     shareArtConfig(eventId: $eventId) {
       ...ShareArtConfigFields
+    }
+  }
+`;
+
+// REA-47: the role of the logged-in person on the art (null: signed out or not part of the event).
+export const MY_SHARE_ART_ROLE = gql`
+  query MyShareArtRole($eventId: String!) {
+    myShareArtRole(eventId: $eventId) {
+      role
+      source
     }
   }
 `;
