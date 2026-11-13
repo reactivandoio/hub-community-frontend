@@ -15,12 +15,8 @@ import {
   GET_EVENT_BY_SLUG_OR_ID,
   GET_SHARE_ART_CONFIG,
   IS_USER_SIGNED_UP,
-  MY_SHARE_ART_ROLE,
 } from '@/lib/queries';
-import type {
-  ShareArtConfig,
-  ShareArtPersonRole,
-} from '@/lib/share-art-config';
+import type { ShareArtConfig } from '@/lib/share-art-config';
 
 function GeneratorSkeleton() {
   return (
@@ -90,18 +86,6 @@ export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
     errorPolicy: 'all',
   });
 
-  // REA-47: the person's role on the organizer's art (organizer, speaker or by the product of the
-  // signup). Only asked when logged in; any failure → no role on the art.
-  const { data: roleData, loading: roleLoading } = useQuery<{
-    myShareArtRole: ShareArtPersonRole | null;
-  }>(MY_SHARE_ART_ROLE, {
-    variables: { eventId: slugOrId },
-    skip: !canGenerate || !isAuthenticated,
-    fetchPolicy: 'network-only',
-    errorPolicy: 'all',
-  });
-  const personRole = roleData?.myShareArtRole?.role ?? null;
-
   // Signed out: the login opens over this page once (REA-25); the notice keeps a button.
   const askLogin = () => requestLogin({ reason: 'Entre para gerar sua arte' });
   const needsLogin =
@@ -119,7 +103,7 @@ export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
     !hydrated ||
     eventLoading ||
     (isAuthenticated && signupLoading) ||
-    (canGenerate && (artLoading || (isAuthenticated && roleLoading)))
+    (canGenerate && artLoading)
   ) {
     content = <GeneratorSkeleton />;
   } else if (eventError || !event) {
@@ -139,7 +123,10 @@ export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
             <span>
               Ainda não se inscreveu em <strong>{event.title}</strong>?
             </span>
-            <Link href={eventPath} className="font-semibold text-primary underline-offset-4 hover:underline">
+            <Link
+              href={eventPath}
+              className="font-semibold text-primary underline-offset-4 hover:underline"
+            >
               Ver evento
             </Link>
           </p>
@@ -149,7 +136,6 @@ export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
           defaultName={user?.name || ''}
           customConfig={artData?.shareArtConfig ?? null}
           signedUp={isSignedUp}
-          personRole={personRole}
         />
       </>
     );

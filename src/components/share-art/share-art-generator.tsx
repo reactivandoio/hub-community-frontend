@@ -77,11 +77,6 @@ interface ShareArtGeneratorProps {
    * default art then reads "Eu vou no" instead of "Me inscrevi no".
    */
   signedUp?: boolean;
-  /**
-   * REA-47: the person's role on the organizer's art (from the BFF); null → no role on it (not
-   * signed up, or signed out).
-   */
-  personRole?: string | null;
 }
 
 /** Background of a custom format: its data URL, or 'failed' (→ default art for that format). */
@@ -147,10 +142,12 @@ export function ShareArtGenerator({
   defaultName = '',
   customConfig = null,
   signedUp = true,
-  personRole = null,
 }: ShareArtGeneratorProps) {
   const artEvent = useMemo(
-    () => ({ ...buildShareArtEvent(event), headline: shareArtHeadline(signedUp) }),
+    () => ({
+      ...buildShareArtEvent(event),
+      headline: shareArtHeadline(signedUp),
+    }),
     [event, signedUp]
   );
 
@@ -220,13 +217,11 @@ export function ShareArtGenerator({
           roleText: customFormat.role_text ?? null,
         }
       : null;
-  // REA-47: the name and the role on the organizer's art, each where it was placed.
+  // REA-47: the name the person typed and the role they picked, where the organizer placed them.
   const customTexts: ArtTextLayer[] = custom
     ? [
         ...(custom.nameText ? [{ text: name, style: custom.nameText }] : []),
-        ...(custom.roleText && personRole
-          ? [{ text: personRole, style: custom.roleText }]
-          : []),
+        ...(custom.roleText ? [{ text: role, style: custom.roleText }] : []),
       ]
     : [];
   const customPending = Boolean(customFormat) && !customBackground;
@@ -278,7 +273,7 @@ export function ShareArtGenerator({
     uploadRun.current += 1;
     setGenerated(null);
     setUpload({ status: 'idle' });
-  }, [format, role, name, photoUrl, coverUrl, logoUrl, custom?.background, personRole]);
+  }, [format, role, name, photoUrl, coverUrl, logoUrl, custom?.background]);
 
   // Fit the fixed-size template into the preview column.
   useEffect(() => {
@@ -485,72 +480,42 @@ export function ShareArtGenerator({
           </div>
         </Step>
 
-        {custom ? (
-          <>
-            <p className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">
-              Este formato usa a arte do evento: sua foto entra no espaço que a
-              organização preparou.
+        {custom && (
+          <p className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">
+            Este formato usa a arte do evento: sua foto entra no espaço que a
+            organização preparou.
+          </p>
+        )}
+        {/* The role and the name: on the default art always; on the organizer's art (REA-47) when
+            it placed them, drawn where it chose. */}
+        {(!custom || custom.roleText) && (
+          <Step index={3} title="Seu papel no evento">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {SHARE_ART_ROLES.map(r => (
+                <OptionButton
+                  key={r}
+                  selected={role === r}
+                  onClick={() => setRole(r)}
+                >
+                  {r}
+                </OptionButton>
+              ))}
+            </div>
+          </Step>
+        )}
+        {(!custom || custom.nameText) && (
+          <Step index={custom && !custom.roleText ? 3 : 4} title="Seu nome">
+            <Input
+              value={name}
+              onChange={e => setName(cleanShareArtName(e.target.value))}
+              maxLength={SHARE_ART_NAME_MAX}
+              placeholder="Como você quer aparecer"
+              aria-label="Seu nome"
+            />
+            <p className="text-xs text-muted-foreground">
+              {name.length}/{SHARE_ART_NAME_MAX} caracteres
             </p>
-            {custom.nameText && (
-              <Step index={3} title="Seu nome">
-                <Input
-                  value={name}
-                  onChange={e => setName(cleanShareArtName(e.target.value))}
-                  maxLength={SHARE_ART_NAME_MAX}
-                  placeholder="Como você quer aparecer"
-                  aria-label="Seu nome"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {name.length}/{SHARE_ART_NAME_MAX} caracteres
-                </p>
-              </Step>
-            )}
-            {custom.roleText && (
-              <p
-                className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground"
-                data-testid="share-art-person-role"
-              >
-                {personRole ? (
-                  <>
-                    Seu papel na arte:{' '}
-                    <strong className="text-foreground">{personRole}</strong>,
-                    definido pela organização do evento.
-                  </>
-                ) : (
-                  'Seu papel no evento não aparece na arte porque você não está inscrito.'
-                )}
-              </p>
-            )}
-          </>
-        ) : (
-          <>
-            <Step index={3} title="Seu papel no evento">
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {SHARE_ART_ROLES.map(r => (
-                  <OptionButton
-                    key={r}
-                    selected={role === r}
-                    onClick={() => setRole(r)}
-                  >
-                    {r}
-                  </OptionButton>
-                ))}
-              </div>
-            </Step>
-
-            <Step index={4} title="Seu nome">
-              <Input
-                value={name}
-                onChange={e => setName(cleanShareArtName(e.target.value))}
-                maxLength={SHARE_ART_NAME_MAX}
-                placeholder="Como você quer aparecer"
-                aria-label="Seu nome"
-              />
-              <p className="text-xs text-muted-foreground">
-                {name.length}/{SHARE_ART_NAME_MAX} caracteres
-              </p>
-            </Step>
-          </>
+          </Step>
         )}
       </div>
 

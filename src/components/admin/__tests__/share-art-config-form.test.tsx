@@ -49,7 +49,7 @@ beforeEach(() => {
 
 const AREA = { x: 0.1, y: 0.2, width: 0.8, height: 0.45, radius: 1 };
 const typedArea = (area: typeof AREA) => ({ __typename: 'ShareArtPhotoArea', ...area });
-const storyFormat = (area = AREA) => ({
+const storyFormat = (area = AREA): Record<string, unknown> => ({
   __typename: 'ShareArtFormatConfig',
   background: 'https://manager.hubcommunity.io/uploads/story.png',
   background_id: '7',
@@ -59,13 +59,11 @@ const storyFormat = (area = AREA) => ({
   name_text: null,
   role_text: null,
 });
-const saved = (story: ReturnType<typeof storyFormat> | null, extra: Record<string, unknown> = {}) => ({
+const saved = (story: Record<string, unknown> | null, extra: Record<string, unknown> = {}) => ({
   __typename: 'ShareArtConfig',
   id: 'sa-1',
   story,
   feed: null,
-  product_roles: [],
-  default_role: 'Participante',
   retired_formats: [],
   ...extra,
 });
@@ -82,13 +80,7 @@ const storyInput = (photo_area: typeof AREA, texts: Record<string, unknown> = {}
   role_text: null,
   ...texts,
 });
-const input = (story: unknown, extra: Record<string, unknown> = {}) => ({
-  story,
-  feed: null,
-  product_roles: [],
-  default_role: 'Participante',
-  ...extra,
-});
+const input = (story: unknown) => ({ story, feed: null });
 /** A first background starts with the name and the role under the photo. */
 const defaultTexts = (format: 'story' | 'feed') => ({
   name_text: rounded(defaultTextArea(format, 'name')),
@@ -103,15 +95,11 @@ const upsertMock = (data: unknown, result: ReturnType<typeof saved>): MockedResp
   };
 };
 
-const renderForm = (
-  initialConfig: ShareArtConfig | null,
-  mocks: MockedResponse[] = [],
-  products: { id: string; name: string }[] = []
-) => {
+const renderForm = (initialConfig: ShareArtConfig | null, mocks: MockedResponse[] = []) => {
   const onSaved = vi.fn();
   render(
     <MockedProvider mocks={mocks}>
-      <ShareArtConfigForm eventId="ev-1" initialConfig={initialConfig} onSaved={onSaved} products={products} />
+      <ShareArtConfigForm eventId="ev-1" initialConfig={initialConfig} onSaved={onSaved} />
     </MockedProvider>
   );
   return { onSaved };
@@ -318,47 +306,10 @@ describe('ShareArtConfigForm — name and role (REA-47)', () => {
   });
 });
 
-describe('ShareArtConfigForm — role per product (REA-47)', () => {
-  const PRODUCTS = [
-    { id: '11', name: 'Ingresso' },
-    { id: '12', name: 'Mentoria' },
-  ];
-
-  it('maps a product to a role and changes the default role', async () => {
-    const mutation = upsertMock(
-      input({ ...storyInput(AREA), background: '7' }, {
-        product_roles: [{ product_id: '12', role: 'Mentor' }],
-        default_role: 'Inscrito',
-      }),
-      saved(storyFormat(), { product_roles: [{ __typename: 'ShareArtProductRole', product_id: '12', role: 'Mentor' }], default_role: 'Inscrito' })
-    );
-    renderForm(saved(storyFormat()) as ShareArtConfig, [mutation], PRODUCTS);
-    const defaultRole = screen.getByLabelText('Papel padrão');
-    await userEvent.clear(defaultRole);
-    await userEvent.type(defaultRole, 'Inscrito');
-    expect(screen.getByLabelText('Ingresso')).toHaveAttribute('placeholder', 'Inscrito');
-    await userEvent.type(screen.getByLabelText('Mentoria'), 'Mentor');
-    await userEvent.click(screen.getByRole('button', { name: /Salvar arte/ }));
-    await waitFor(() => expect(mutation.newData).toHaveBeenCalled());
-  });
-
-  it('shows the saved roles', () => {
-    renderForm(
-      saved(storyFormat(), {
-        product_roles: [{ __typename: 'ShareArtProductRole', product_id: '11', role: 'Voluntário' }],
-      }) as ShareArtConfig,
-      [],
-      PRODUCTS
-    );
-    expect(screen.getByLabelText('Ingresso')).toHaveValue('Voluntário');
-    expect(screen.getByLabelText('Mentoria')).toHaveValue('');
-    expect(screen.getByRole('button', { name: /Salvar arte/ })).toBeDisabled();
-  });
-
-  it('says everyone gets the default role when the event has no products', () => {
-    renderForm(null);
-    expect(screen.getByText(/todos os inscritos saem com o papel padrão/)).toBeInTheDocument();
-  });
+it('has no role per product: the role is what the person picks in the generator (REA-47)', () => {
+  renderForm(saved(storyFormat()) as ShareArtConfig);
+  expect(screen.queryByText('Papel na arte')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Papel padrão')).not.toBeInTheDocument();
 });
 
 describe('ShareArtConfigForm — the feed is 4:5 (REA-47)', () => {

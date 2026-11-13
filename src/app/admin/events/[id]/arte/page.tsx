@@ -18,7 +18,7 @@ import type { EventResponse } from '@/lib/types';
 
 /**
  * `/admin/events/<id>/arte` (REA-43): background and photo area of the "eu vou" art per format;
- * REA-47: name and role areas, and the role per product.
+ * REA-47: where the name and the role (typed/picked in the generator) go, and their style.
  * Admin and organizer of the event; the BFF checks it again on save.
  */
 export default function ShareArtAdminPage() {
@@ -69,10 +69,6 @@ export default function ShareArtAdminPage() {
           eventId={eventId}
           initialConfig={config}
           onSaved={setSavedConfig}
-          products={(event.products ?? []).map(product => ({
-            id: String(product.id),
-            name: product.name,
-          }))}
         />
       </AdminPage>
     </FadeIn>

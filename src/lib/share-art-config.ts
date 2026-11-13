@@ -36,7 +36,8 @@ export type ShareArtFont =
 export type ShareArtAlign = 'left' | 'center' | 'right';
 
 /**
- * REA-47: where the person's name (or role) goes, and how it looks. `size` is the font size as a
+ * REA-47: where the name the person types (or the role they pick) in the generator goes, and how it
+ * looks. `size` is the font size as a
  * fraction of the image width (0.05 → 54px on 1080px); the text shrinks to fit its area.
  */
 export interface ShareArtText extends ShareArtRect {
@@ -44,11 +45,6 @@ export interface ShareArtText extends ShareArtRect {
   size: number;
   color: string;
   align: ShareArtAlign;
-}
-
-export interface ShareArtProductRole {
-  product_id: string;
-  role: string;
 }
 
 export interface ShareArtFormatConfig {
@@ -67,19 +63,8 @@ export interface ShareArtConfig {
   id?: string | null;
   story: ShareArtFormatConfig | null;
   feed: ShareArtFormatConfig | null;
-  /** REA-47: role of whoever signed up with each product of the Eventando. */
-  product_roles?: ShareArtProductRole[] | null;
-  default_role?: string | null;
   /** REA-47: formats whose saved background is in an old ratio (the 1:1 feed): default art for now. */
   retired_formats?: string[] | null;
-}
-
-/** REA-47: the person's role, from the BFF (`myShareArtRole`). */
-export type ShareArtRoleSource = 'ORGANIZER' | 'SPEAKER' | 'PRODUCT' | 'DEFAULT';
-
-export interface ShareArtPersonRole {
-  role: string;
-  source: ShareArtRoleSource;
 }
 
 export const SHARE_ART_FORMAT_KEYS: ShareArtFormat[] = ['story', 'feed'];
@@ -427,8 +412,6 @@ export function formatInput(
 
 // ─── REA-47: name and role on the art ────────────────────────────────────────────────────
 
-export const SHARE_ART_DEFAULT_ROLE = 'Participante';
-export const SHARE_ART_ROLE_MAX = 40;
 /** Font size, as a fraction of the image width. */
 export const SHARE_ART_TEXT_SIZE_MIN = 0.01;
 export const SHARE_ART_TEXT_SIZE_MAX = 0.2;
@@ -447,11 +430,36 @@ export interface ShareArtFontSpec {
 export const SHARE_ART_FONTS: ShareArtFontSpec[] = [
   { key: 'inter', label: 'Inter', family: 'inter', weight: 400 },
   { key: 'inter_bold', label: 'Inter negrito', family: 'inter', weight: 800 },
-  { key: 'serif', label: 'Serifada', family: 'Georgia, "Times New Roman", serif', weight: 400 },
-  { key: 'serif_bold', label: 'Serifada negrito', family: 'Georgia, "Times New Roman", serif', weight: 700 },
-  { key: 'dancing_script', label: 'Dancing Script (cursiva)', family: '"DancingScript", cursive', weight: 400 },
-  { key: 'great_vibes', label: 'Great Vibes (cursiva)', family: '"GreatVibes", cursive', weight: 400 },
-  { key: 'allura', label: 'Allura (cursiva)', family: '"Allura", cursive', weight: 400 },
+  {
+    key: 'serif',
+    label: 'Serifada',
+    family: 'Georgia, "Times New Roman", serif',
+    weight: 400,
+  },
+  {
+    key: 'serif_bold',
+    label: 'Serifada negrito',
+    family: 'Georgia, "Times New Roman", serif',
+    weight: 700,
+  },
+  {
+    key: 'dancing_script',
+    label: 'Dancing Script (cursiva)',
+    family: '"DancingScript", cursive',
+    weight: 400,
+  },
+  {
+    key: 'great_vibes',
+    label: 'Great Vibes (cursiva)',
+    family: '"GreatVibes", cursive',
+    weight: 400,
+  },
+  {
+    key: 'allura',
+    label: 'Allura (cursiva)',
+    family: '"Allura", cursive',
+    weight: 400,
+  },
 ];
 
 export const fontSpecOf = (font: ShareArtFont): ShareArtFontSpec =>
@@ -503,9 +511,4 @@ export function fitTextSize(
   const width = measure(px);
   if (width > areaWidth && width > 0) px = (px * areaWidth) / width;
   return Math.max(1, Math.floor(px * 100) / 100);
-}
-
-/** The role shown in the admin preview (no person yet): the event's default role. */
-export function sampleRole(config: Pick<ShareArtConfig, 'default_role'> | null | undefined): string {
-  return config?.default_role?.trim() || SHARE_ART_DEFAULT_ROLE;
 }

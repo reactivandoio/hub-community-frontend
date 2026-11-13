@@ -51,10 +51,8 @@ import {
   type ShareArtFormat,
 } from '@/lib/share-art';
 import {
-  SHARE_ART_DEFAULT_ROLE,
   SHARE_ART_FONTS,
   SHARE_ART_FORMAT_KEYS,
-  SHARE_ART_ROLE_MAX,
   SHARE_ART_TEXT_SIZE_MAX,
   SHARE_ART_TEXT_SIZE_MIN,
   backgroundProblem,
@@ -98,37 +96,9 @@ const TEXT_FIELD: Record<TextKind, 'nameText' | 'roleText'> = {
 };
 const TEXT_LABEL: Record<TextKind, string> = { name: 'Nome', role: 'Papel' };
 
-/** REA-47: role per product (product id → role; empty → the default role) and the default role. */
-interface RolesState {
-  byProduct: Record<string, string>;
-  defaultRole: string;
-}
-
-export function toRolesState(config: ShareArtConfig | null | undefined): RolesState {
-  const byProduct: Record<string, string> = {};
-  (config?.product_roles ?? []).forEach(entry => {
-    byProduct[entry.product_id] = entry.role;
-  });
-  return {
-    byProduct,
-    defaultRole: config?.default_role || SHARE_ART_DEFAULT_ROLE,
-  };
-}
-
-const rolesInput = (roles: RolesState) => ({
-  product_roles: Object.entries(roles.byProduct)
-    .map(([product_id, role]) => ({ product_id, role: role.trim() }))
-    .filter(entry => entry.role),
-  default_role: roles.defaultRole.trim() || SHARE_ART_DEFAULT_ROLE,
-});
-
-/** The sample name of the admin preview. */
+/** The sample name and role of the admin preview (the person types/picks them in the generator). */
 const SAMPLE_NAME = 'Maria Silva';
-
-export interface ShareArtProductOption {
-  id: string;
-  name: string;
-}
+const SAMPLE_ROLE = 'Participante';
 
 export function toFormState(
   config: ShareArtConfig | null | undefined
@@ -158,11 +128,8 @@ const formatOf = (value: FormatState) =>
   });
 
 /** What the save sends: the local blob URL and the "square" switch are editor state only. */
-const savedShape = (state: FormState, roles: RolesState) =>
-  JSON.stringify([
-    SHARE_ART_FORMAT_KEYS.map(format => formatOf(state[format])),
-    rolesInput(roles),
-  ]);
+const savedShape = (state: FormState) =>
+  JSON.stringify(SHARE_ART_FORMAT_KEYS.map(format => formatOf(state[format])));
 
 function errorMessage(err: unknown): string {
   const apolloErr = err as {
@@ -183,21 +150,16 @@ interface ShareArtConfigFormProps {
   eventId: string;
   initialConfig: ShareArtConfig | null | undefined;
   onSaved: (config: ShareArtConfig | null) => void;
-  /** REA-47: the event's products (ticket types), to map each one to a role. */
-  products?: ShareArtProductOption[];
 }
 
 export function ShareArtConfigForm({
   eventId,
   initialConfig,
   onSaved,
-  products = [],
 }: ShareArtConfigFormProps) {
   const { toast } = useToast();
   const [saved, setSaved] = useState(() => toFormState(initialConfig));
   const [state, setState] = useState(saved);
-  const [savedRoles, setSavedRoles] = useState(() => toRolesState(initialConfig));
-  const [roles, setRoles] = useState(savedRoles);
   // REA-47: which area of each format is being edited (the photo, the name or the role).
   const [active, setActive] = useState<Record<ShareArtFormat, EditorAreaKey>>({
     story: 'photo',
@@ -228,9 +190,6 @@ export function ShareArtConfigForm({
     const next = toFormState(initialConfig);
     setSaved(next);
     setState(next);
-    const nextRoles = toRolesState(initialConfig);
-    setSavedRoles(nextRoles);
-    setRoles(nextRoles);
   }, [initialConfig]);
 
   useEffect(
@@ -239,8 +198,8 @@ export function ShareArtConfigForm({
   );
 
   const dirty = useMemo(
-    () => savedShape(state, roles) !== savedShape(saved, savedRoles),
-    [state, saved, roles, savedRoles]
+    () => savedShape(state) !== savedShape(saved),
+    [state, saved]
   );
   useUnsavedChanges(dirty, () => false);
 
@@ -254,13 +213,20 @@ export function ShareArtConfigForm({
   // REA-47: the sample texts of the editor and the preview.
   const samples: Record<TextKind, string> = {
     name: SAMPLE_NAME,
-    role: roles.defaultRole.trim() || SHARE_ART_DEFAULT_ROLE,
+    role: SAMPLE_ROLE,
   };
   const textAreas = (value: FormatState) =>
     (['name', 'role'] as TextKind[]).flatMap(kind => {
       const style = value[TEXT_FIELD[kind]];
       return style
-        ? [{ key: kind, label: `Área do ${kind === 'name' ? 'nome' : 'papel'}`, style, preview: samples[kind] }]
+        ? [
+            {
+              key: kind,
+              label: `Área do ${kind === 'name' ? 'nome' : 'papel'}`,
+              style,
+              preview: samples[kind],
+            },
+          ]
         : [];
     });
   const previewTexts = (value: FormatState) =>
@@ -387,7 +353,6 @@ export function ShareArtConfigForm({
           data: {
             story: formatOf(state.story),
             feed: formatOf(state.feed),
-            ...rolesInput(roles),
           },
         },
       });
@@ -536,10 +501,10 @@ export function ShareArtConfigForm({
                       className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground"
                       data-testid={`retired-${key}`}
                     >
-                      O fundo salvo antes estava em outra proporção e deixou
-                      de valer: o {spec.label} agora é {spec.ratio} (
-                      {spec.width}×{spec.height}). Envie um fundo novo; até lá,
-                      os participantes geram a arte padrão neste formato.
+                      O fundo salvo antes estava em outra proporção e deixou de
+                      valer: o {spec.label} agora é {spec.ratio} ({spec.width}×
+                      {spec.height}). Envie um fundo novo; até lá, os
+                      participantes geram a arte padrão neste formato.
                     </p>
                   )}
 
@@ -600,57 +565,62 @@ export function ShareArtConfigForm({
 
                         {active[key] === 'photo' ? (
                           <>
-                        <div className="max-w-[520px] space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor={`radius-${key}`}>
-                              Arredondamento
-                            </Label>
-                            <span className="text-xs text-muted-foreground">
-                              {Math.round(value.area.radius * 100)}%
-                            </span>
-                          </div>
-                          <Slider
-                            id={`radius-${key}`}
-                            thumbLabel="Arredondamento da área"
-                            min={0}
-                            max={100}
-                            step={1}
-                            value={[Math.round(value.area.radius * 100)]}
-                            onValueChange={([radius]) =>
-                              update(key, {
-                                area: { ...value.area, radius: radius / 100 },
-                              })
-                            }
-                          />
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>Canto reto</span>
-                            <span>{value.square ? 'Círculo' : 'Cápsula'}</span>
-                          </div>
-                        </div>
+                            <div className="max-w-[520px] space-y-2">
+                              <div className="flex items-center justify-between">
+                                <Label htmlFor={`radius-${key}`}>
+                                  Arredondamento
+                                </Label>
+                                <span className="text-xs text-muted-foreground">
+                                  {Math.round(value.area.radius * 100)}%
+                                </span>
+                              </div>
+                              <Slider
+                                id={`radius-${key}`}
+                                thumbLabel="Arredondamento da área"
+                                min={0}
+                                max={100}
+                                step={1}
+                                value={[Math.round(value.area.radius * 100)]}
+                                onValueChange={([radius]) =>
+                                  update(key, {
+                                    area: {
+                                      ...value.area,
+                                      radius: radius / 100,
+                                    },
+                                  })
+                                }
+                              />
+                              <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>Canto reto</span>
+                                <span>
+                                  {value.square ? 'Círculo' : 'Cápsula'}
+                                </span>
+                              </div>
+                            </div>
 
-                        <div className="flex max-w-[520px] items-center justify-between rounded-lg border p-3">
-                          <div>
-                            <Label htmlFor={`square-${key}`}>
-                              Área quadrada
-                            </Label>
-                            <p className="text-xs text-muted-foreground">
-                              Com o arredondamento no máximo, a foto vira um
-                              círculo.
-                            </p>
-                          </div>
-                          <Switch
-                            id={`square-${key}`}
-                            checked={value.square}
-                            onCheckedChange={checked =>
-                              update(key, {
-                                square: checked,
-                                area: checked
-                                  ? squareArea(value.area, ratio)
-                                  : value.area,
-                              })
-                            }
-                          />
-                        </div>
+                            <div className="flex max-w-[520px] items-center justify-between rounded-lg border p-3">
+                              <div>
+                                <Label htmlFor={`square-${key}`}>
+                                  Área quadrada
+                                </Label>
+                                <p className="text-xs text-muted-foreground">
+                                  Com o arredondamento no máximo, a foto vira um
+                                  círculo.
+                                </p>
+                              </div>
+                              <Switch
+                                id={`square-${key}`}
+                                checked={value.square}
+                                onCheckedChange={checked =>
+                                  update(key, {
+                                    square: checked,
+                                    area: checked
+                                      ? squareArea(value.area, ratio)
+                                      : value.area,
+                                  })
+                                }
+                              />
+                            </div>
                           </>
                         ) : (
                           <TextControls
@@ -726,69 +696,6 @@ export function ShareArtConfigForm({
         })}
       </Tabs>
 
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Papel na arte</CardTitle>
-          <CardDescription>
-            O papel que aparece na arte de cada pessoa. Organizadores da
-            comunidade do evento saem como &quot;Organizador&quot; e palestrantes
-            como &quot;Palestrante&quot;, automaticamente. Os inscritos saem com
-            o papel do produto (tipo de ingresso) da inscrição; um produto sem
-            papel usa o papel padrão. Quem não está inscrito não tem papel na
-            arte.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="max-w-md space-y-1.5">
-            <Label htmlFor="share-art-default-role">Papel padrão</Label>
-            <Input
-              id="share-art-default-role"
-              value={roles.defaultRole}
-              maxLength={SHARE_ART_ROLE_MAX}
-              placeholder={SHARE_ART_DEFAULT_ROLE}
-              onChange={e =>
-                setRoles(prev => ({ ...prev, defaultRole: e.target.value }))
-              }
-            />
-          </div>
-          {products.length > 0 ? (
-            <div className="space-y-3">
-              <p className="text-sm font-medium">Papel por produto</p>
-              {products.map(product => (
-                <div
-                  key={product.id}
-                  className="grid max-w-xl grid-cols-1 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
-                >
-                  <Label htmlFor={`share-art-role-${product.id}`}>
-                    {product.name}
-                  </Label>
-                  <Input
-                    id={`share-art-role-${product.id}`}
-                    value={roles.byProduct[product.id] ?? ''}
-                    maxLength={SHARE_ART_ROLE_MAX}
-                    placeholder={roles.defaultRole.trim() || SHARE_ART_DEFAULT_ROLE}
-                    onChange={e =>
-                      setRoles(prev => ({
-                        ...prev,
-                        byProduct: {
-                          ...prev.byProduct,
-                          [product.id]: e.target.value,
-                        },
-                      }))
-                    }
-                  />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Este evento não tem produtos no Eventando: todos os inscritos saem
-              com o papel padrão.
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
       <input
         ref={sampleInput}
         type="file"
@@ -813,7 +720,11 @@ export function ShareArtConfigForm({
   );
 }
 
-const ALIGN_OPTIONS: { value: ShareArtAlign; label: string; Icon: typeof AlignLeft }[] = [
+const ALIGN_OPTIONS: {
+  value: ShareArtAlign;
+  label: string;
+  Icon: typeof AlignLeft;
+}[] = [
   { value: 'left', label: 'Alinhar à esquerda', Icon: AlignLeft },
   { value: 'center', label: 'Centralizar', Icon: AlignCenter },
   { value: 'right', label: 'Alinhar à direita', Icon: AlignRight },
@@ -842,8 +753,8 @@ function TextControls({
           <Label htmlFor={`show-${id}`}>Mostrar {what} na arte</Label>
           <p className="text-xs text-muted-foreground">
             {kind === 'name'
-              ? 'A pessoa digita o nome dela (quem está logado já vem preenchido).'
-              : 'Vem da inscrição da pessoa; veja "Papel na arte" abaixo.'}
+              ? 'O nome que a pessoa digita no gerador (quem está logado já vem preenchido).'
+              : 'O papel que a pessoa escolhe no gerador: Participante, Líder, Mentor, Voluntário, Palestrante ou Organizador.'}
           </p>
         </div>
         <Switch
@@ -858,7 +769,9 @@ function TextControls({
             <Label htmlFor={`font-${id}`}>Fonte</Label>
             <Select
               value={value.font}
-              onValueChange={font => onChange({ ...value, font: font as ShareArtFont })}
+              onValueChange={font =>
+                onChange({ ...value, font: font as ShareArtFont })
+              }
             >
               <SelectTrigger id={`font-${id}`} aria-label={`Fonte d${what}`}>
                 <SelectValue />
@@ -886,7 +799,9 @@ function TextControls({
               max={SHARE_ART_TEXT_SIZE_MAX * 1000}
               step={1}
               value={[Math.round(value.size * 1000)]}
-              onValueChange={([size]) => onChange({ ...value, size: size / 1000 })}
+              onValueChange={([size]) =>
+                onChange({ ...value, size: size / 1000 })
+              }
             />
             <p className="text-xs text-muted-foreground">
               Um texto longo diminui sozinho para caber na área.
@@ -911,7 +826,11 @@ function TextControls({
             </div>
             <div className="space-y-1.5">
               <span className="text-sm font-medium">Alinhamento</span>
-              <div role="radiogroup" aria-label={`Alinhamento d${what}`} className="flex gap-1">
+              <div
+                role="radiogroup"
+                aria-label={`Alinhamento d${what}`}
+                className="flex gap-1"
+              >
                 {ALIGN_OPTIONS.map(({ value: align, label, Icon }) => (
                   <Button
                     key={align}
