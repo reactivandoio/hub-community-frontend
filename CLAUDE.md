@@ -158,7 +158,7 @@ src/
   (login, then the profile modal). Campaigns only reach adults with a date of birth.
 
 - **Arte "Eu vou" do evento (REA-43)** — the participant's art (`/events/<slug>/arte`,
-  `components/share-art/`) has two renderers per format (Stories 9:16, Feed 1:1): the default Hub
+  `components/share-art/`) has two renderers per format (Stories 9:16, Feed 4:5 — 1:1 until REA-47): the default Hub
   template (`share-art-template.tsx`, html-to-image) and, when the event has one, the organizer's art:
   a background image with the photo area on top, drawn on a canvas by `drawCustomArt`
   (`lib/share-art-custom.ts`), the same function the admin preview uses. `/admin/events/<id>/arte`
@@ -185,9 +185,28 @@ src/
   opens `ShareArtBackgroundCropDialog` (react-easy-crop, ratio locked to the format, drag + zoom)
   instead of an error; "Recortar imagem de fundo" crops the current one again, from the picked
   original (or, for a saved one, its `/api/og-image` URL). The crop is scaled to exactly 1080×1920 /
-  1080×1080 JPEG and uploaded already cropped; it is never enlarged — a crop under 1080 px of the
+  1080×1350 JPEG and uploaded already cropped; it is never enlarged — a crop under 1080 px of the
   original's width cannot be confirmed (`cropProblem`), and an image too small even at zoom 1 is
   refused before the dialog (`cropSourceProblem`). The BFF still checks the uploaded file's ratio.
+
+- **Nome e papel na arte; Feed 4:5 (REA-47)** — per format, the organizer's art can also place the
+  two texts the person already fills in the generator: the role they pick in "Seu papel no evento"
+  (`SHARE_ART_ROLES`: Participante, Líder, Mentor, Voluntário, Palestrante, Organizador) and the name
+  they type in "Seu nome" (up to 25 characters). Nothing is looked up: no role comes from signups,
+  products or speakers. `name_text` / `role_text` are an area in fractions of the background plus
+  font, size (fraction of the image width), color and alignment; null = that text is not on the
+  art, and then its step is not asked. In `/admin/events/<id>/arte` the buttons Foto / Nome / Papel
+  pick the area to edit in `ShareArtAreaEditor` (all areas are shown and draggable, handles only on
+  the selected one) and `TextControls` sets show/hide, font (`SHARE_ART_FONTS`: Inter, Inter negrito,
+  serif, serif negrito and the self-hosted cursive ones), size, color and alignment; a first
+  background starts with both under the photo (`defaultTextArea`); the preview shows "Maria Silva" /
+  "Participante". `drawCustomArt` draws the texts after the photo (`drawArtText`: vertically
+  centered, aligned, shrunk to fit the width — `fitTextSize`), after `loadArtFonts` (a canvas only
+  draws loaded fonts; Inter's hashed next/font name is read from `<body>`). The default art is as
+  before. `formatInput` sends only the input's fields (Apollo's `__typename` would be refused). The
+  feed is now **4:5 (1080×1350)** everywhere (default template 360×450, crop, export, "Feed (4:5)"); a
+  feed background saved in 1:1 comes back as null with `retired_formats: ['feed']` — default art in
+  that format and a notice in the admin until a new one is sent.
 
 ### Provider Hierarchy (layout.tsx)
 FirebaseProvider → ApolloProvider → AuthProvider → LoginPromptProvider → LogoutModalWrapper → AgendaProvider → FilterProvider → ThemeProvider → children

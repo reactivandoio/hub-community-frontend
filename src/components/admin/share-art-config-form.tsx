@@ -2,6 +2,9 @@
 
 import { useMutation } from '@apollo/client';
 import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
   Crop,
   ImagePlus,
   Loader2,
@@ -13,7 +16,10 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { AdminPageActions } from '@/components/admin/page-actions';
-import { ShareArtAreaEditor } from '@/components/admin/share-art-area-editor';
+import {
+  ShareArtAreaEditor,
+  type EditorAreaKey,
+} from '@/components/admin/share-art-area-editor';
 import { ShareArtBackgroundCropDialog } from '@/components/admin/share-art-background-crop-dialog';
 import { useUnsavedChanges } from '@/components/admin/unsaved-guard';
 import { CustomArtCanvas } from '@/components/share-art/custom-art-canvas';
@@ -25,7 +31,15 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -37,18 +51,25 @@ import {
   type ShareArtFormat,
 } from '@/lib/share-art';
 import {
+  SHARE_ART_FONTS,
   SHARE_ART_FORMAT_KEYS,
+  SHARE_ART_TEXT_SIZE_MAX,
+  SHARE_ART_TEXT_SIZE_MIN,
   backgroundProblem,
   cropSourceProblem,
   customFormatOf,
   defaultPhotoArea,
+  defaultTextArea,
   formatInput,
   imageRatioOf,
   isSquareArea,
   ratioMatches,
   squareArea,
+  type ShareArtAlign,
   type ShareArtConfig,
+  type ShareArtFont,
   type ShareArtPhotoArea,
+  type ShareArtText,
 } from '@/lib/share-art-config';
 import { SAMPLE_PHOTO_URL, readImageSize } from '@/lib/share-art-custom';
 import { preparePhoto } from '@/lib/share-art-image';
@@ -61,9 +82,23 @@ interface FormatState {
   backgroundUrl: string | null;
   area: ShareArtPhotoArea;
   square: boolean;
+  /** REA-47: null → that text is not on the art. */
+  nameText: ShareArtText | null;
+  roleText: ShareArtText | null;
 }
 
 type FormState = Record<ShareArtFormat, FormatState>;
+
+type TextKind = 'name' | 'role';
+const TEXT_FIELD: Record<TextKind, 'nameText' | 'roleText'> = {
+  name: 'nameText',
+  role: 'roleText',
+};
+const TEXT_LABEL: Record<TextKind, string> = { name: 'Nome', role: 'Papel' };
+
+/** The sample name and role of the admin preview (the person types/picks them in the generator). */
+const SAMPLE_NAME = 'Maria Silva';
+const SAMPLE_ROLE = 'Participante';
 
 export function toFormState(
   config: ShareArtConfig | null | undefined
@@ -77,21 +112,24 @@ export function toFormState(
       backgroundUrl: custom?.background ?? null,
       area,
       square: isSquareArea(area, imageRatioOf(format)),
+      nameText: custom?.name_text ?? null,
+      roleText: custom?.role_text ?? null,
     };
   });
   return state;
 }
 
+const formatOf = (value: FormatState) =>
+  formatInput({
+    backgroundId: value.backgroundId,
+    area: value.area,
+    nameText: value.nameText,
+    roleText: value.roleText,
+  });
+
 /** What the save sends: the local blob URL and the "square" switch are editor state only. */
 const savedShape = (state: FormState) =>
-  JSON.stringify(
-    SHARE_ART_FORMAT_KEYS.map(format =>
-      formatInput({
-        backgroundId: state[format].backgroundId,
-        area: state[format].area,
-      })
-    )
-  );
+  JSON.stringify(SHARE_ART_FORMAT_KEYS.map(format => formatOf(state[format])));
 
 function errorMessage(err: unknown): string {
   const apolloErr = err as {
@@ -122,6 +160,12 @@ export function ShareArtConfigForm({
   const { toast } = useToast();
   const [saved, setSaved] = useState(() => toFormState(initialConfig));
   const [state, setState] = useState(saved);
+  // REA-47: which area of each format is being edited (the photo, the name or the role).
+  const [active, setActive] = useState<Record<ShareArtFormat, EditorAreaKey>>({
+    story: 'photo',
+    feed: 'photo',
+  });
+  const retired = new Set(initialConfig?.retired_formats ?? []);
   const [format, setFormat] = useState<ShareArtFormat>('story');
   const [uploading, setUploading] = useState<ShareArtFormat | null>(null);
   const [problems, setProblems] = useState<
@@ -166,6 +210,28 @@ export function ShareArtConfigForm({
   const update = (key: ShareArtFormat, patch: Partial<FormatState>) =>
     setState(prev => ({ ...prev, [key]: { ...prev[key], ...patch } }));
 
+  // REA-47: the sample texts of the editor and the preview.
+  const samples: Record<TextKind, string> = {
+    name: SAMPLE_NAME,
+    role: SAMPLE_ROLE,
+  };
+  const textAreas = (value: FormatState) =>
+    (['name', 'role'] as TextKind[]).flatMap(kind => {
+      const style = value[TEXT_FIELD[kind]];
+      return style
+        ? [
+            {
+              key: kind,
+              label: `Área do ${kind === 'name' ? 'nome' : 'papel'}`,
+              style,
+              preview: samples[kind],
+            },
+          ]
+        : [];
+    });
+  const previewTexts = (value: FormatState) =>
+    textAreas(value).map(area => ({ text: area.preview, style: area.style }));
+
   const objectUrl = (file: Blob) => {
     const url = URL.createObjectURL(file);
     blobUrls.current.push(url);
@@ -189,10 +255,16 @@ export function ShareArtConfigForm({
           ...prev[key],
           backgroundId: id,
           backgroundUrl: url,
-          // A first background starts with the default circle; a new one keeps the area.
+          // A first background starts with the default circle and, under it, the name and the
+          // role (REA-47); a new one keeps the areas.
           ...(prev[key].backgroundId
             ? {}
-            : { area: defaultPhotoArea(key), square: true }),
+            : {
+                area: defaultPhotoArea(key),
+                square: true,
+                nameText: defaultTextArea(key, 'name'),
+                roleText: defaultTextArea(key, 'role'),
+              }),
         },
       }));
     } catch (err) {
@@ -279,14 +351,8 @@ export function ShareArtConfigForm({
         variables: {
           eventId,
           data: {
-            story: formatInput({
-              backgroundId: state.story.backgroundId,
-              area: state.story.area,
-            }),
-            feed: formatInput({
-              backgroundId: state.feed.backgroundId,
-              area: state.feed.area,
-            }),
+            story: formatOf(state.story),
+            feed: formatOf(state.feed),
           },
         },
       });
@@ -430,13 +496,52 @@ export function ShareArtConfigForm({
                       {problems[key]}
                     </p>
                   )}
+                  {retired.has(key) && !value.backgroundUrl && (
+                    <p
+                      className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground"
+                      data-testid={`retired-${key}`}
+                    >
+                      O fundo salvo antes estava em outra proporção e deixou de
+                      valer: o {spec.label} agora é {spec.ratio} ({spec.width}×
+                      {spec.height}). Envie um fundo novo; até lá, os
+                      participantes geram a arte padrão neste formato.
+                    </p>
+                  )}
 
                   {value.backgroundUrl ? (
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_auto]">
                       <div className="space-y-5">
+                        <div
+                          role="radiogroup"
+                          aria-label={`O que editar no ${spec.label}`}
+                          className="flex flex-wrap gap-2"
+                        >
+                          {(['photo', 'name', 'role'] as EditorAreaKey[]).map(
+                            item => (
+                              <Button
+                                key={item}
+                                type="button"
+                                size="sm"
+                                role="radio"
+                                aria-checked={active[key] === item}
+                                variant={
+                                  active[key] === item ? 'default' : 'outline'
+                                }
+                                onClick={() =>
+                                  setActive(prev => ({ ...prev, [key]: item }))
+                                }
+                              >
+                                {item === 'photo'
+                                  ? 'Foto'
+                                  : TEXT_LABEL[item as TextKind]}
+                              </Button>
+                            )
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground">
-                          Arraste a área para posicionar a foto e use os
-                          quadradinhos para redimensionar.
+                          Arraste as áreas para posicionar a foto, o nome e o
+                          papel, e use os quadradinhos da área escolhida para
+                          redimensionar.
                         </p>
                         <ShareArtAreaEditor
                           backgroundUrl={value.backgroundUrl}
@@ -445,62 +550,96 @@ export function ShareArtConfigForm({
                           square={value.square}
                           photoUrl={samplePhoto}
                           onChange={area => update(key, { area })}
+                          texts={textAreas(value)}
+                          onTextChange={(kind, style) =>
+                            update(key, { [TEXT_FIELD[kind]]: style })
+                          }
+                          active={active[key]}
+                          onSelect={item =>
+                            setActive(prev => ({ ...prev, [key]: item }))
+                          }
                           className={
-                            key === 'story' ? 'max-w-[400px]' : 'max-w-[520px]'
+                            key === 'story' ? 'max-w-[400px]' : 'max-w-[440px]'
                           }
                         />
 
-                        <div className="max-w-[520px] space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor={`radius-${key}`}>
-                              Arredondamento
-                            </Label>
-                            <span className="text-xs text-muted-foreground">
-                              {Math.round(value.area.radius * 100)}%
-                            </span>
-                          </div>
-                          <Slider
-                            id={`radius-${key}`}
-                            thumbLabel="Arredondamento da área"
-                            min={0}
-                            max={100}
-                            step={1}
-                            value={[Math.round(value.area.radius * 100)]}
-                            onValueChange={([radius]) =>
-                              update(key, {
-                                area: { ...value.area, radius: radius / 100 },
-                              })
-                            }
-                          />
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>Canto reto</span>
-                            <span>{value.square ? 'Círculo' : 'Cápsula'}</span>
-                          </div>
-                        </div>
+                        {active[key] === 'photo' ? (
+                          <>
+                            <div className="max-w-[520px] space-y-2">
+                              <div className="flex items-center justify-between">
+                                <Label htmlFor={`radius-${key}`}>
+                                  Arredondamento
+                                </Label>
+                                <span className="text-xs text-muted-foreground">
+                                  {Math.round(value.area.radius * 100)}%
+                                </span>
+                              </div>
+                              <Slider
+                                id={`radius-${key}`}
+                                thumbLabel="Arredondamento da área"
+                                min={0}
+                                max={100}
+                                step={1}
+                                value={[Math.round(value.area.radius * 100)]}
+                                onValueChange={([radius]) =>
+                                  update(key, {
+                                    area: {
+                                      ...value.area,
+                                      radius: radius / 100,
+                                    },
+                                  })
+                                }
+                              />
+                              <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>Canto reto</span>
+                                <span>
+                                  {value.square ? 'Círculo' : 'Cápsula'}
+                                </span>
+                              </div>
+                            </div>
 
-                        <div className="flex max-w-[520px] items-center justify-between rounded-lg border p-3">
-                          <div>
-                            <Label htmlFor={`square-${key}`}>
-                              Área quadrada
-                            </Label>
-                            <p className="text-xs text-muted-foreground">
-                              Com o arredondamento no máximo, a foto vira um
-                              círculo.
-                            </p>
-                          </div>
-                          <Switch
-                            id={`square-${key}`}
-                            checked={value.square}
-                            onCheckedChange={checked =>
+                            <div className="flex max-w-[520px] items-center justify-between rounded-lg border p-3">
+                              <div>
+                                <Label htmlFor={`square-${key}`}>
+                                  Área quadrada
+                                </Label>
+                                <p className="text-xs text-muted-foreground">
+                                  Com o arredondamento no máximo, a foto vira um
+                                  círculo.
+                                </p>
+                              </div>
+                              <Switch
+                                id={`square-${key}`}
+                                checked={value.square}
+                                onCheckedChange={checked =>
+                                  update(key, {
+                                    square: checked,
+                                    area: checked
+                                      ? squareArea(value.area, ratio)
+                                      : value.area,
+                                  })
+                                }
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <TextControls
+                            formatLabel={spec.label}
+                            kind={active[key] as TextKind}
+                            value={value[TEXT_FIELD[active[key] as TextKind]]}
+                            onChange={text =>
                               update(key, {
-                                square: checked,
-                                area: checked
-                                  ? squareArea(value.area, ratio)
-                                  : value.area,
+                                [TEXT_FIELD[active[key] as TextKind]]: text,
+                              })
+                            }
+                            onEnable={() =>
+                              update(key, {
+                                [TEXT_FIELD[active[key] as TextKind]]:
+                                  defaultTextArea(key, active[key] as TextKind),
                               })
                             }
                           />
-                        </div>
+                        )}
                       </div>
 
                       <div className="space-y-3">
@@ -511,6 +650,7 @@ export function ShareArtConfigForm({
                           backgroundUrl={value.backgroundUrl}
                           photoUrl={samplePhoto}
                           area={value.area}
+                          texts={previewTexts(value)}
                           width={PREVIEW_WIDTH}
                           height={previewHeight}
                           label={`Prévia da arte ${spec.label}`}
@@ -577,5 +717,140 @@ export function ShareArtConfigForm({
         onCropped={handleCropped}
       />
     </form>
+  );
+}
+
+const ALIGN_OPTIONS: {
+  value: ShareArtAlign;
+  label: string;
+  Icon: typeof AlignLeft;
+}[] = [
+  { value: 'left', label: 'Alinhar à esquerda', Icon: AlignLeft },
+  { value: 'center', label: 'Centralizar', Icon: AlignCenter },
+  { value: 'right', label: 'Alinhar à direita', Icon: AlignRight },
+];
+
+/** REA-47: show/hide, font, size, color and alignment of the name or the role. */
+function TextControls({
+  formatLabel,
+  kind,
+  value,
+  onChange,
+  onEnable,
+}: {
+  formatLabel: string;
+  kind: TextKind;
+  value: ShareArtText | null;
+  onChange: (text: ShareArtText | null) => void;
+  onEnable: () => void;
+}) {
+  const what = kind === 'name' ? 'o nome' : 'o papel';
+  const id = `${formatLabel}-${kind}`.toLowerCase();
+  return (
+    <div className="max-w-[520px] space-y-4 rounded-lg border p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <Label htmlFor={`show-${id}`}>Mostrar {what} na arte</Label>
+          <p className="text-xs text-muted-foreground">
+            {kind === 'name'
+              ? 'O nome que a pessoa digita no gerador (quem está logado já vem preenchido).'
+              : 'O papel que a pessoa escolhe no gerador: Participante, Líder, Mentor, Voluntário, Palestrante ou Organizador.'}
+          </p>
+        </div>
+        <Switch
+          id={`show-${id}`}
+          checked={Boolean(value)}
+          onCheckedChange={checked => (checked ? onEnable() : onChange(null))}
+        />
+      </div>
+      {value && (
+        <>
+          <div className="space-y-1.5">
+            <Label htmlFor={`font-${id}`}>Fonte</Label>
+            <Select
+              value={value.font}
+              onValueChange={font =>
+                onChange({ ...value, font: font as ShareArtFont })
+              }
+            >
+              <SelectTrigger id={`font-${id}`} aria-label={`Fonte d${what}`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SHARE_ART_FONTS.map(font => (
+                  <SelectItem key={font.key} value={font.key}>
+                    {font.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor={`size-${id}`}>Tamanho</Label>
+              <span className="text-xs text-muted-foreground">
+                {Math.round(value.size * 1080)} px na arte
+              </span>
+            </div>
+            <Slider
+              id={`size-${id}`}
+              thumbLabel={`Tamanho d${what}`}
+              min={SHARE_ART_TEXT_SIZE_MIN * 1000}
+              max={SHARE_ART_TEXT_SIZE_MAX * 1000}
+              step={1}
+              value={[Math.round(value.size * 1000)]}
+              onValueChange={([size]) =>
+                onChange({ ...value, size: size / 1000 })
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              Um texto longo diminui sozinho para caber na área.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor={`color-${id}`}>Cor</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  id={`color-${id}`}
+                  type="color"
+                  aria-label={`Cor d${what}`}
+                  value={value.color}
+                  onChange={e => onChange({ ...value, color: e.target.value })}
+                  className="h-9 w-12 cursor-pointer rounded border bg-transparent p-0.5"
+                />
+                <span className="font-mono text-xs text-muted-foreground">
+                  {value.color}
+                </span>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <span className="text-sm font-medium">Alinhamento</span>
+              <div
+                role="radiogroup"
+                aria-label={`Alinhamento d${what}`}
+                className="flex gap-1"
+              >
+                {ALIGN_OPTIONS.map(({ value: align, label, Icon }) => (
+                  <Button
+                    key={align}
+                    type="button"
+                    size="icon"
+                    role="radio"
+                    aria-checked={value.align === align}
+                    aria-label={label}
+                    variant={value.align === align ? 'default' : 'outline'}
+                    className="h-9 w-9"
+                    onClick={() => onChange({ ...value, align })}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
   );
 }

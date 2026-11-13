@@ -27,12 +27,12 @@ interface ShareArtBackgroundCropDialogProps {
   /** Why the dialog opened: the picked image is not in the format's ratio. */
   wrongRatio?: { width: number; height: number } | null;
   onCancel: () => void;
-  /** The background, already cropped to the format's exact size (1080×1920 or 1080×1080). */
+  /** The background, already cropped to the format's exact size (1080×1920 or 1080×1350). */
   onCropped: (file: File) => void | Promise<void>;
 }
 
 /**
- * REA-45: crops a background of the "eu vou" art to its format (Stories 9:16, Feed 1:1) — the ratio
+ * REA-45: crops a background of the "eu vou" art to its format (Stories 9:16, Feed 4:5) — the ratio
  * is locked; drag and zoom choose the part. The crop is scaled down to the format's size, never up:
  * a crop narrower than the format's width (too much zoom on a small image) cannot be confirmed.
  */

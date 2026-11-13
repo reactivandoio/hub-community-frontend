@@ -34,7 +34,8 @@ export const SHARE_ART_FORMATS: Record<
     width: 1080,
     height: 1920,
   },
-  feed: { label: 'Feed', ratio: '1:1', aspect: 1, width: 1080, height: 1080 },
+  // REA-47: the portrait of the Instagram feed (it used to be 1:1).
+  feed: { label: 'Feed', ratio: '4:5', aspect: 4 / 5, width: 1080, height: 1350 },
 };
 
 /**
@@ -47,7 +48,7 @@ export const SHARE_ART_LAYOUT: Record<
   { width: number; height: number; photo: { width: number; height: number } }
 > = {
   story: { width: 360, height: 640, photo: { width: 328, height: 416 } },
-  feed: { width: 360, height: 360, photo: { width: 176, height: 264 } },
+  feed: { width: 360, height: 450, photo: { width: 176, height: 316 } },
 };
 
 export type ShareArtFilter = 'natural' | 'destaque' | 'pb';

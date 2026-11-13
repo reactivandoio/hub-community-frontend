@@ -123,7 +123,10 @@ export function ShareArtPage({ slugOrId }: { slugOrId: string }) {
             <span>
               Ainda não se inscreveu em <strong>{event.title}</strong>?
             </span>
-            <Link href={eventPath} className="font-semibold text-primary underline-offset-4 hover:underline">
+            <Link
+              href={eventPath}
+              className="font-semibold text-primary underline-offset-4 hover:underline"
+            >
               Ver evento
             </Link>
           </p>

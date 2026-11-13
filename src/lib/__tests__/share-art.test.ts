@@ -83,7 +83,7 @@ describe('shareArtFileName', () => {
     expect(shareArtFileName('sw-anapolis', 'Voluntário', 'story')).toBe(
       'sw-anapolis-voluntario-9x16.png'
     );
-    expect(shareArtFileName('', 'Líder', 'feed')).toBe('evento-lider-1x1.png');
+    expect(shareArtFileName('', 'Líder', 'feed')).toBe('evento-lider-4x5.png');
   });
 });
 
@@ -113,6 +113,7 @@ describe('SHARE_ART_LAYOUT', () => {
     expect(
       SHARE_ART_LAYOUT.story.height / SHARE_ART_LAYOUT.story.width
     ).toBeCloseTo(16 / 9);
-    expect(SHARE_ART_LAYOUT.feed.height).toBe(SHARE_ART_LAYOUT.feed.width);
+    // REA-47: the feed is 4:5 (1080×1350).
+    expect(SHARE_ART_LAYOUT.feed.height / SHARE_ART_LAYOUT.feed.width).toBeCloseTo(5 / 4);
   });
 });

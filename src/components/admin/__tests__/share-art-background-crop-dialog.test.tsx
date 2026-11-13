@@ -6,7 +6,7 @@ import { ShareArtBackgroundCropDialog } from '@/components/admin/share-art-backg
 
 // react-easy-crop needs layout; the stub reports the crop the test picks, as the real one does
 // after a drag or a zoom (pixels of the original image).
-let cropPixels = { x: 0, y: 0, width: 2251, height: 2251 };
+let cropPixels = { x: 0, y: 0, width: 2251, height: 2814 };
 let lastCropper: any = null;
 vi.mock('react-easy-crop', async () => {
   const { useEffect } = await import('react');
@@ -28,7 +28,7 @@ vi.mock('@/lib/get-cropped-img', () => ({
 }));
 
 beforeEach(() => {
-  cropPixels = { x: 0, y: 0, width: 2251, height: 2251 };
+  cropPixels = { x: 0, y: 0, width: 2251, height: 2814 };
   lastCropper = null;
   mockGetCroppedImg.mockReset().mockResolvedValue(new File(['c'], 'c.jpg', { type: 'image/jpeg' }));
 });
@@ -45,14 +45,14 @@ describe('ShareArtBackgroundCropDialog (REA-45)', () => {
         onCropped={onCropped}
       />
     );
-    expect(screen.getByRole('dialog')).toHaveTextContent('Recortar o fundo do Feed (1:1)');
-    expect(screen.getByRole('dialog')).toHaveTextContent('A imagem tem 2251×2814, fora da proporção 1:1.');
-    expect(lastCropper.aspect).toBe(1);
-    expect(screen.getByTestId('crop-size')).toHaveTextContent('Recorte de 2251×2251 pixels');
+    expect(screen.getByRole('dialog')).toHaveTextContent('Recortar o fundo do Feed (4:5)');
+    expect(screen.getByRole('dialog')).toHaveTextContent('A imagem tem 2251×2814, fora da proporção 4:5.');
+    expect(lastCropper.aspect).toBe(0.8);
+    expect(screen.getByTestId('crop-size')).toHaveTextContent('Recorte de 2251×2814 pixels');
 
     await userEvent.click(screen.getByRole('button', { name: 'Usar recorte' }));
     await waitFor(() => expect(onCropped).toHaveBeenCalled());
-    expect(mockGetCroppedImg).toHaveBeenCalledWith('blob:bg', cropPixels, 1080, 1080, 'fundo-feed-1080x1080.jpg');
+    expect(mockGetCroppedImg).toHaveBeenCalledWith('blob:bg', cropPixels, 1080, 1350, 'fundo-feed-1080x1350.jpg');
   });
 
   it('uses 9:16 and 1080×1920 for Stories', async () => {
@@ -67,7 +67,7 @@ describe('ShareArtBackgroundCropDialog (REA-45)', () => {
   });
 
   it('does not take a crop narrower than 1080 px (too much zoom): it would be enlarged', () => {
-    cropPixels = { x: 300, y: 300, width: 900, height: 900 };
+    cropPixels = { x: 300, y: 300, width: 900, height: 1125 };
     render(
       <ShareArtBackgroundCropDialog imageSrc="blob:bg" format="feed" onCancel={vi.fn()} onCropped={vi.fn()} />
     );

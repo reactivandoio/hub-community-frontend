@@ -18,6 +18,10 @@ import {
   cropProblem,
   cropSourceProblem,
   maxCropWidth,
+  SHARE_ART_FONTS,
+  SHARE_ART_MIN_TEXT_SIDE,
+  defaultTextArea,
+  fitTextSize,
 } from '../share-art-config';
 
 const STORY = 9 / 16;
@@ -27,10 +31,15 @@ const close = (a: ShareArtPhotoArea, b: Partial<ShareArtPhotoArea>) =>
   );
 
 describe('background checks (same rule as the BFF)', () => {
-  it('accepts 9:16 for stories and 1:1 for the feed, up to 1% off', () => {
+  it('accepts 9:16 for stories and 4:5 for the feed (REA-47), up to 1% off', () => {
     expect(backgroundProblem('story', 1080, 1920)).toBeNull();
     expect(backgroundProblem('story', 1080, 1910)).toBeNull();
-    expect(backgroundProblem('feed', 2048, 2048)).toBeNull();
+    expect(backgroundProblem('feed', 2048, 2560)).toBeNull();
+    expect(backgroundProblem('feed', 1080, 1350)).toBeNull();
+    // The old square feed is refused now.
+    expect(backgroundProblem('feed', 2048, 2048)).toBe(
+      'O fundo do Feed (4:5) precisa ter proporção 4:5 (a enviada tem 2048×2048).'
+    );
     expect(ratioMatches(1080, 1900, STORY)).toBe(false);
   });
 
@@ -39,7 +48,7 @@ describe('background checks (same rule as the BFF)', () => {
       'O fundo do Stories (9:16) precisa ter proporção 9:16 (a enviada tem 1080×1350).'
     );
     expect(backgroundProblem('feed', 1080, 1920)).toBe(
-      'O fundo do Feed (1:1) precisa ter proporção 1:1 (a enviada tem 1080×1920).'
+      'O fundo do Feed (4:5) precisa ter proporção 4:5 (a enviada tem 1080×1920).'
     );
   });
 
@@ -70,7 +79,9 @@ describe('default and square areas', () => {
     expect(story.y + story.height / 2).toBeCloseTo(0.5, 5);
     expect(isSquareArea(story, STORY)).toBe(true);
     expect(areaAspect(story, STORY)).toBeCloseTo(1, 5);
-    close(defaultPhotoArea('feed'), { x: 0.2, y: 0.2, width: 0.6, height: 0.6 });
+    const feed = defaultPhotoArea('feed');
+    close(feed, { x: 0.2, y: 0.26, width: 0.6, height: 0.48 });
+    expect(isSquareArea(feed, 4 / 5)).toBe(true);
   });
 
   it('squares an area around its center, by its smaller side', () => {
@@ -182,6 +193,9 @@ describe('formatInput', () => {
     ).toEqual({
       background: '42',
       photo_area: { x: 0.123457, y: 0, width: 0.5, height: 0.5, radius: 1 },
+      // REA-47: without texts, the name and the role are off.
+      name_text: null,
+      role_text: null,
     });
     expect(formatInput({ backgroundId: null, area: defaultPhotoArea('feed') })).toBeNull();
     expect(formatInput(null)).toBeNull();
@@ -208,5 +222,61 @@ describe('background crop (REA-45)', () => {
     expect(cropProblem('feed', 1000)).toBe(
       'O recorte tem 1000 px de largura; o fundo do Feed precisa de ao menos 1080 px. Diminua o zoom.'
     );
+  });
+});
+
+describe('name and role texts (REA-47)', () => {
+  it('start under the default photo, inside the image, centered and white', () => {
+    for (const format of ['story', 'feed'] as const) {
+      const photo = defaultPhotoArea(format);
+      const name = defaultTextArea(format, 'name');
+      const role = defaultTextArea(format, 'role');
+      expect(name.y).toBeGreaterThanOrEqual(photo.y + photo.height);
+      expect(role.y).toBeGreaterThanOrEqual(name.y + name.height);
+      expect(role.y + role.height).toBeLessThanOrEqual(1);
+      expect(name).toMatchObject({ align: 'center', color: '#ffffff', font: 'inter_bold' });
+      expect(role.size).toBeLessThan(name.size);
+    }
+  });
+
+  it('fits the font size to the area: capped by its height, shrunk to its width', () => {
+    const measure = (px: number) => px * 10; // a 10-character text at 0.5 × px per char… × 2
+    expect(fitTextSize(measure, { size: 50, areaWidth: 1000, areaHeight: 100 })).toBe(50);
+    expect(fitTextSize(measure, { size: 50, areaWidth: 1000, areaHeight: 23 })).toBe(20);
+    expect(fitTextSize(measure, { size: 50, areaWidth: 300, areaHeight: 100 })).toBe(30);
+  });
+
+  it('sends the texts rounded and without __typename, or null when off', () => {
+    const name = {
+      __typename: 'ShareArtText', x: 0.1234567891, y: 0.7, width: 0.8, height: 0.05,
+      font: 'inter_bold' as const, size: 0.05, color: '#ffffff', align: 'center' as const,
+    };
+    const out = formatInput({
+      backgroundId: '42',
+      area: { __typename: 'ShareArtPhotoArea', x: 0, y: 0, width: 0.5, height: 0.5, radius: 1 } as never,
+      nameText: name,
+      roleText: null,
+    });
+    expect(out?.photo_area).toEqual({ x: 0, y: 0, width: 0.5, height: 0.5, radius: 1 });
+    expect(out?.name_text).toEqual({
+      x: 0.123457, y: 0.7, width: 0.8, height: 0.05, font: 'inter_bold', size: 0.05, color: '#ffffff', align: 'center',
+    });
+    expect(out?.role_text).toBeNull();
+  });
+
+  it('has the same fonts as the BFF and the backend', () => {
+    expect(SHARE_ART_FONTS.map(font => font.key)).toEqual([
+      'inter', 'inter_bold', 'serif', 'serif_bold', 'dancing_script', 'great_vibes', 'allura',
+    ]);
+  });
+
+  it('moves and resizes a text area like the photo, keeping its style', () => {
+    const text = defaultTextArea('story', 'name');
+    const moved = moveArea(text, 0.05, -0.1);
+    expect(moved).toMatchObject({ font: text.font, size: text.size, color: text.color, align: text.align });
+    expect(moved.x).toBeCloseTo(0.15);
+    const resized = resizeArea(text, 's', 0, -0.04, { imageRatio: 9 / 16, minSide: SHARE_ART_MIN_TEXT_SIDE });
+    expect(resized.height).toBeCloseTo(SHARE_ART_MIN_TEXT_SIDE);
+    expect(resized).not.toHaveProperty('radius');
   });
 });

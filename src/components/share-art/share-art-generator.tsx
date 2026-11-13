@@ -50,7 +50,11 @@ import {
   imageRatioOf,
   type ShareArtConfig,
 } from '@/lib/share-art-config';
-import { exportCustomArt, loadArtImage } from '@/lib/share-art-custom';
+import {
+  exportCustomArt,
+  loadArtImage,
+  type ArtTextLayer,
+} from '@/lib/share-art-custom';
 import {
   cropPhoto,
   downloadBlob,
@@ -140,7 +144,10 @@ export function ShareArtGenerator({
   signedUp = true,
 }: ShareArtGeneratorProps) {
   const artEvent = useMemo(
-    () => ({ ...buildShareArtEvent(event), headline: shareArtHeadline(signedUp) }),
+    () => ({
+      ...buildShareArtEvent(event),
+      headline: shareArtHeadline(signedUp),
+    }),
     [event, signedUp]
   );
 
@@ -203,8 +210,20 @@ export function ShareArtGenerator({
   const customBackground = backgrounds[format];
   const custom =
     customFormat && customBackground && customBackground !== 'failed'
-      ? { area: customFormat.photo_area, background: customBackground }
+      ? {
+          area: customFormat.photo_area,
+          background: customBackground,
+          nameText: customFormat.name_text ?? null,
+          roleText: customFormat.role_text ?? null,
+        }
       : null;
+  // REA-47: the name the person typed and the role they picked, where the organizer placed them.
+  const customTexts: ArtTextLayer[] = custom
+    ? [
+        ...(custom.nameText ? [{ text: name, style: custom.nameText }] : []),
+        ...(custom.roleText ? [{ text: role, style: custom.roleText }] : []),
+      ]
+    : [];
   const customPending = Boolean(customFormat) && !customBackground;
   // The crop follows the configured area even before the background loads (a failed background
   // falls back to the default frame, which covers any ratio).
@@ -322,6 +341,7 @@ export function ShareArtGenerator({
             background: await loadArtImage(custom.background),
             photo: photoUrl ? await loadArtImage(photoUrl) : null,
             area: custom.area,
+            texts: customTexts,
           })
         : await exportNodeToPng(templateRef.current!, layout, output);
       const art = {
@@ -460,40 +480,42 @@ export function ShareArtGenerator({
           </div>
         </Step>
 
-        {custom ? (
+        {custom && (
           <p className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">
             Este formato usa a arte do evento: sua foto entra no espaço que a
             organização preparou.
           </p>
-        ) : (
-          <>
-            <Step index={3} title="Seu papel no evento">
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {SHARE_ART_ROLES.map(r => (
-                  <OptionButton
-                    key={r}
-                    selected={role === r}
-                    onClick={() => setRole(r)}
-                  >
-                    {r}
-                  </OptionButton>
-                ))}
-              </div>
-            </Step>
-
-            <Step index={4} title="Seu nome">
-              <Input
-                value={name}
-                onChange={e => setName(cleanShareArtName(e.target.value))}
-                maxLength={SHARE_ART_NAME_MAX}
-                placeholder="Como você quer aparecer"
-                aria-label="Seu nome"
-              />
-              <p className="text-xs text-muted-foreground">
-                {name.length}/{SHARE_ART_NAME_MAX} caracteres
-              </p>
-            </Step>
-          </>
+        )}
+        {/* The role and the name: on the default art always; on the organizer's art (REA-47) when
+            it placed them, drawn where it chose. */}
+        {(!custom || custom.roleText) && (
+          <Step index={3} title="Seu papel no evento">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {SHARE_ART_ROLES.map(r => (
+                <OptionButton
+                  key={r}
+                  selected={role === r}
+                  onClick={() => setRole(r)}
+                >
+                  {r}
+                </OptionButton>
+              ))}
+            </div>
+          </Step>
+        )}
+        {(!custom || custom.nameText) && (
+          <Step index={custom && !custom.roleText ? 3 : 4} title="Seu nome">
+            <Input
+              value={name}
+              onChange={e => setName(cleanShareArtName(e.target.value))}
+              maxLength={SHARE_ART_NAME_MAX}
+              placeholder="Como você quer aparecer"
+              aria-label="Seu nome"
+            />
+            <p className="text-xs text-muted-foreground">
+              {name.length}/{SHARE_ART_NAME_MAX} caracteres
+            </p>
+          </Step>
         )}
       </div>
 
@@ -521,6 +543,7 @@ export function ShareArtGenerator({
                   backgroundUrl={custom.background}
                   photoUrl={photoUrl}
                   area={custom.area}
+                  texts={customTexts}
                   width={layout.width * previewScale}
                   height={layout.height * previewScale}
                   className="rounded-none shadow-none"

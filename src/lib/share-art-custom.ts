@@ -8,7 +8,11 @@
 import {
   areaToPixels,
   coverSource,
+  fitTextSize,
+  fontSpecOf,
+  type ShareArtFont,
   type ShareArtPhotoArea,
+  type ShareArtText,
 } from '@/lib/share-art-config';
 
 /** The part of CanvasRenderingContext2D used here (lets tests pass a recorder). */
@@ -30,6 +34,7 @@ export type ArtContext = Pick<
   | 'textAlign'
   | 'textBaseline'
   | 'imageSmoothingQuality'
+  | 'measureText'
 >;
 
 interface Drawable {
@@ -63,19 +68,89 @@ export function roundedRectPath(
 }
 
 export interface DrawCustomArtOptions {
-  /** Output size in pixels (1080×1920 / 1080×1080 for the PNG, smaller for a preview). */
+  /** Output size in pixels (1080×1920 / 1080×1350 for the PNG, smaller for a preview). */
   width: number;
   height: number;
   background: ArtImage;
   /** The participant's (or the sample) photo; null draws a "Sua foto" placeholder. */
   photo: ArtImage | null;
   area: ShareArtPhotoArea;
+  /** REA-47: the person's name and role, each in its area (an empty text is not drawn). */
+  texts?: ArtTextLayer[];
+}
+
+/** REA-47: one text of the art (the name or the role) and where/how it goes. */
+export interface ArtTextLayer {
+  text: string;
+  style: ShareArtText;
+}
+
+const INTER_FALLBACK = 'Inter, system-ui, sans-serif';
+
+/**
+ * The CSS family of the Hub's Inter: next/font gives it a hashed name, applied to <body>, so it is
+ * read from there.
+ */
+function interFamily(): string {
+  if (typeof document === 'undefined' || !document.body) return INTER_FALLBACK;
+  const family = getComputedStyle(document.body).fontFamily;
+  return family && /inter/i.test(family) ? family : INTER_FALLBACK;
+}
+
+/** The canvas `font` of a text of the art at `px` pixels. */
+export function artFont(font: ShareArtFont, px: number): string {
+  const spec = fontSpecOf(font);
+  const family = spec.family === 'inter' ? interFamily() : spec.family;
+  return `${spec.weight} ${px}px ${family}`;
+}
+
+/**
+ * Loads the fonts before drawing: a canvas draws with whatever is loaded at that moment, so a
+ * cursive font not used anywhere else on the page would come out as the fallback.
+ */
+export async function loadArtFonts(fonts: ShareArtFont[]): Promise<void> {
+  if (typeof document === 'undefined' || !document.fonts?.load) return;
+  await Promise.all(
+    [...new Set(fonts)].map(font =>
+      document.fonts.load(artFont(font, 40), 'Aa').catch(() => [])
+    )
+  );
+}
+
+/** Draws one text in its area: vertically centered, aligned, shrunk to fit the area's width. */
+export function drawArtText(
+  ctx: ArtContext,
+  { text, style }: ArtTextLayer,
+  width: number,
+  height: number
+): void {
+  const value = text.trim();
+  if (!value) return;
+  const rect = areaToPixels(style, width, height);
+  const px = fitTextSize(
+    size => {
+      ctx.font = artFont(style.font, size);
+      return ctx.measureText(value).width;
+    },
+    { size: style.size * width, areaWidth: rect.width, areaHeight: rect.height }
+  );
+  ctx.font = artFont(style.font, px);
+  ctx.fillStyle = style.color;
+  ctx.textAlign = style.align;
+  ctx.textBaseline = 'middle';
+  const x =
+    style.align === 'left'
+      ? rect.left
+      : style.align === 'right'
+        ? rect.left + rect.width
+        : rect.left + rect.width / 2;
+  ctx.fillText(value, x, rect.top + rect.height / 2);
 }
 
 /** Draws the custom art on `ctx`. The background already has the format's ratio (checked on upload). */
 export function drawCustomArt(
   ctx: ArtContext,
-  { width, height, background, photo, area }: DrawCustomArtOptions
+  { width, height, background, photo, area, texts = [] }: DrawCustomArtOptions
 ): void {
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(background, 0, 0, width, height);
@@ -123,6 +198,12 @@ export function drawCustomArt(
     );
   }
   ctx.restore();
+
+  texts.forEach(layer => {
+    ctx.save();
+    drawArtText(ctx, layer, width, height);
+    ctx.restore();
+  });
 }
 
 export function loadArtImage(src: string): Promise<HTMLImageElement> {
@@ -145,6 +226,7 @@ export async function exportCustomArt(
   canvas.height = options.height;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas indisponível.');
+  await loadArtFonts((options.texts ?? []).map(layer => layer.style.font));
   drawCustomArt(ctx, options);
   const blob = await new Promise<Blob | null>(resolve =>
     canvas.toBlob(resolve, 'image/png')
