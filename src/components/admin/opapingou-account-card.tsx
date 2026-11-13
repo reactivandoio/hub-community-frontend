@@ -33,6 +33,8 @@ import {
   USE_OPAPINGOU_CONNECTION,
 } from '@/lib/queries';
 import type { EventOpaPingouAccount } from '@/lib/types';
+import { useOptionalAdminAccess } from '@/components/admin/admin-guard';
+import { isOnlyEventManager } from '@/lib/admin-access';
 
 interface OpaPingouAccountCardProps {
   /** Hub event id; undefined while the event is being created. */
@@ -61,6 +63,7 @@ export function OpaPingouAccountCard({
   onAccountChange,
 }: OpaPingouAccountCardProps) {
   const { toast } = useToast();
+  const adminAccess = useOptionalAdminAccess();
   const [apiKey, setApiKey] = useState('');
   const [replacing, setReplacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +96,10 @@ export function OpaPingouAccountCard({
   useEffect(() => {
     if (account) onAccountChange?.(Boolean(account.connection || account.legacy));
   }, [account, onAccountChange]);
-  const showForm = !connection || replacing;
+  // REA-48: an event's managers see the account but never change it (the BFF refuses too): it is
+  // where the ticket money goes.
+  const readOnly = Boolean(adminAccess && isOnlyEventManager(adminAccess));
+  const showForm = !readOnly && (!connection || replacing);
   const reusable = (account?.reusable || []).filter((c) => c.id !== connection?.id);
 
   const done = (message: string) => {
@@ -245,6 +251,7 @@ export function OpaPingouAccountCard({
                   Conectada: <span className="font-medium">{connectionLabel(connection)}</span>
                 </span>
               </p>
+              {readOnly ? null : (
               <div className="flex gap-2">
                 <Button
                   type="button"
@@ -269,6 +276,7 @@ export function OpaPingouAccountCard({
                   Remover
                 </Button>
               </div>
+              )}
             </div>
           ) : account?.legacy ? (
             <p className="text-sm flex gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
@@ -281,6 +289,12 @@ export function OpaPingouAccountCard({
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
               Sem conta conectada, os lotes pagos deste evento não aceitam inscrição. Os gratuitos
               seguem normalmente.
+            </p>
+          )}
+
+          {readOnly && (
+            <p className="text-xs text-muted-foreground">
+              Só o admin e os organizadores da comunidade mudam a conta que recebe os pagamentos.
             </p>
           )}
 
