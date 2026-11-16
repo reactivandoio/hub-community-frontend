@@ -91,7 +91,7 @@ describe('AdminShell: general sidebar', () => {
     pathname = '/admin/events';
     renderShell();
     expect(linkNames(menu('Menu do admin'))).toEqual([
-      'Painel', 'Eventos', 'Comunidades', 'Palestrantes', 'Votações', 'Usuários', 'Idade (18+)',
+      'Painel', 'Eventos', 'Comunidades', 'Palestrantes', 'Votações', 'Usuários', 'Idade (18+)', 'IA (termhub)',
     ]);
     expect(within(menu('Menu do admin')).getByRole('link', { name: 'Eventos' })).toHaveAttribute('aria-current', 'page');
     expect(within(menu('Menu do admin')).getByRole('link', { name: 'Painel' })).not.toHaveAttribute('aria-current');
@@ -100,7 +100,7 @@ describe('AdminShell: general sidebar', () => {
   it('hides the admin-only modules from a community-manager', () => {
     isAdmin = false;
     renderShell();
-    expect(linkNames(menu('Menu do admin'))).toEqual(['Painel', 'Eventos', 'Comunidades']);
+    expect(linkNames(menu('Menu do admin'))).toEqual(['Painel', 'Eventos', 'Comunidades', 'IA (termhub)']);
   });
 
   it('does not ask for an event outside one', () => {
