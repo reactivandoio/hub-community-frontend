@@ -178,6 +178,16 @@ src/
   Mailgun events, enviado / não enviado) and the Mailgun timeline (`emailEventLabel`). Pure rules in
   `lib/admin-user.ts`. Events only exist after the Mailgun webhook is configured on the BFF.
 
+- **E-mails agendados (REA-59)** — `/admin/emails` (admin only, `ADMIN_ONLY_PATHS`; sidebar "E-mails
+  agendados"; the BFF checks it too), `ADMIN_EMAIL_QUEUE` polled every minute, rendered by
+  `components/admin/email-queue/email-queue-view.tsx`: usage of the day and of the month (limits,
+  reserve, what campaigns may still send today), campaigns in the queue of every event (sending or
+  paused, oldest first: event → its e-mail page, type, total, sent, remaining, forecast end) with the
+  existing pause / resume / cancel (`UPDATE_EMAIL_CAMPAIGN_STATUS`; cancel asks first), the forecast per
+  day (the BFF replays the queue with the daily share and what is left of the month, up to 120 days;
+  paused campaigns are not scheduled) and the date-of-birth requests waiting (link to the user page).
+  Labels in `lib/email-queue.ts`.
+
 - **Maioridade (REA-36)** — the Hub is 18+ only. Every signup form has the required
   `AdultDeclaration` checkbox (`components/adult-declaration.tsx`, "Declaro que tenho 18 anos ou
   mais", never pre-checked) and sends `adult_declaration: true`: logged
@@ -189,10 +199,13 @@ src/
   `ageOn` in `lib/birth-date.ts` (São Paulo calendar day, same rule as the BFF and the backend).
   The BFF refuses all of it again. `/admin/usuarios/idade` (admin only, sidebar "Idade (18+)",
   `lib/age-review.ts`): accounts without a date of birth (select up to 50 → e-mail asking for it;
-  without a date 7 days after the e-mail the backend deactivates the account) and minors
+  without a date 7 days after the e-mail the account becomes "Pendente de atualização", REA-60: it is
+  NOT deactivated — it still gets the login code, `CompleteProfileModal` asks for the date and the
+  declaration before anything else, and the BFF refuses its other mutations with
+  `PROFILE_UPDATE_REQUIRED`) and minors (still blocked for real: no login code)
   ("Desativar e avisar" → `blocked` + e-mail with the reason; signups are kept). The e-mails share the
   campaigns' daily quota; nothing runs without a click. `/completar-cadastro` is the e-mail's link
-  (login, then the profile modal). Campaigns only reach adults with a date of birth.
+  (login, then the profile modal). The invite to the base only reaches adults with a date of birth; "Convide alguém" and the event reminder go to every confirmed signup (REA-57: they declared themselves 18+ on signing up), minus deactivated accounts and the unsubscribed.
 
 - **Arte "Eu vou" do evento (REA-43)** — the participant's art (`/events/<slug>/arte`,
   `components/share-art/`) has two renderers per format (Stories 9:16, Feed 4:5 — 1:1 until REA-47): the default Hub

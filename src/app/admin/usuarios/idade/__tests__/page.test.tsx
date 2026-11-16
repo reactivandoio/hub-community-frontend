@@ -38,7 +38,7 @@ vi.mock('@apollo/client', async (importOriginal) => {
     useQuery: (doc: any, options: any) => {
       if (name(doc) === 'AdminAgeReviewSummary') {
         return {
-          data: { adminAgeReviewSummary: { noBirthDate: 2, notRequested: 1, requested: 1, minors: 2, minorsBlocked: 1, emailsLeftToday: emailsLeft } },
+          data: { adminAgeReviewSummary: { noBirthDate: 2, notRequested: 1, requested: 1, pendingUpdate: 0, minors: 2, minorsBlocked: 1, emailsLeftToday: emailsLeft } },
           refetch,
         };
       }
@@ -61,7 +61,7 @@ describe('Idade (18+) — sem data de nascimento', () => {
     render(<AgeReviewPage />);
     expect(reviewCalls).toContainEqual({ kind: 'NO_BIRTH_DATE', status: 'NONE', page: 1, pageSize: 50 });
     expect(screen.getByText('E-mails restantes hoje')).toBeInTheDocument();
-    expect(screen.getByText('1 sem ação · 1 aguardando')).toBeInTheDocument();
+    expect(screen.getByText('1 sem ação · 1 aguardando · 0 pendentes de atualização')).toBeInTheDocument();
   });
 
   it('only accounts not asked yet can be selected; sending asks first and reports the result', async () => {

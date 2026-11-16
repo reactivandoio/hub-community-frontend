@@ -16,7 +16,7 @@ const labels = (items: { label: string }[]) => items.map((item) => item.label);
 describe('mainNavItems', () => {
   it('shows every module to an admin', () => {
     expect(labels(mainNavItems({ isAdmin: true }))).toEqual([
-      'Painel', 'Eventos', 'Comunidades', 'Palestrantes', 'Votações', 'Usuários', 'Idade (18+)', 'IA (termhub)',
+      'Painel', 'Eventos', 'Comunidades', 'Palestrantes', 'Votações', 'Usuários', 'Idade (18+)', 'E-mails agendados', 'IA (termhub)',
     ]);
   });
 
@@ -163,6 +163,7 @@ describe('adminBreadcrumbs', () => {
     expect(trail('/admin/speakers')).toEqual(['Admin', 'Palestrantes']);
     expect(trail('/admin/usuarios')).toEqual(['Admin', 'Usuários']);
     expect(trail('/admin/usuarios/idade')).toEqual(['Admin', 'Usuários', 'Idade (18+)']);
+    expect(trail('/admin/emails')).toEqual(['Admin', 'E-mails agendados']);
     expect(trail('/admin/voting-sessions')).toEqual(['Admin', 'Votações']);
     expect(trail('/admin/voting-sessions/new')).toEqual(['Admin', 'Votações', 'Nova sessão']);
     expect(trail('/admin/voting-sessions/xyz')).toEqual(['Admin', 'Votações', 'Editar sessão']);

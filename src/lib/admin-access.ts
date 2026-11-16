@@ -57,7 +57,8 @@ export const eventManagerMayOpen = (access: AdminAccess, pathname: string | null
 };
 
 /** Admin-only areas inside /admin (a community-manager gets "Sem acesso"). */
-export const ADMIN_ONLY_PATHS = ['/admin/usuarios', '/admin/speakers', '/admin/voting-sessions'];
+// REA-59: /admin/emails — every scheduled e-mail of every event.
+export const ADMIN_ONLY_PATHS = ['/admin/usuarios', '/admin/speakers', '/admin/voting-sessions', '/admin/emails'];
 
 export const isAdminOnlyPath = (pathname: string | null | undefined) =>
   !!pathname &&
