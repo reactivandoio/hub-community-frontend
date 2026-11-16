@@ -39,9 +39,11 @@ export interface CommunityDetail {
 export interface Organizer {
   id: string;
   username: string;
-  email: string;
-  name: string;
+  email?: string;
+  name?: string | null;
+  /** Older payloads only: the photo is `speaker.avatar` (REA-54). */
   avatar?: string;
+  speaker?: { name?: string | null; avatar?: string | null } | null;
   role?: string;
 }
 
