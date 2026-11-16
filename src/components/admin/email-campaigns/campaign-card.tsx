@@ -32,6 +32,8 @@ import {
 } from '@/lib/queries';
 import type { EmailCampaignAudience } from '@/lib/types';
 
+import { AiTextButton, type AiDraft } from './ai-text-button';
+
 const MAX_SUBJECT = 150;
 const MAX_MESSAGE = 2000;
 
@@ -93,6 +95,13 @@ export function CampaignCard({ eventSlug, eventTitle, kind, running }: CampaignC
     }
   };
 
+  // REA-51: the AI draft only fills the form; the admin reviews it and sends as usual.
+  const onApplyDraft = (draft: AiDraft) => {
+    setSubject(draft.subject.slice(0, MAX_SUBJECT));
+    setMessage(draft.message.slice(0, MAX_MESSAGE));
+    toast.success('Rascunho da IA no formulário. Revise antes de enviar.');
+  };
+
   const canSend = Boolean(audience?.sending_enabled && audience.total > 0 && !running);
 
   return (
@@ -108,6 +117,10 @@ export function CampaignCard({ eventSlug, eventTitle, kind, running }: CampaignC
         ) : audience ? (
           <p className="text-sm font-medium">{audienceSummary(audience)}</p>
         ) : null}
+      </div>
+
+      <div>
+        <AiTextButton eventSlug={eventSlug} type={kind.type} current={{ subject, message }} onApply={onApplyDraft} />
       </div>
 
       <div className="space-y-2">
