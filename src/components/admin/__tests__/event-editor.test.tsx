@@ -255,3 +255,19 @@ describe('EventEditor (REA-45 arte para não inscritos)', () => {
     expect(updateEvent.mock.calls[0][0].variables.data.share_art_open).toBe(false);
   });
 });
+
+describe('EventEditor (REA-55 várias comunidades)', () => {
+  it('loads every community of the event and sends all of them on save', async () => {
+    paymentsV2 = true;
+    (event as any).communities = [{ id: 'c1', title: 'Uma' }, { id: 'c2', title: 'Outra' }];
+    try {
+      render(<EventEditor />);
+      fireEvent.click(await screen.findByText('Salvar Evento'));
+      expect(lastInitial.communityIds).toEqual(['c1', 'c2']);
+      await waitFor(() => expect(updateEvent).toHaveBeenCalled());
+      expect(updateEvent.mock.calls[0][0].variables.data.communities).toEqual(['c1', 'c2']);
+    } finally {
+      delete (event as any).communities;
+    }
+  });
+});

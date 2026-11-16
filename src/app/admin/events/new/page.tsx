@@ -38,7 +38,7 @@ export default function NewEventPage() {
         share_art_open: data.share_art_open || false,
         description: data.description, // Assuming it's compatible or handled by backend/form
         images: data.images,
-        communities: data.communityId ? [data.communityId] : [],
+        communities: data.communityIds || [],
         location: data.location?.id || data.location,
         talks: data.talks?.map((t: any) => t.id) || [],
       };

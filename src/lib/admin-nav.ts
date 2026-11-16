@@ -61,6 +61,8 @@ const MAIN_ITEMS: AdminNavItem[] = [
   { label: 'Usuários', href: '/admin/usuarios', icon: 'users', exact: true },
   // REA-36: accounts without a date of birth and minors (admin only, under /admin/usuarios).
   { label: 'Idade (18+)', href: '/admin/usuarios/idade', icon: 'age' },
+  // REA-59: every e-mail still scheduled (campaign queue of all events, birth date requests). Admin only.
+  { label: 'E-mails agendados', href: '/admin/emails', icon: 'email' },
   // REA-51: each admin user's own termhub token, for "Gerar texto com IA" (every admin role).
   { label: 'IA (termhub)', href: '/admin/configuracoes/ia', icon: 'ai' },
 ];
@@ -182,6 +184,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   'voting-sessions': 'Votações',
   usuarios: 'Usuários',
   configuracoes: 'Configurações',
+  emails: 'E-mails agendados',
 };
 
 const EVENT_SUB_LABELS: Record<string, string> = {

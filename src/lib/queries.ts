@@ -1932,6 +1932,7 @@ export const ADMIN_AGE_REVIEW_SUMMARY = gql`
       noBirthDate
       notRequested
       requested
+      pendingUpdate
       minors
       minorsBlocked
       emailsLeftToday
@@ -2310,6 +2311,57 @@ export const CANCEL_AI_TEXT_GENERATION = gql`
   mutation CancelAiTextGeneration($id: ID!) {
     cancelAiTextGeneration(id: $id) {
       ${AI_TEXT_GENERATION_FIELDS}
+    }
+  }
+`;
+
+// REA-59 (admin only): every e-mail still scheduled — campaign queue of every event with the
+// forecast, date of birth requests waiting, and today's / this month's usage.
+export const ADMIN_EMAIL_QUEUE = gql`
+  query AdminEmailQueue {
+    adminEmailQueue {
+      sending_enabled
+      redirect_to
+      usage {
+        sent_today
+        sent_this_month
+        daily_limit
+        monthly_limit
+        reserve
+        campaigns_left_today
+      }
+      campaigns {
+        id
+        event_slug
+        event_title
+        type
+        subject
+        status
+        total
+        sent
+        failed
+        remaining
+        created_by_email
+        started_at
+        createdAt
+        finish_date
+      }
+      schedule {
+        date
+        count
+        campaigns {
+          id
+          count
+        }
+      }
+      schedule_truncated
+      dob_requests {
+        total
+        page
+        pageSize
+        emailsLeftToday
+        items {${AGE_REVIEW_USER_FIELDS}}
+      }
     }
   }
 `;

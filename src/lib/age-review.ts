@@ -8,8 +8,11 @@ export function ageReviewStatusLabel(user: AgeReviewUser, now: Date = new Date()
   if (user.status === 'minor_blocked') return 'Desativada (menor de idade)';
   if (user.status === 'dob_blocked') return 'Desativada (sem data de nascimento)';
   if (user.blocked) return 'Desativada';
+  // REA-60: past the 7 days the account is not deactivated: it still logs in and has to fill the
+  // date of birth (18+) and the declaration before using the Hub.
+  if (user.status === 'dob_update_required') return 'Pendente de atualização';
   if (user.status === 'dob_requested') {
-    if (user.deadline && new Date(user.deadline).getTime() <= now.getTime()) return 'Prazo vencido: será desativada';
+    if (user.deadline && new Date(user.deadline).getTime() <= now.getTime()) return 'Prazo vencido: ficará pendente de atualização';
     return 'Aguardando a data';
   }
   return 'Sem ação';
@@ -17,7 +20,7 @@ export function ageReviewStatusLabel(user: AgeReviewUser, now: Date = new Date()
 
 /** A user without a date can get the request: active and not asked yet. */
 export const canRequestDateOfBirth = (user: AgeReviewUser) =>
-  !user.blocked && !user.dateOfBirth && user.status !== 'dob_requested';
+  !user.blocked && !user.dateOfBirth && user.status !== 'dob_requested' && user.status !== 'dob_update_required';
 
 /** A minor can be deactivated; one already deactivated as a minor can get the e-mail again. */
 export const canBlockMinor = (user: AgeReviewUser) => !user.blocked || user.status === 'minor_blocked';
