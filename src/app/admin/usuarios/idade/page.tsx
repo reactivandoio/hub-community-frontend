@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Mail, UserX } from 'lucide-react';
 import { useState } from 'react';
 
 import { AdminPage, AdminPageHeader } from '@/components/admin/admin-page';
+import { GuardedLink } from '@/components/admin/unsaved-guard';
 import { FadeIn } from '@/components/animations';
 import {
   AlertDialog,
@@ -44,6 +45,7 @@ import {
   formatDateTime,
   formatIsoDate,
 } from '@/lib/age-review';
+import { adminUserHref } from '@/lib/admin-user';
 import {
   ADMIN_AGE_REVIEW,
   ADMIN_AGE_REVIEW_SUMMARY,
@@ -89,7 +91,10 @@ function StatusBadge({ user }: { user: AgeReviewUser }) {
 function Person({ user }: { user: AgeReviewUser }) {
   return (
     <>
-      <div className="font-medium">{user.name || user.username || '—'}</div>
+      {/* REA-52: the user's page (profile and e-mails). */}
+      <GuardedLink href={adminUserHref(user.id)} className="font-medium text-primary hover:underline">
+        {user.name || user.username || user.email || '—'}
+      </GuardedLink>
       <div className="text-sm text-muted-foreground">{user.email}</div>
     </>
   );

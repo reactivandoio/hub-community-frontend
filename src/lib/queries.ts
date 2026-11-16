@@ -895,6 +895,97 @@ export const GET_SPEAKERS = gql`
   }
 `;
 
+// REA-53: the /admin/speakers list, with the account each speaker is (admin only in the BFF).
+export const GET_ADMIN_SPEAKERS = gql`
+  query GetAdminSpeakers($sort: [SpeakerSort], $pagination: PaginationInput) {
+    speakers(sort: $sort, pagination: $pagination) {
+      data {
+        id
+        name
+        avatar
+        highlight
+        biography
+        email
+        account {
+          id
+          documentId
+          name
+          email
+        }
+        talks {
+          id
+          title
+        }
+      }
+      meta {
+        total
+        page
+        pageSize
+        pageCount
+      }
+    }
+  }
+`;
+
+export const SPEAKER_ACCOUNT_REVIEW = gql`
+  query SpeakerAccountReview {
+    speakerAccountReview {
+      total
+      withAccount
+      withoutAccount
+      withoutAccountWithTalks
+      suggestions {
+        reason
+        speakerId
+        speakerName
+        talks
+        account {
+          id
+          documentId
+          name
+          email
+        }
+      }
+    }
+  }
+`;
+
+export const LINK_SPEAKER_ACCOUNT = gql`
+  mutation LinkSpeakerAccount($speakerId: String!, $userId: ID!) {
+    linkSpeakerAccount(speakerId: $speakerId, userId: $userId) {
+      joined
+      speaker {
+        id
+      }
+    }
+  }
+`;
+
+export const UNLINK_SPEAKER_ACCOUNT = gql`
+  mutation UnlinkSpeakerAccount($speakerId: String!) {
+    unlinkSpeakerAccount(speakerId: $speakerId) {
+      id
+    }
+  }
+`;
+
+// REA-53: accounts to link a speaker to (admin only), by name, username or e-mail.
+export const SPEAKER_ACCOUNT_SEARCH = gql`
+  query SpeakerAccountSearch($search: String) {
+    adminUsers(search: $search, page: 1, pageSize: 8) {
+      total
+      items {
+        id
+        documentId
+        username
+        email
+        name
+        blocked
+      }
+    }
+  }
+`;
+
 // Lean list for the speaker picker: paged through by fetchAllSpeakers.
 export const GET_SPEAKER_OPTIONS = gql`
   query GetSpeakerOptions($sort: [SpeakerSort], $pagination: PaginationInput) {
@@ -2037,6 +2128,102 @@ export const ACCEPT_MANAGEMENT_INVITE = gql`
       eventId
       eventSlug
       eventTitle
+    }
+  }
+`;
+
+// REA-52 (admin only): one user's page — profile and the e-mails sent to it.
+const ADMIN_EVENT_REF = `id title slug`;
+
+export const ADMIN_USER_PROFILE = gql`
+  query AdminUserProfile($userId: ID!) {
+    adminUserProfile(userId: $userId) {
+      id
+      documentId
+      username
+      email
+      name
+      phone
+      cpf_masked
+      date_of_birth
+      blocked
+      confirmed
+      registration_pending
+      created_at
+      role {
+        type
+        name
+      }
+      communities {
+        id
+        title
+      }
+      events {
+        id
+        title
+      }
+      adult_declaration
+      adult_declaration_at
+      marketing_opt_in
+      marketing_opt_in_at
+      age_review_status
+      age_review_requested_at
+      age_review_blocked_at
+      signups {
+        id
+        event { ${ADMIN_EVENT_REF} }
+        created_at
+        product_name
+        payment_status
+        paid_cents
+        manual_approved
+        checked_in
+        checked_in_at
+      }
+      certificates {
+        id
+        code
+        category
+        event { ${ADMIN_EVENT_REF} }
+        issued_at
+        sent_at
+        revoked_at
+      }
+      attendances {
+        id
+        event { ${ADMIN_EVENT_REF} }
+        created_at
+      }
+      email_count
+    }
+  }
+`;
+
+export const ADMIN_USER_EMAILS = gql`
+  query AdminUserEmails($userId: ID!, $page: Int, $pageSize: Int) {
+    adminUserEmails(userId: $userId, page: $page, pageSize: $pageSize) {
+      total
+      page
+      pageSize
+      items {
+        id
+        kind
+        subject
+        status
+        error
+        sent_at
+        message_id
+        last_event
+        last_event_at
+        events {
+          event
+          at
+          severity
+          reason
+          message
+          url
+        }
+      }
     }
   }
 `;

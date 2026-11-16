@@ -250,6 +250,12 @@ export const adminBreadcrumbs = (
     return crumbs;
   }
 
+  // REA-52: one user's page.
+  if (area === 'usuarios') {
+    crumbs.push({ label: 'Usuário', href: itemHref });
+    return crumbs;
+  }
+
   crumbs.push({ label: readable(item), href: itemHref });
   return crumbs;
 };
