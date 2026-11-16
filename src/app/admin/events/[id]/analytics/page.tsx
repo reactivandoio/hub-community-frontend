@@ -42,6 +42,8 @@ import {
 import { AdminPage, AdminPageError, AdminPageHeader, AdminPageLoading } from '@/components/admin/admin-page';
 import { useAdminAccess } from '@/components/admin/admin-guard';
 import { ApproveSignupButton } from '@/components/admin/approve-signup-dialog';
+import { ResendConfirmationButton } from '@/components/admin/resend-confirmation-button';
+import { canResendConfirmation } from '@/lib/confirmation-email';
 import { FadeIn } from '@/components/animations';
 import { EventPaymentsCard } from '@/components/admin/event-payments-card';
 import { ProductsBreakdownCard } from '@/components/admin/products-breakdown-card';
@@ -940,6 +942,7 @@ export default function EventAnalyticsPage() {
                       <TableHead>Cupom</TableHead>
                       <TableHead>Data</TableHead>
                       <TableHead>Check-in</TableHead>
+                      <TableHead>E-mail de confirmação</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1030,6 +1033,19 @@ export default function EventAnalyticsPage() {
                                     })
                                   : 'Sim'}
                               </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">
+                            {canResendConfirmation(signup) ? (
+                              <ResendConfirmationButton
+                                event={resolvedEventDocId}
+                                signup={signup}
+                                onResent={() => {
+                                  refetch().catch(() => undefined);
+                                }}
+                              />
                             ) : (
                               <span className="text-muted-foreground">—</span>
                             )}

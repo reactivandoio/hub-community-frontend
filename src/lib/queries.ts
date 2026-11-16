@@ -524,6 +524,18 @@ export const APPROVE_SIGNUP_MANUALLY = gql`
   }
 `;
 
+// REA-50: "Reenviar e-mail" on a row of the participants list (admin, organizers, managers).
+export const RESEND_SIGNUP_CONFIRMATION = gql`
+  mutation ResendSignupConfirmation($event: String!, $signupId: ID!) {
+    resendSignupConfirmation(event: $event, signup_id: $signupId) {
+      success
+      message
+      sent_at
+      retry_after
+    }
+  }
+`;
+
 export const IS_USER_SIGNED_UP = gql`
   query IsUserSignedUp($eventId: String!, $email: String!) {
     isUserSignedUp(eventId: $eventId, email: $email) {
@@ -999,6 +1011,10 @@ export const GET_EVENT_ANALYTICS = gql`
         manual_approved
         manual_approved_at
         manual_approved_by
+        confirmation_email_status
+        confirmation_email_at
+        confirmation_email_error
+        confirmation_resent_at
       }
       checked_in_count
       attendance_rate

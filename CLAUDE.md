@@ -141,6 +141,18 @@ src/
   `manual`), R$ 0, out of the revenue (`summarizePayments` counts it in `manual`), with "por X em
   data" in the list and "Aprovado por" / "Aprovado em" in the CSV. The BFF checks the role.
 
+- **Reenviar o e-mail de confirmação (REA-50)** — in Analytics → Participantes the column "E-mail de
+  confirmação" has "Reenviar e-mail" (`ResendConfirmationButton`,
+  `components/admin/resend-confirmation-button.tsx`) on confirmed signups only — without payment or
+  `CONFIRMED`, paid or approved by hand (`canResendConfirmation` in `lib/confirmation-email.ts`). It
+  asks first, runs `RESEND_SIGNUP_CONFIRMATION` (admin, the event's organizers and managers; the BFF
+  checks role and status again) and the person gets the same "Inscrição confirmada" e-mail with the
+  ticket. After a resend the button waits a minute ("Aguarde Ns", the BFF refuses too) and the row
+  shows "Reenviado em <data>" (`confirmation_resent_at`). A failed send shows "Não enviado" with the
+  provider's message on hover (`confirmation_email_status` / `confirmation_email_error`); a refusal
+  for the day's quota comes back as a clear message in the toast. Only sends made after REA-50 are
+  tied to a signup: older ones show nothing.
+
 - **Maioridade (REA-36)** — the Hub is 18+ only. Every signup form has the required
   `AdultDeclaration` checkbox (`components/adult-declaration.tsx`, "Declaro que tenho 18 anos ou
   mais", never pre-checked) and sends `adult_declaration: true`: logged
