@@ -131,6 +131,19 @@ src/
   signup form has an optional `marketing_opt_in` checkbox (only recorded: campaigns go to everyone who
   has not unsubscribed, legitimate interest).
 
+- **Textos com IA no e-mail marketing (REA-51)** — each campaign card has "Gerar texto com IA"
+  (`components/admin/email-campaigns/ai-text-button.tsx`, rules in `lib/ai-text.ts`). Without a saved
+  termhub token (`GET_TERMHUB_SETTINGS`) it goes to `/admin/configuracoes/ia?voltar=<page>` (sidebar
+  "IA (termhub)", every admin role; `components/admin/ai/termhub-settings.tsx`): the person pastes their
+  personal termhub token (scope `runs`, password field, cleared after saving) and the project key; the
+  BFF tests it on termhub and stores it encrypted — the page only ever sees `token_hint` (…abcd). With a
+  token, the dialog takes an optional wish (tone, highlights, ≤ 500 chars), runs
+  `GENERATE_EMAIL_CAMPAIGN_TEXT` with a `requestId` per click (idempotent), polls `GET_AI_TEXT_GENERATION`
+  every 1.5 s (queue → text being written → draft), offers "Cancelar geração" (`CANCEL_AI_TEXT_GENERATION`;
+  the dialog does not close while a run goes) and "Usar este texto", which only fills subject and message —
+  the admin reviews, previews and sends as before; the AI never sends. Token/project errors
+  (`needsSetup`) link to the settings; limits (2 at a time, 30 an hour) come as the BFF's message.
+
 - **Aprovação manual (REA-34)** — in Analytics → Participantes an admin (`useAdminAccess().isAdmin`)
   approves a paid signup without a charge: "Aprovar" shows only on pending / expired / canceled rows
   (`canApproveSignup` in `lib/manual-approval.ts`; never refunded, confirmed, already approved or

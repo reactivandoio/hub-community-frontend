@@ -2040,3 +2040,83 @@ export const ACCEPT_MANAGEMENT_INVITE = gql`
     }
   }
 `;
+
+// ─── REA-51: AI texts for e-mail campaigns (termhub runs) ──────────
+
+const TERMHUB_SETTINGS_FIELDS = `
+  configured
+  token_hint
+  project
+  verified_at
+  server_ready
+  base_url
+`;
+
+const AI_TEXT_GENERATION_FIELDS = `
+  id
+  campaign_type
+  status
+  preview
+  subject
+  message
+  error_code
+  error_message
+  created_at
+  finished_at
+`;
+
+export const GET_TERMHUB_SETTINGS = gql`
+  query TermhubSettings {
+    termhubSettings {
+      ${TERMHUB_SETTINGS_FIELDS}
+    }
+  }
+`;
+
+export const SAVE_TERMHUB_SETTINGS = gql`
+  mutation SaveTermhubSettings($input: TermhubSettingsInput!) {
+    saveTermhubSettings(input: $input) {
+      ${TERMHUB_SETTINGS_FIELDS}
+    }
+  }
+`;
+
+export const TEST_TERMHUB_SETTINGS = gql`
+  mutation TestTermhubSettings {
+    testTermhubSettings {
+      ${TERMHUB_SETTINGS_FIELDS}
+    }
+  }
+`;
+
+export const DELETE_TERMHUB_SETTINGS = gql`
+  mutation DeleteTermhubSettings {
+    deleteTermhubSettings {
+      ${TERMHUB_SETTINGS_FIELDS}
+    }
+  }
+`;
+
+export const GENERATE_EMAIL_CAMPAIGN_TEXT = gql`
+  mutation GenerateEmailCampaignText($input: GenerateEmailCampaignTextInput!) {
+    generateEmailCampaignText(input: $input) {
+      ${AI_TEXT_GENERATION_FIELDS}
+    }
+  }
+`;
+
+export const GET_AI_TEXT_GENERATION = gql`
+  query AiTextGeneration($id: ID!) {
+    aiTextGeneration(id: $id) {
+      ${AI_TEXT_GENERATION_FIELDS}
+    }
+  }
+`;
+
+export const CANCEL_AI_TEXT_GENERATION = gql`
+  mutation CancelAiTextGeneration($id: ID!) {
+    cancelAiTextGeneration(id: $id) {
+      ${AI_TEXT_GENERATION_FIELDS}
+    }
+  }
+`;

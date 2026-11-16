@@ -16,12 +16,12 @@ const labels = (items: { label: string }[]) => items.map((item) => item.label);
 describe('mainNavItems', () => {
   it('shows every module to an admin', () => {
     expect(labels(mainNavItems({ isAdmin: true }))).toEqual([
-      'Painel', 'Eventos', 'Comunidades', 'Palestrantes', 'Votações', 'Usuários', 'Idade (18+)',
+      'Painel', 'Eventos', 'Comunidades', 'Palestrantes', 'Votações', 'Usuários', 'Idade (18+)', 'IA (termhub)',
     ]);
   });
 
   it('hides the admin-only modules from a community-manager', () => {
-    expect(labels(mainNavItems({ isAdmin: false }))).toEqual(['Painel', 'Eventos', 'Comunidades']);
+    expect(labels(mainNavItems({ isAdmin: false }))).toEqual(['Painel', 'Eventos', 'Comunidades', 'IA (termhub)']);
   });
 });
 
@@ -134,6 +134,20 @@ describe('isNavItemActive', () => {
     expect(isNavItemActive('/admin/events/e1', geral)).toBe(true);
     expect(isNavItemActive('/admin/events/e1/programacao', geral)).toBe(false);
     expect(isNavItemActive('/admin/events/e1/programacao', programacao)).toBe(true);
+  });
+});
+
+describe('AI settings (REA-51)', () => {
+  it('is in the sidebar of every admin role, the event manager included', () => {
+    expect(labels(mainNavItems({ isAdmin: false, isEventManager: true }))).toContain('IA (termhub)');
+  });
+
+  it('has its breadcrumb', () => {
+    expect(adminBreadcrumbs('/admin/configuracoes/ia')).toEqual([
+      { label: 'Admin', href: '/admin' },
+      { label: 'Configurações', href: '/admin/configuracoes' },
+      { label: 'IA (termhub)', href: '/admin/configuracoes/ia' },
+    ]);
   });
 });
 

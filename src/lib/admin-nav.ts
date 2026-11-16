@@ -16,6 +16,7 @@ export type AdminNavIcon =
   | 'voting'
   | 'users'
   | 'age'
+  | 'ai'
   | 'general'
   | 'schedule'
   | 'products'
@@ -60,6 +61,8 @@ const MAIN_ITEMS: AdminNavItem[] = [
   { label: 'Usuários', href: '/admin/usuarios', icon: 'users', exact: true },
   // REA-36: accounts without a date of birth and minors (admin only, under /admin/usuarios).
   { label: 'Idade (18+)', href: '/admin/usuarios/idade', icon: 'age' },
+  // REA-51: each admin user's own termhub token, for "Gerar texto com IA" (every admin role).
+  { label: 'IA (termhub)', href: '/admin/configuracoes/ia', icon: 'ai' },
 ];
 
 /** The general admin sidebar: a community-manager does not see the admin-only areas. */
@@ -178,6 +181,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   speakers: 'Palestrantes',
   'voting-sessions': 'Votações',
   usuarios: 'Usuários',
+  configuracoes: 'Configurações',
 };
 
 const EVENT_SUB_LABELS: Record<string, string> = {
@@ -233,6 +237,11 @@ export const adminBreadcrumbs = (
 
   if (area === 'voting-sessions') {
     crumbs.push({ label: item === 'new' ? 'Nova sessão' : 'Editar sessão', href: itemHref });
+    return crumbs;
+  }
+
+  if (area === 'configuracoes' && item === 'ia') {
+    crumbs.push({ label: 'IA (termhub)', href: itemHref });
     return crumbs;
   }
 
