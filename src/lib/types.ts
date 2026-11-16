@@ -1081,3 +1081,97 @@ export interface AgeReviewBlockResult {
   emailsLeftToday: number;
   user: AgeReviewUser;
 }
+
+// REA-52: the admin's page of one user.
+export interface AdminEventRef {
+  id: string;
+  title?: string | null;
+  slug?: string | null;
+}
+
+export interface AdminUserSignup {
+  id: string;
+  event?: AdminEventRef | null;
+  created_at?: string | null;
+  product_name?: string | null;
+  payment_status?: string | null;
+  paid_cents?: number | null;
+  manual_approved?: boolean | null;
+  checked_in?: boolean | null;
+  checked_in_at?: string | null;
+}
+
+export interface AdminUserCertificate {
+  id: string;
+  code?: string | null;
+  category?: string | null;
+  event?: AdminEventRef | null;
+  issued_at?: string | null;
+  sent_at?: string | null;
+  revoked_at?: string | null;
+}
+
+export interface AdminUserAttendance {
+  id: string;
+  event?: AdminEventRef | null;
+  created_at?: string | null;
+}
+
+export interface AdminUserProfile {
+  id: string;
+  documentId?: string | null;
+  username?: string | null;
+  email?: string | null;
+  name?: string | null;
+  phone?: string | null;
+  cpf_masked?: string | null;
+  date_of_birth?: string | null;
+  blocked?: boolean | null;
+  confirmed?: boolean | null;
+  registration_pending?: boolean | null;
+  created_at?: string | null;
+  role?: { type: string; name: string } | null;
+  communities: { id: string; title?: string | null }[];
+  events: { id: string; title?: string | null }[];
+  adult_declaration?: boolean | null;
+  adult_declaration_at?: string | null;
+  marketing_opt_in?: boolean | null;
+  marketing_opt_in_at?: string | null;
+  age_review_status?: string | null;
+  age_review_requested_at?: string | null;
+  age_review_blocked_at?: string | null;
+  /** null = that source could not be read now. */
+  signups?: AdminUserSignup[] | null;
+  certificates?: AdminUserCertificate[] | null;
+  attendances?: AdminUserAttendance[] | null;
+  email_count?: number | null;
+}
+
+export interface AdminEmailEvent {
+  event: string;
+  at?: string | null;
+  severity?: string | null;
+  reason?: string | null;
+  message?: string | null;
+  url?: string | null;
+}
+
+export interface AdminUserEmail {
+  id: string;
+  kind?: string | null;
+  subject?: string | null;
+  status?: string | null;
+  error?: string | null;
+  sent_at?: string | null;
+  message_id?: string | null;
+  last_event?: string | null;
+  last_event_at?: string | null;
+  events: AdminEmailEvent[];
+}
+
+export interface AdminUserEmailPage {
+  items: AdminUserEmail[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
