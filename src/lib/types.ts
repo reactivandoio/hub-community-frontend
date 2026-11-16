@@ -65,6 +65,18 @@ export interface Speaker {
   highlight?: boolean;
   talks?: { id: string; title: string }[];
   socials?: Link[];
+  /** REA-53: admin only (null for everyone else). */
+  email?: string | null;
+  /** REA-53: the account this speaker is; admin only. */
+  account?: SpeakerAccount | null;
+}
+
+/** REA-53: the account a speaker is linked to. `id` is the numeric users-permissions id. */
+export interface SpeakerAccount {
+  id: string | null;
+  documentId: string;
+  name: string | null;
+  email: string | null;
 }
 
 export interface Talk {

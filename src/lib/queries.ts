@@ -895,6 +895,97 @@ export const GET_SPEAKERS = gql`
   }
 `;
 
+// REA-53: the /admin/speakers list, with the account each speaker is (admin only in the BFF).
+export const GET_ADMIN_SPEAKERS = gql`
+  query GetAdminSpeakers($sort: [SpeakerSort], $pagination: PaginationInput) {
+    speakers(sort: $sort, pagination: $pagination) {
+      data {
+        id
+        name
+        avatar
+        highlight
+        biography
+        email
+        account {
+          id
+          documentId
+          name
+          email
+        }
+        talks {
+          id
+          title
+        }
+      }
+      meta {
+        total
+        page
+        pageSize
+        pageCount
+      }
+    }
+  }
+`;
+
+export const SPEAKER_ACCOUNT_REVIEW = gql`
+  query SpeakerAccountReview {
+    speakerAccountReview {
+      total
+      withAccount
+      withoutAccount
+      withoutAccountWithTalks
+      suggestions {
+        reason
+        speakerId
+        speakerName
+        talks
+        account {
+          id
+          documentId
+          name
+          email
+        }
+      }
+    }
+  }
+`;
+
+export const LINK_SPEAKER_ACCOUNT = gql`
+  mutation LinkSpeakerAccount($speakerId: String!, $userId: ID!) {
+    linkSpeakerAccount(speakerId: $speakerId, userId: $userId) {
+      joined
+      speaker {
+        id
+      }
+    }
+  }
+`;
+
+export const UNLINK_SPEAKER_ACCOUNT = gql`
+  mutation UnlinkSpeakerAccount($speakerId: String!) {
+    unlinkSpeakerAccount(speakerId: $speakerId) {
+      id
+    }
+  }
+`;
+
+// REA-53: accounts to link a speaker to (admin only), by name, username or e-mail.
+export const SPEAKER_ACCOUNT_SEARCH = gql`
+  query SpeakerAccountSearch($search: String) {
+    adminUsers(search: $search, page: 1, pageSize: 8) {
+      total
+      items {
+        id
+        documentId
+        username
+        email
+        name
+        blocked
+      }
+    }
+  }
+`;
+
 // Lean list for the speaker picker: paged through by fetchAllSpeakers.
 export const GET_SPEAKER_OPTIONS = gql`
   query GetSpeakerOptions($sort: [SpeakerSort], $pagination: PaginationInput) {
