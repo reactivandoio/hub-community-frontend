@@ -287,6 +287,15 @@ src/
   Sem conta (`filterByAccount`, `lib/speaker-accounts.ts`). Medium term speakers become accounts
   (plan in the backend CLAUDE.md, "Speakers and accounts").
 
+- **Várias comunidades por evento (REA-55)** — the "Comunidades" block of the event form (Geral) lists
+  every community of the event as chips and adds more with "Adicionar comunidade"; the editor loads
+  and saves all of them (`communityIds`; before, only the first was loaded and saving dropped the
+  others). Rules in `lib/event-communities.ts`, the same the BFF checks again: the admin adds and
+  removes any ("Nova Comunidade" is the admin's); a community-manager adds only communities it
+  organizes and takes the event out only of those, never the last one; an event-manager changes
+  nothing. Organizers of any of the event's communities manage it. The public event page already
+  lists every community.
+
 ### Provider Hierarchy (layout.tsx)
 FirebaseProvider → ApolloProvider → AuthProvider → LoginPromptProvider → LogoutModalWrapper → AgendaProvider → FilterProvider → ThemeProvider → children
 

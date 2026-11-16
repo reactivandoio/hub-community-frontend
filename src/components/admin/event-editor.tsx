@@ -1,5 +1,6 @@
 'use client';
 
+import { eventCommunityIds } from '@/lib/event-communities';
 import { EventManagersCard } from '@/components/admin/management-people';
 import { EventForm } from '@/components/admin/event-form';
 import { useUnsavedChanges } from '@/components/admin/unsaved-guard';
@@ -105,7 +106,10 @@ export function EventEditor() {
         unlisted: event.unlisted || false,
         share_art_open: event.share_art_open || false,
         description: event.description,
-        communityId: event.communities?.[0]?.id, // Get the first community ID if available
+        // REA-55: every community of the event (only the first used to be kept, and saved).
+        communityIds: eventCommunityIds(event.communities),
+        // Their names, even when the communities list does not bring them.
+        communityOptions: event.communities || [],
         location: event.location,
         id: event.id, // Keep reference for update
         talks: event.talks || [],
@@ -137,7 +141,7 @@ export function EventEditor() {
         description: formData.description,
         images: formData.images,
         location: formData.location?.id || formData.location, // Send ID string
-        communities: formData.communityId ? [formData.communityId] : [],
+        communities: formData.communityIds || [],
         talks: formData.talks?.map((t: any) => t.id) || [],
       };
 

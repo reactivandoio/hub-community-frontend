@@ -9,6 +9,9 @@ const uploadFiles = vi.fn();
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
+// REA-55: who is editing (null = outside the admin, nothing restricted).
+let access: any = null;
+vi.mock('@/components/admin/admin-guard', () => ({ useOptionalAdminAccess: () => access }));
 vi.mock('@/components/ui/rich-text-editor', () => ({
   RichTextEditor: () => null,
 }));
@@ -67,7 +70,10 @@ async function renderWithCover(onSubmit = vi.fn(), onSaved = vi.fn()) {
   return { onSubmit, onSaved };
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  access = null;
+});
 
 describe('EventForm cover upload', () => {
   it('saves the event with the uploaded cover id and reports the saved id', async () => {
@@ -272,5 +278,58 @@ describe('EventForm: arte "Eu vou" para quem não está inscrito (REA-45)', () =
     fireEvent.click(screen.getByRole('button', { name: /Salvar Evento/ }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0].share_art_open).toBe(false);
+  });
+});
+
+describe('EventForm: várias comunidades (REA-55)', () => {
+  const COMMUNITIES = [
+    { id: 'c1', title: 'Uma', slug: 'uma' },
+    { id: 'c2', title: 'Outra', slug: 'outra' },
+  ];
+  const renderCommunities = () => {
+    const onSubmit = vi.fn().mockResolvedValue('evt-1');
+    render(
+      <MockedProvider mocks={[]} addTypename={false}>
+        <EventForm
+          initialData={{ ...initialData, id: 'evt-1', communityIds: ['c1', 'c2'], communityOptions: COMMUNITIES }}
+          onSubmit={onSubmit}
+          section="general"
+        />
+      </MockedProvider>
+    );
+    return { onSubmit };
+  };
+  const ana = { role: 'community-manager', isAdmin: false, isCommunityManager: true, canAccessAdmin: true, communities: [{ id: 'c1', title: 'Uma' }] };
+
+  it('shows every community of the event and saves the list without the one removed', async () => {
+    access = { role: 'admin', isAdmin: true, isCommunityManager: false, canAccessAdmin: true, communities: [] };
+    const { onSubmit } = renderCommunities();
+    const list = screen.getByRole('list', { name: 'Comunidades do evento' });
+    expect(list).toHaveTextContent('Uma');
+    expect(list).toHaveTextContent('Outra');
+    expect(screen.getByRole('button', { name: /Nova Comunidade/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tirar o evento de Outra' }));
+    expect(list).not.toHaveTextContent('Outra');
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Evento/ }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0].communityIds).toEqual(['c1']);
+  });
+
+  it('a community manager only takes the event out of the communities it organizes', () => {
+    access = ana;
+    renderCommunities();
+    expect(screen.getByRole('button', { name: 'Tirar o evento de Uma' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Tirar o evento de Outra' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Nova Comunidade/ })).not.toBeInTheDocument();
+    expect(screen.getByText('Adicionar comunidade')).toBeInTheDocument();
+  });
+
+  it('an event manager does not change the communities', () => {
+    access = { role: 'event-manager', isAdmin: false, isCommunityManager: false, isEventManager: true, canAccessAdmin: true, communities: [] };
+    renderCommunities();
+    expect(screen.queryByRole('button', { name: /Tirar o evento de/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Adicionar comunidade')).not.toBeInTheDocument();
+    expect(screen.getByText(/Só o admin e os organizadores das comunidades/)).toBeInTheDocument();
   });
 });

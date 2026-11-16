@@ -27,7 +27,8 @@ export const createEventSchema = z.object({
   description: z.any().optional(),
   location: z.any().optional(),
   images: z.array(z.any()).optional(),
-  communityId: z.string().optional(),
+  /** REA-55: every community of the event. */
+  communityIds: z.array(z.string()).optional(),
   talks: z.array(z.any()).optional(),
   products: z.array(z.any()).optional(),
 });

@@ -58,7 +58,11 @@ import {
   X,
 } from 'lucide-react';
 import { useOptionalAdminAccess } from '@/components/admin/admin-guard';
-import { visibleCommunities } from '@/lib/admin-access';
+import {
+  addableEventCommunities,
+  canEditEventCommunities,
+  canRemoveEventCommunity,
+} from '@/lib/event-communities';
 import { UploadError, uploadFiles } from '@/lib/upload';
 import Image from 'next/image';
 import {
@@ -73,7 +77,11 @@ import { useForm } from 'react-hook-form';
 const EVENT_FORM_ID = 'event-form';
 
 interface EventFormProps {
-  initialData?: CreateEventFormValues & { id?: string };
+  initialData?: CreateEventFormValues & {
+    id?: string;
+    /** REA-55: the event's communities (id, title, slug), so their names always show. */
+    communityOptions?: { id: string; title?: string | null; slug?: string | null }[];
+  };
   onSubmit: (data: CreateEventFormValues) => Promise<string | undefined>;
   /** Called after "Salvar Evento" saved the event, with its id. */
   onSaved?: (id: string) => void;
@@ -142,36 +150,34 @@ export function EventForm({
     }
   }, [locationsData, initialData, selectedLocationId]);
 
-  // Community State
+  // Community State (REA-55: several communities per event)
   const [communities, setCommunities] = useState(MOCK_COMMUNITIES);
-  const [selectedCommunityId, setSelectedCommunityId] = useState<
-    string | undefined
-  >(initialData?.communityId);
+  const [selectedCommunityIds, setSelectedCommunityIds] = useState<string[]>(
+    initialData?.communityIds || []
+  );
 
   const { data: communitiesData } = useQuery(GET_COMMUNITIES);
-  // A community-manager may only link events to the communities it organizes (the BFF checks it).
+  // A community-manager only adds and removes the communities it organizes (the BFF checks it).
   const adminAccess = useOptionalAdminAccess();
 
   useEffect(() => {
-    if (communitiesData?.communities?.data) {
-      const all = communitiesData.communities.data;
-      const allowed = adminAccess ? visibleCommunities(adminAccess, all) : all;
-      // Keep the event's current community listed even when it is not one the user manages.
-      const current = all.find((comm: any) => comm.id === initialData?.communityId);
-      const list = current && !allowed.includes(current) ? [current, ...allowed] : allowed;
-      const options = list.map((comm: any) => ({
+    const all: any[] = communitiesData?.communities?.data || [];
+    const own: any[] = (initialData?.communityOptions || []).filter(
+      (comm: any) => comm?.id && !all.some(c => c.id === comm.id)
+    );
+    if (all.length + own.length === 0) return;
+    setCommunities(
+      [...all, ...own].map((comm: any) => ({
         label: comm.title,
         value: comm.id,
         data: comm,
-      }));
-      setCommunities(options);
+      }))
+    );
+  }, [communitiesData, initialData?.communityOptions]);
 
-      // If we have initialData and the community is in the list, ensure it's selected
-      if (initialData?.communityId && !selectedCommunityId) {
-        setSelectedCommunityId(initialData.communityId);
-      }
-    }
-  }, [communitiesData, initialData, selectedCommunityId, adminAccess]);
+  useEffect(() => {
+    if (initialData?.communityIds) setSelectedCommunityIds(initialData.communityIds);
+  }, [initialData?.communityIds]);
 
   // Talks State
   const [talks, setTalks] = useState<Talk[]>(initialData?.talks || []);
@@ -267,7 +273,7 @@ export function EventForm({
       share_art_open: false,
       description: [],
       location: undefined,
-      communityId: undefined,
+      communityIds: [],
       talks: [],
       products: [],
     },
@@ -348,6 +354,11 @@ export function EventForm({
   };
 
   // Community Handlers
+  const setCommunityIds = (ids: string[]) => {
+    setSelectedCommunityIds(ids);
+    form.setValue('communityIds', ids, { shouldDirty: true });
+  };
+
   const handleAddCommunity = (newCommunity: any) => {
     const newOption = {
       label: newCommunity.title,
@@ -355,14 +366,23 @@ export function EventForm({
       data: newCommunity,
     };
     setCommunities(prev => [...prev, newOption]);
-    setSelectedCommunityId(newCommunity.id);
-    form.setValue('communityId', newCommunity.id);
+    setCommunityIds([...selectedCommunityIds, newCommunity.id]);
   };
 
   const handleCommunitySelect = (id: string) => {
-    setSelectedCommunityId(id);
-    form.setValue('communityId', id);
+    if (id && !selectedCommunityIds.includes(id)) setCommunityIds([...selectedCommunityIds, id]);
   };
+
+  const handleCommunityRemove = (id: string) => {
+    setCommunityIds(selectedCommunityIds.filter(c => c !== id));
+  };
+
+  const canEditCommunities = canEditEventCommunities(adminAccess);
+  const addableCommunityOptions = addableEventCommunities(
+    adminAccess,
+    communities.map(c => ({ ...c, id: c.value })),
+    selectedCommunityIds
+  );
 
   // Talk Handlers
   const handleAddTalk = (newTalk: any) => {
@@ -458,7 +478,7 @@ export function EventForm({
     <Form {...form}>
       <form id={EVENT_FORM_ID} onSubmit={form.handleSubmit(handleFormSubmit, (errors) => {
           // Auto-navigate to the tab that contains the first error
-          const generalFields = ['title', 'slug', 'start_date', 'end_date', 'max_slots', 'description', 'location', 'communityId', 'is_online', 'call_link', 'unlisted', 'share_art_open', 'images'];
+          const generalFields = ['title', 'slug', 'start_date', 'end_date', 'max_slots', 'description', 'location', 'communityIds', 'is_online', 'call_link', 'unlisted', 'share_art_open', 'images'];
           const scheduleFields = ['talks'];
           const productFields = ['products'];
           const errorKeys = Object.keys(errors);
@@ -851,49 +871,76 @@ export function EventForm({
               </div>
             </div>
 
-            {/* Community Section */}
+            {/* Community Section (REA-55: one or more) */}
             <div className="space-y-4 rounded-lg border p-4">
               <div className="flex items-center justify-between">
                 <FormLabel className="text-base font-semibold">
-                  Comunidade
+                  Comunidades
                 </FormLabel>
-                <CommunityFormDialog
-                  onSave={handleAddCommunity}
-                  trigger={
-                    <Button type="button" variant="outline" size="sm">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Nova Comunidade
-                    </Button>
-                  }
-                />
+                {canEditCommunities && (!adminAccess || adminAccess.isAdmin) && (
+                  <CommunityFormDialog
+                    onSave={handleAddCommunity}
+                    trigger={
+                      <Button type="button" variant="outline" size="sm">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Nova Comunidade
+                      </Button>
+                    }
+                  />
+                )}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormItem className="flex-1">
-                  <FormLabel>Selecionar Comunidade</FormLabel>
+              <ul className="flex flex-wrap gap-2" aria-label="Comunidades do evento">
+                {selectedCommunityIds.length === 0 && (
+                  <li className="text-sm text-muted-foreground">Nenhuma comunidade.</li>
+                )}
+                {selectedCommunityIds.map(id => {
+                  const comm = communities.find(c => c.value === id)?.data;
+                  const label = comm?.title || 'Comunidade';
+                  return (
+                    <li
+                      key={id}
+                      className="flex items-center gap-1 rounded-full border bg-muted/40 py-1 pl-3 pr-1 text-sm"
+                    >
+                      <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span>{label}</span>
+                      {canRemoveEventCommunity(adminAccess, id, selectedCommunityIds) ? (
+                        <button
+                          type="button"
+                          className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                          aria-label={`Tirar o evento de ${label}`}
+                          onClick={() => handleCommunityRemove(id)}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      ) : (
+                        <span className="w-1" />
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+              {canEditCommunities ? (
+                <FormItem className="md:max-w-md">
+                  <FormLabel>Adicionar comunidade</FormLabel>
                   <Combobox
-                    options={communities}
-                    value={selectedCommunityId}
+                    key={selectedCommunityIds.join(',')}
+                    options={addableCommunityOptions}
+                    value={undefined}
                     onSelect={handleCommunitySelect}
                     placeholder="Selecione uma comunidade..."
+                    emptyText="Nenhuma comunidade para adicionar."
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Quem organiza qualquer uma das comunidades gere o evento.
+                    {adminAccess && !adminAccess.isAdmin &&
+                      ' Você adiciona e tira só as comunidades que organiza.'}
+                  </p>
                 </FormItem>
-                {selectedCommunityId &&
-                  (() => {
-                    const comm = communities.find(
-                      c => c.value === selectedCommunityId
-                    )?.data;
-                    return comm ? (
-                      <div className="text-sm text-muted-foreground pt-8">
-                        <div className="flex items-center gap-1">
-                          <Users className="h-4 w-4" />
-                          <span>
-                            {comm.title} ({comm.slug})
-                          </span>
-                        </div>
-                      </div>
-                    ) : null;
-                  })()}
-              </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Só o admin e os organizadores das comunidades mudam as comunidades do evento.
+                </p>
+              )}
             </div>
             </div>
 
