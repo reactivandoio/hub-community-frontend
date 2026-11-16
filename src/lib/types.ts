@@ -618,6 +618,21 @@ export interface SignupEntry {
   manual_approved_at?: string | null;
   /** Name or e-mail of who approved. */
   manual_approved_by?: string | null;
+  /** REA-50: the last "Inscrição confirmada" e-mail — 'sent' | 'failed'; null when unknown. */
+  confirmation_email_status?: string | null;
+  confirmation_email_at?: string | null;
+  /** The provider's message when it failed. */
+  confirmation_email_error?: string | null;
+  /** Last resend from the participants list. */
+  confirmation_resent_at?: string | null;
+}
+
+/** REA-50: resendSignupConfirmation. */
+export interface ResendSignupConfirmationResult {
+  success: boolean;
+  message?: string | null;
+  sent_at?: string | null;
+  retry_after?: number | null;
 }
 
 /** REA-34: signupApprovalPreview. */
