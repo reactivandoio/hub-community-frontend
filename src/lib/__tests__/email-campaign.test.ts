@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { audienceSummary, campaignKinds, defaultSubject, isActive, progressPercent } from '@/lib/email-campaign';
+import {
+  CAMPAIGN_KINDS, audienceSummary, campaignKinds, defaultSubject, isActive, progressPercent,
+} from '@/lib/email-campaign';
 
 const audience = { total: 1240, approximate: true, daily_limit: 70, estimated_days: 18, sending_enabled: true, redirect_to: null };
 
@@ -41,5 +43,21 @@ describe('audienceSummary', () => {
     expect(audienceSummary(audience)).toBe('até 1.240 pessoas · cerca de 18 dias (70 por dia)');
     expect(audienceSummary({ ...audience, total: 1, approximate: false, estimated_days: 1 })).toBe('1 pessoa · sai hoje');
     expect(audienceSummary({ ...audience, total: 0, approximate: false, estimated_days: 0 })).toBe('0 pessoas');
+  });
+});
+
+describe('who each campaign reaches (REA-36, REA-57)', () => {
+  const description = (type: string) => CAMPAIGN_KINDS.find((kind) => kind.type === type)?.description || '';
+
+  it('the reminder goes to every confirmed signup, without the date of birth filter', () => {
+    expect(description('reminder')).toMatch(/todos os inscritos confirmados/);
+    expect(description('reminder')).not.toMatch(/data de nascimento/);
+    expect(description('reminder')).toMatch(/desativadas/);
+    expect(description('reminder')).toMatch(/descadastrou/);
+  });
+
+  it('invite and share keep the 18+ date of birth filter', () => {
+    expect(description('invite')).toMatch(/data de nascimento de maior de 18 anos/);
+    expect(description('share')).toMatch(/data de nascimento de maior de 18 anos/);
   });
 });

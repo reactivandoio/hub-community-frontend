@@ -29,7 +29,9 @@ export const CAMPAIGN_KINDS: CampaignKind[] = [
   {
     type: 'reminder',
     title: 'Lembrete do evento',
-    description: 'Lembra os inscritos com data de nascimento de maior de 18 anos da data, do horário e do local.',
+    // REA-57: every confirmed signup (they declared themselves 18+ on signing up), without the date
+    // of birth filter of the other two; deactivated accounts and the unsubscribed stay out.
+    description: 'Lembra todos os inscritos confirmados da data, do horário e do local (menos contas desativadas e quem se descadastrou).',
     audience: 'Inscritos',
     adminOnly: false,
   },
