@@ -262,6 +262,18 @@ src/
   eventos" per user and a warning when role and links do not match (`accessMismatch`,
   `lib/access-links.ts`); the role can be picked there too (Event Manager included).
 
+- **Palestrantes e contas (REA-53)** — `/admin/speakers` (admin only) has "Editar" per row
+  (`SpeakerEditDialog`, `components/admin/speaker-edit-dialog.tsx`: name, highlight, biography —
+  sent only when edited — and the account) and a "Conta" column (the BFF answers `Speaker.account` /
+  `email` only to the admin; the list uses `GET_ADMIN_SPEAKERS`). Linking searches accounts with
+  `SPEAKER_ACCOUNT_SEARCH` (adminUsers) and runs `LINK_SPEAKER_ACCOUNT`; the BFF refuses a speaker
+  already linked to another account and an account that is already a speaker with talks, and joins
+  the empty speaker the account got at its first login (the toast says so). Above the list,
+  `SPEAKER_ACCOUNT_REVIEW` shows how many speakers have an account and "Sugestões de vínculo" (same
+  e-mail, or a name only one account has), each confirmed by a click. Filters Todos / Com conta /
+  Sem conta (`filterByAccount`, `lib/speaker-accounts.ts`). Medium term speakers become accounts
+  (plan in the backend CLAUDE.md, "Speakers and accounts").
+
 ### Provider Hierarchy (layout.tsx)
 FirebaseProvider → ApolloProvider → AuthProvider → LoginPromptProvider → LogoutModalWrapper → AgendaProvider → FilterProvider → ThemeProvider → children
 
