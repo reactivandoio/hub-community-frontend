@@ -195,7 +195,7 @@ src/
   `PROFILE_UPDATE_REQUIRED`) and minors (still blocked for real: no login code)
   ("Desativar e avisar" → `blocked` + e-mail with the reason; signups are kept). The e-mails share the
   campaigns' daily quota; nothing runs without a click. `/completar-cadastro` is the e-mail's link
-  (login, then the profile modal). Campaigns only reach adults with a date of birth.
+  (login, then the profile modal). The invite to the base only reaches adults with a date of birth; "Convide alguém" and the event reminder go to every confirmed signup (REA-57: they declared themselves 18+ on signing up), minus deactivated accounts and the unsubscribed.
 
 - **Arte "Eu vou" do evento (REA-43)** — the participant's art (`/events/<slug>/arte`,
   `components/share-art/`) has two renderers per format (Stories 9:16, Feed 4:5 — 1:1 until REA-47): the default Hub
