@@ -1926,6 +1926,7 @@ export const ADMIN_AGE_REVIEW_SUMMARY = gql`
       noBirthDate
       notRequested
       requested
+      pendingUpdate
       minors
       minorsBlocked
       emailsLeftToday

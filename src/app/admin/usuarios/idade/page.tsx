@@ -84,7 +84,9 @@ function Pager({ page, total, pageSize, onPage }: { page: number; total: number;
 
 function StatusBadge({ user }: { user: AgeReviewUser }) {
   const label = ageReviewStatusLabel(user);
-  const variant = user.blocked ? 'destructive' : user.status === 'dob_requested' ? 'secondary' : 'outline';
+  const variant = user.blocked
+    ? 'destructive'
+    : user.status === 'dob_requested' || user.status === 'dob_update_required' ? 'secondary' : 'outline';
   return <Badge variant={variant}>{label}</Badge>;
 }
 
@@ -177,8 +179,9 @@ function NoBirthDateTab({ emailsLeft, onChanged }: { emailsLeft: number | null; 
     <section className="space-y-4">
       <p className="text-sm text-muted-foreground">
         Contas sem data de nascimento. O pedido manda um e-mail para a pessoa informar a data em até 7 dias.
-        Se ela não informar, a conta é desativada automaticamente; se informar, o pedido se encerra. Os 7 dias
-        contam a partir do envio de cada e-mail.
+        Se ela não informar, a conta fica pendente de atualização: continua recebendo o código de login, mas só
+        volta a usar o Hub depois de informar a data (18+) e a declaração. Se informar, o pedido se encerra. Os 7
+        dias contam a partir do envio de cada e-mail.
       </p>
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
         <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); setSelected(new Set()); }}>
@@ -188,7 +191,7 @@ function NoBirthDateTab({ emailsLeft, onChanged }: { emailsLeft: number | null; 
           <SelectContent>
             <SelectItem value="NONE">Sem ação</SelectItem>
             <SelectItem value="dob_requested">Aguardando a data</SelectItem>
-            <SelectItem value="dob_blocked">Desativadas</SelectItem>
+            <SelectItem value="dob_update_required">Pendentes de atualização</SelectItem>
             <SelectItem value={ALL}>Todas</SelectItem>
           </SelectContent>
         </Select>
@@ -261,7 +264,7 @@ function NoBirthDateTab({ emailsLeft, onChanged }: { emailsLeft: number | null; 
               {left !== null && selected.size > left
                 ? ` Hoje restam só ${left} envios (cota compartilhada com as campanhas); os outros ${selected.size - left} ficam para outro dia.`
                 : ''}
-              {' Quem não informar a data em 7 dias terá a conta desativada automaticamente.'}
+              {' Quem não informar a data em 7 dias fica com o cadastro pendente de atualização: entra normalmente, mas precisa informar a data antes de usar o Hub.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -415,7 +418,7 @@ export default function AgeReviewPage() {
           <Stat
             label="Sem data de nascimento"
             value={summary?.noBirthDate ?? '—'}
-            hint={summary ? `${summary.notRequested} sem ação · ${summary.requested} aguardando` : undefined}
+            hint={summary ? `${summary.notRequested} sem ação · ${summary.requested} aguardando · ${summary.pendingUpdate} pendentes de atualização` : undefined}
           />
           <Stat
             label="Menores de idade"

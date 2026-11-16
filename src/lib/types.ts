@@ -1044,7 +1044,7 @@ export interface EmailCampaignAudience {
 // ─── REA-36: age review (admin only) ───────────────────────────────
 
 export type AgeReviewKind = 'NO_BIRTH_DATE' | 'MINOR';
-export type AgeReviewStatus = 'dob_requested' | 'dob_blocked' | 'minor_blocked';
+export type AgeReviewStatus = 'dob_requested' | 'dob_update_required' | 'dob_blocked' | 'minor_blocked';
 
 export interface AgeReviewUser {
   id: string;
@@ -1074,6 +1074,8 @@ export interface AgeReviewSummary {
   noBirthDate: number;
   notRequested: number;
   requested: number;
+  /** REA-60: past the 7 days without a date; not blocked, asked on the next access. */
+  pendingUpdate: number;
   minors: number;
   minorsBlocked: number;
   emailsLeftToday: number;
