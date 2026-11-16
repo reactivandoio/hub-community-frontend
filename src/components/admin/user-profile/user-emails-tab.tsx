@@ -32,9 +32,11 @@ function EmailRow({ email }: { email: AdminUserEmail }) {
     <li className="rounded-md border p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
+          {/* The subject when there is one; the kind goes under it only then, never twice. */}
           <div className="font-medium break-words">{email.subject || emailKindLabel(email.kind)}</div>
           <div className="text-xs text-muted-foreground">
-            {emailKindLabel(email.kind)} · {formatDateTimeBR(email.sent_at)}
+            {email.subject ? `${emailKindLabel(email.kind)} · ` : ''}
+            {formatDateTimeBR(email.sent_at)}
           </div>
         </div>
         <div className="flex items-center gap-2">

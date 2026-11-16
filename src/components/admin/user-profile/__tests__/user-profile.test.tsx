@@ -91,6 +91,22 @@ describe('UserEmailsTab (REA-52)', () => {
     expect(screen.getByText('Recusado pelo Mailgun: 421 limit')).toBeInTheDocument();
   });
 
+  it('counts every e-mail of the address and never repeats the kind as the subtitle', async () => {
+    render(
+      <MockedProvider mocks={[emailsMock([
+        email({ id: 'd1', kind: 'signup-confirmation-resend', subject: null, sent_at: '2026-11-16T02:03:00Z' }),
+        email({ id: 'd2', kind: 'login-code', subject: 'Seu código de acesso: 123456', sent_at: '2026-11-16T01:37:00Z' }),
+      ], 2)]} addTypename={false}>
+        <UserEmailsTab userId="9" />
+      </MockedProvider>,
+    );
+    expect(await screen.findByText(/^2 e-mails\./)).toBeInTheDocument();
+    expect(screen.getAllByText('Inscrição confirmada (reenvio)')).toHaveLength(1);
+    expect(screen.getByText('15/11/2026 23:03')).toBeInTheDocument();
+    expect(screen.getByText('Seu código de acesso: 123456')).toBeInTheDocument();
+    expect(screen.getByText(/Código de login ·/)).toBeInTheDocument();
+  });
+
   it('says when nothing was sent', async () => {
     render(
       <MockedProvider mocks={[emailsMock([])]} addTypename={false}>
