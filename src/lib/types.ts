@@ -67,6 +67,18 @@ export interface Speaker {
   highlight?: boolean;
   talks?: { id: string; title: string }[];
   socials?: Link[];
+  /** REA-53: admin only (null for everyone else). */
+  email?: string | null;
+  /** REA-53: the account this speaker is; admin only. */
+  account?: SpeakerAccount | null;
+}
+
+/** REA-53: the account a speaker is linked to. `id` is the numeric users-permissions id. */
+export interface SpeakerAccount {
+  id: string | null;
+  documentId: string;
+  name: string | null;
+  email: string | null;
 }
 
 export interface Talk {
@@ -1176,4 +1188,33 @@ export interface AdminUserEmailPage {
   total: number;
   page: number;
   pageSize: number;
+}
+
+// ─── REA-51: AI texts for e-mail campaigns (termhub runs) ──────────
+
+/** The signed-in admin user's termhub credential. The token itself never comes back. */
+export interface TermhubSettings {
+  configured: boolean;
+  /** Last 4 characters of the saved token, e.g. "…ab12". */
+  token_hint: string | null;
+  project: string | null;
+  verified_at: string | null;
+  /** False while the server has no TERMHUB_TOKEN_KEY. */
+  server_ready: boolean;
+  base_url: string;
+}
+
+export type AiTextGenerationStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+
+export interface AiTextGeneration {
+  id: string;
+  campaign_type: EmailCampaignType;
+  status: AiTextGenerationStatus;
+  preview: string | null;
+  subject: string | null;
+  message: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string | null;
+  finished_at: string | null;
 }

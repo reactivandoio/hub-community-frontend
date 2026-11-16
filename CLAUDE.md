@@ -131,6 +131,19 @@ src/
   signup form has an optional `marketing_opt_in` checkbox (only recorded: campaigns go to everyone who
   has not unsubscribed, legitimate interest).
 
+- **Textos com IA no e-mail marketing (REA-51)** — each campaign card has "Gerar texto com IA"
+  (`components/admin/email-campaigns/ai-text-button.tsx`, rules in `lib/ai-text.ts`). Without a saved
+  termhub token (`GET_TERMHUB_SETTINGS`) it goes to `/admin/configuracoes/ia?voltar=<page>` (sidebar
+  "IA (termhub)", every admin role; `components/admin/ai/termhub-settings.tsx`): the person pastes their
+  personal termhub token (scope `runs`, password field, cleared after saving) and the project key; the
+  BFF tests it on termhub and stores it encrypted — the page only ever sees `token_hint` (…abcd). With a
+  token, the dialog takes an optional wish (tone, highlights, ≤ 500 chars), runs
+  `GENERATE_EMAIL_CAMPAIGN_TEXT` with a `requestId` per click (idempotent), polls `GET_AI_TEXT_GENERATION`
+  every 1.5 s (queue → text being written → draft), offers "Cancelar geração" (`CANCEL_AI_TEXT_GENERATION`;
+  the dialog does not close while a run goes) and "Usar este texto", which only fills subject and message —
+  the admin reviews, previews and sends as before; the AI never sends. Token/project errors
+  (`needsSetup`) link to the settings; limits (2 at a time, 30 an hour) come as the BFF's message.
+
 - **Aprovação manual (REA-34)** — in Analytics → Participantes an admin (`useAdminAccess().isAdmin`)
   approves a paid signup without a charge: "Aprovar" shows only on pending / expired / canceled rows
   (`canApproveSignup` in `lib/manual-approval.ts`; never refunded, confirmed, already approved or
@@ -261,6 +274,18 @@ src/
   lowers it; removing someone never changes their role — `/admin/usuarios` shows "Comunidades e
   eventos" per user and a warning when role and links do not match (`accessMismatch`,
   `lib/access-links.ts`); the role can be picked there too (Event Manager included).
+
+- **Palestrantes e contas (REA-53)** — `/admin/speakers` (admin only) has "Editar" per row
+  (`SpeakerEditDialog`, `components/admin/speaker-edit-dialog.tsx`: name, highlight, biography —
+  sent only when edited — and the account) and a "Conta" column (the BFF answers `Speaker.account` /
+  `email` only to the admin; the list uses `GET_ADMIN_SPEAKERS`). Linking searches accounts with
+  `SPEAKER_ACCOUNT_SEARCH` (adminUsers) and runs `LINK_SPEAKER_ACCOUNT`; the BFF refuses a speaker
+  already linked to another account and an account that is already a speaker with talks, and joins
+  the empty speaker the account got at its first login (the toast says so). Above the list,
+  `SPEAKER_ACCOUNT_REVIEW` shows how many speakers have an account and "Sugestões de vínculo" (same
+  e-mail, or a name only one account has), each confirmed by a click. Filters Todos / Com conta /
+  Sem conta (`filterByAccount`, `lib/speaker-accounts.ts`). Medium term speakers become accounts
+  (plan in the backend CLAUDE.md, "Speakers and accounts").
 
 ### Provider Hierarchy (layout.tsx)
 FirebaseProvider → ApolloProvider → AuthProvider → LoginPromptProvider → LogoutModalWrapper → AgendaProvider → FilterProvider → ThemeProvider → children
