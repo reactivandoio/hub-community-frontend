@@ -1159,6 +1159,23 @@ export interface AdminUserProfile {
   email_count?: number | null;
 }
 
+/** REA-63: what changing a user's e-mail to an address would do. */
+export interface AdminEmailCheck {
+  available: boolean;
+  message?: string | null;
+  signupsToMove: number;
+  signupConflicts: number;
+}
+
+export interface AdminUserUpdateResult {
+  changedFields: string[];
+  signupsMoved: number;
+  signupsKept: number;
+  signupsFailed: number;
+  sessionsRevoked: boolean;
+  message: string;
+}
+
 export interface AdminEmailEvent {
   event: string;
   at?: string | null;
