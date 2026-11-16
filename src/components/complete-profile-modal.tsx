@@ -150,7 +150,9 @@ export function CompleteProfileModal() {
         <DialogHeader>
           <DialogTitle>Complete seu cadastro</DialogTitle>
           <DialogDescription>
-            Precisamos desses dados para emitir seu certificado de participação nos eventos.
+            {missing.includes('date_of_birth')
+              ? 'Para continuar usando o Hub Community, informe os dados abaixo: a plataforma é só para pessoas com 18 anos ou mais, e eles também são usados no seu certificado.'
+              : 'Precisamos desses dados para emitir seu certificado de participação nos eventos.'}
           </DialogDescription>
         </DialogHeader>
 

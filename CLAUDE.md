@@ -189,7 +189,10 @@ src/
   `ageOn` in `lib/birth-date.ts` (São Paulo calendar day, same rule as the BFF and the backend).
   The BFF refuses all of it again. `/admin/usuarios/idade` (admin only, sidebar "Idade (18+)",
   `lib/age-review.ts`): accounts without a date of birth (select up to 50 → e-mail asking for it;
-  without a date 7 days after the e-mail the backend deactivates the account) and minors
+  without a date 7 days after the e-mail the account becomes "Pendente de atualização", REA-60: it is
+  NOT deactivated — it still gets the login code, `CompleteProfileModal` asks for the date and the
+  declaration before anything else, and the BFF refuses its other mutations with
+  `PROFILE_UPDATE_REQUIRED`) and minors (still blocked for real: no login code)
   ("Desativar e avisar" → `blocked` + e-mail with the reason; signups are kept). The e-mails share the
   campaigns' daily quota; nothing runs without a click. `/completar-cadastro` is the e-mail's link
   (login, then the profile modal). Campaigns only reach adults with a date of birth.

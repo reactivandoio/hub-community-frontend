@@ -13,7 +13,8 @@ describe('ageReviewStatusLabel', () => {
   it('names each situation', () => {
     expect(ageReviewStatusLabel(user(), now)).toBe('Sem ação');
     expect(ageReviewStatusLabel(user({ status: 'dob_requested', deadline: '2026-11-15T00:00:00.000Z' }), now)).toBe('Aguardando a data');
-    expect(ageReviewStatusLabel(user({ status: 'dob_requested', deadline: '2026-11-10T00:00:00.000Z' }), now)).toBe('Prazo vencido: será desativada');
+    expect(ageReviewStatusLabel(user({ status: 'dob_requested', deadline: '2026-11-10T00:00:00.000Z' }), now)).toBe('Prazo vencido: ficará pendente de atualização');
+    expect(ageReviewStatusLabel(user({ status: 'dob_update_required' }), now)).toBe('Pendente de atualização');
     expect(ageReviewStatusLabel(user({ blocked: true, status: 'dob_blocked' }), now)).toBe('Desativada (sem data de nascimento)');
     expect(ageReviewStatusLabel(user({ blocked: true, status: 'minor_blocked' }), now)).toBe('Desativada (menor de idade)');
     expect(ageReviewStatusLabel(user({ blocked: true }), now)).toBe('Desativada');
@@ -24,6 +25,7 @@ describe('actions', () => {
   it('asks for the date only of active accounts not asked yet', () => {
     expect(canRequestDateOfBirth(user())).toBe(true);
     expect(canRequestDateOfBirth(user({ status: 'dob_requested' }))).toBe(false);
+    expect(canRequestDateOfBirth(user({ status: 'dob_update_required' }))).toBe(false);
     expect(canRequestDateOfBirth(user({ blocked: true }))).toBe(false);
   });
   it('blocks an active minor or re-sends to one blocked as a minor', () => {
