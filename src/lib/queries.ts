@@ -83,7 +83,13 @@ export const GET_COMMUNITY_BY_SLUG_OR_ID = gql`
       organizers {
         id
         username
-        email
+        name
+        # REA-54: the person's photo is the avatar of their speaker profile.
+        speaker {
+          id
+          name
+          avatar
+        }
       }
       events {
         id

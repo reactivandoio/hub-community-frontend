@@ -17,6 +17,7 @@ import Link from 'next/link';
 
 import { FadeIn } from '@/components/animations';
 import { CommunityDetailsSkeleton } from '@/components/community-details-skeleton';
+import { CommunityOrganizers } from '@/components/community-organizers';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -278,28 +279,7 @@ export function CommunityDetails({ slugOrId }: CommunityDetailsProps) {
           </section>
 
           {/* Organizers */}
-          {community.organizers.length > 0 && (
-            <section>
-              <h2 className="text-2xl font-bold text-foreground mb-6">Organizadores</h2>
-              <div className="flex flex-wrap gap-4">
-                {community.organizers.map(organizer => (
-                  <Link
-                    key={organizer.id}
-                    href={`/users/${organizer.username}`}
-                    className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border hover:border-primary/30 hover:shadow-sm transition-all"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-                      {organizer.username?.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-foreground text-sm">{organizer.username}</h4>
-                      <p className="text-xs text-muted-foreground">{organizer.role || 'Organizador'}</p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          )}
+          <CommunityOrganizers organizers={community.organizers} />
 
           {/* Ongoing Events */}
           {!!ongoingEvents?.length && (
