@@ -2046,3 +2046,99 @@ export const ACCEPT_MANAGEMENT_INVITE = gql`
     }
   }
 `;
+
+// REA-52 (admin only): one user's page — profile and the e-mails sent to it.
+const ADMIN_EVENT_REF = `id title slug`;
+
+export const ADMIN_USER_PROFILE = gql`
+  query AdminUserProfile($userId: ID!) {
+    adminUserProfile(userId: $userId) {
+      id
+      documentId
+      username
+      email
+      name
+      phone
+      cpf_masked
+      date_of_birth
+      blocked
+      confirmed
+      registration_pending
+      created_at
+      role {
+        type
+        name
+      }
+      communities {
+        id
+        title
+      }
+      events {
+        id
+        title
+      }
+      adult_declaration
+      adult_declaration_at
+      marketing_opt_in
+      marketing_opt_in_at
+      age_review_status
+      age_review_requested_at
+      age_review_blocked_at
+      signups {
+        id
+        event { ${ADMIN_EVENT_REF} }
+        created_at
+        product_name
+        payment_status
+        paid_cents
+        manual_approved
+        checked_in
+        checked_in_at
+      }
+      certificates {
+        id
+        code
+        category
+        event { ${ADMIN_EVENT_REF} }
+        issued_at
+        sent_at
+        revoked_at
+      }
+      attendances {
+        id
+        event { ${ADMIN_EVENT_REF} }
+        created_at
+      }
+      email_count
+    }
+  }
+`;
+
+export const ADMIN_USER_EMAILS = gql`
+  query AdminUserEmails($userId: ID!, $page: Int, $pageSize: Int) {
+    adminUserEmails(userId: $userId, page: $page, pageSize: $pageSize) {
+      total
+      page
+      pageSize
+      items {
+        id
+        kind
+        subject
+        status
+        error
+        sent_at
+        message_id
+        last_event
+        last_event_at
+        events {
+          event
+          at
+          severity
+          reason
+          message
+          url
+        }
+      }
+    }
+  }
+`;

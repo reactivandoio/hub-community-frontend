@@ -40,6 +40,7 @@ import { useDebounce } from '@/hooks/use-debounce';
 import { useToast } from '@/hooks/use-toast';
 import { roleLabel } from '@/lib/admin-access';
 import { accessMismatch } from '@/lib/access-links';
+import { adminUserHref } from '@/lib/admin-user';
 import { ADMIN_ROLES, ADMIN_USERS, ROLE_CHANGES, SET_USER_ROLE } from '@/lib/queries';
 
 // Admin only (ADMIN_ONLY_PATHS in lib/admin-access); the BFF checks it again on every call,
@@ -309,7 +310,10 @@ export default function UsersAdminPage() {
                     {users.items.map((row) => (
                       <TableRow key={row.id}>
                         <TableCell>
-                          <div className="font-medium">{row.name || row.username || '—'}</div>
+                          {/* REA-52: the user's page (profile and e-mails). */}
+                          <GuardedLink href={adminUserHref(row.id)} className="font-medium text-primary hover:underline">
+                            {row.name || row.username || row.email || '—'}
+                          </GuardedLink>
                           <div className="text-sm text-muted-foreground">{row.email}</div>
                           {row.blocked && <Badge variant="destructive">Bloqueado</Badge>}
                         </TableCell>
