@@ -3,6 +3,7 @@ symptom: "A foto do organizador não aparece em /communities/<slug> (só a inici
 tags: [avatar, foto, organizador, comunidade, populate, strapi, bff]
 evidence: fixed
 card: REA-54
+pr: https://github.com/reactivandoio/hub-community-frontend/pull/92
 agent: claude
 date: 2026-11-15
 ---
