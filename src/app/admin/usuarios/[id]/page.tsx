@@ -4,6 +4,7 @@ import { useQuery } from '@apollo/client';
 import { useParams, useRouter } from 'next/navigation';
 
 import { AdminPage, AdminPageError, AdminPageHeader, AdminPageLoading } from '@/components/admin/admin-page';
+import { UserEditDialog } from '@/components/admin/user-profile/user-edit-dialog';
 import { UserEmailsTab } from '@/components/admin/user-profile/user-emails-tab';
 import { UserProfileView } from '@/components/admin/user-profile/user-profile-view';
 import { FadeIn } from '@/components/animations';
@@ -13,7 +14,8 @@ import type { AdminUserProfile } from '@/lib/types';
 
 /**
  * REA-52: everything about one user, admin only (ADMIN_ONLY_PATHS covers /admin/usuarios; the BFF
- * checks it again). Opened from /admin/usuarios and /admin/usuarios/idade.
+ * checks it again). Opened from /admin/usuarios and /admin/usuarios/idade. REA-63: "Editar" corrects
+ * the account data.
  */
 export default function AdminUserPage() {
   const params = useParams();
@@ -34,7 +36,11 @@ export default function AdminUserPage() {
   return (
     <FadeIn>
       <AdminPage>
-        <AdminPageHeader title={profile.name || profile.username || profile.email || 'Usuário'} description={profile.email} />
+        <AdminPageHeader
+          title={profile.name || profile.username || profile.email || 'Usuário'}
+          description={profile.email}
+          actions={<UserEditDialog profile={profile} />}
+        />
         <Tabs defaultValue="perfil" className="space-y-4">
           <TabsList>
             <TabsTrigger value="perfil">Perfil</TabsTrigger>

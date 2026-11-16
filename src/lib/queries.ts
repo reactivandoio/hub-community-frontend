@@ -2309,6 +2309,31 @@ export const CANCEL_AI_TEXT_GENERATION = gql`
   }
 `;
 
+// REA-63: the admin corrects a user's account data on /admin/usuarios/<id>.
+export const ADMIN_CHECK_USER_EMAIL = gql`
+  query AdminCheckUserEmail($userId: ID!, $email: String!) {
+    adminCheckUserEmail(userId: $userId, email: $email) {
+      available
+      message
+      signupsToMove
+      signupConflicts
+    }
+  }
+`;
+
+export const ADMIN_UPDATE_USER = gql`
+  mutation AdminUpdateUser($userId: ID!, $input: AdminUserInput!, $moveSignups: Boolean) {
+    adminUpdateUser(userId: $userId, input: $input, moveSignups: $moveSignups) {
+      changedFields
+      signupsMoved
+      signupsKept
+      signupsFailed
+      sessionsRevoked
+      message
+    }
+  }
+`;
+
 // REA-59 (admin only): every e-mail still scheduled — campaign queue of every event with the
 // forecast, date of birth requests waiting, and today's / this month's usage.
 export const ADMIN_EMAIL_QUEUE = gql`
