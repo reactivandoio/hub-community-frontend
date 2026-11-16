@@ -49,15 +49,16 @@ describe('audienceSummary', () => {
 describe('who each campaign reaches (REA-36, REA-57)', () => {
   const description = (type: string) => CAMPAIGN_KINDS.find((kind) => kind.type === type)?.description || '';
 
-  it('the reminder goes to every confirmed signup, without the date of birth filter', () => {
-    expect(description('reminder')).toMatch(/todos os inscritos confirmados/);
-    expect(description('reminder')).not.toMatch(/data de nascimento/);
-    expect(description('reminder')).toMatch(/desativadas/);
-    expect(description('reminder')).toMatch(/descadastrou/);
+  it('share and reminder go to every confirmed signup, without the date of birth filter', () => {
+    for (const type of ['share', 'reminder']) {
+      expect(description(type)).toMatch(/odos os inscritos confirmados/);
+      expect(description(type)).not.toMatch(/data de nascimento/);
+      expect(description(type)).toMatch(/desativadas/);
+      expect(description(type)).toMatch(/descadastrou/);
+    }
   });
 
-  it('invite and share keep the 18+ date of birth filter', () => {
+  it('only the invite to the base keeps the 18+ date of birth filter', () => {
     expect(description('invite')).toMatch(/data de nascimento de maior de 18 anos/);
-    expect(description('share')).toMatch(/data de nascimento de maior de 18 anos/);
   });
 });

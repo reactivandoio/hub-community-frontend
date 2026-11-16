@@ -22,7 +22,8 @@ export const CAMPAIGN_KINDS: CampaignKind[] = [
   {
     type: 'share',
     title: 'Convide alguém',
-    description: 'Cada inscrito com data de nascimento de maior de 18 anos recebe um link pessoal do evento para mandar no WhatsApp, LinkedIn ou copiar.',
+    // REA-57: every confirmed signup, like the reminder (no date of birth filter).
+    description: 'Todos os inscritos confirmados recebem um link pessoal do evento para mandar no WhatsApp, LinkedIn ou copiar (menos contas desativadas e quem se descadastrou).',
     audience: 'Inscritos',
     adminOnly: false,
   },
@@ -30,7 +31,7 @@ export const CAMPAIGN_KINDS: CampaignKind[] = [
     type: 'reminder',
     title: 'Lembrete do evento',
     // REA-57: every confirmed signup (they declared themselves 18+ on signing up), without the date
-    // of birth filter of the other two; deactivated accounts and the unsubscribed stay out.
+    // of birth filter of the invite; deactivated accounts and the unsubscribed stay out.
     description: 'Lembra todos os inscritos confirmados da data, do horário e do local (menos contas desativadas e quem se descadastrou).',
     audience: 'Inscritos',
     adminOnly: false,
