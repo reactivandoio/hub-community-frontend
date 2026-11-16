@@ -1216,3 +1216,47 @@ export interface AiTextGeneration {
   created_at: string | null;
   finished_at: string | null;
 }
+
+// REA-59: the admin's scheduled e-mails page.
+export interface AdminEmailUsage {
+  sent_today: number;
+  sent_this_month: number;
+  daily_limit: number;
+  monthly_limit: number | null;
+  reserve: number;
+  campaigns_left_today: number;
+}
+
+export interface AdminQueuedCampaign {
+  id: string;
+  event_slug?: string | null;
+  event_title?: string | null;
+  type: EmailCampaignType;
+  subject: string;
+  status: 'sending' | 'paused' | string;
+  total: number;
+  sent: number;
+  failed: number;
+  remaining: number;
+  created_by_email?: string | null;
+  started_at?: string | null;
+  createdAt?: string | null;
+  /** YYYY-MM-DD (São Paulo); null when paused, off or beyond the forecast. */
+  finish_date?: string | null;
+}
+
+export interface AdminScheduledDay {
+  date: string;
+  count: number;
+  campaigns: { id: string; count: number }[];
+}
+
+export interface AdminEmailQueue {
+  sending_enabled: boolean;
+  redirect_to?: string | null;
+  usage: AdminEmailUsage;
+  campaigns: AdminQueuedCampaign[];
+  schedule: AdminScheduledDay[];
+  schedule_truncated: boolean;
+  dob_requests?: AgeReviewPage | null;
+}

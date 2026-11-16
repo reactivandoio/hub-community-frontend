@@ -178,6 +178,16 @@ src/
   Mailgun events, enviado / não enviado) and the Mailgun timeline (`emailEventLabel`). Pure rules in
   `lib/admin-user.ts`. Events only exist after the Mailgun webhook is configured on the BFF.
 
+- **E-mails agendados (REA-59)** — `/admin/emails` (admin only, `ADMIN_ONLY_PATHS`; sidebar "E-mails
+  agendados"; the BFF checks it too), `ADMIN_EMAIL_QUEUE` polled every minute, rendered by
+  `components/admin/email-queue/email-queue-view.tsx`: usage of the day and of the month (limits,
+  reserve, what campaigns may still send today), campaigns in the queue of every event (sending or
+  paused, oldest first: event → its e-mail page, type, total, sent, remaining, forecast end) with the
+  existing pause / resume / cancel (`UPDATE_EMAIL_CAMPAIGN_STATUS`; cancel asks first), the forecast per
+  day (the BFF replays the queue with the daily share and what is left of the month, up to 120 days;
+  paused campaigns are not scheduled) and the date-of-birth requests waiting (link to the user page).
+  Labels in `lib/email-queue.ts`.
+
 - **Maioridade (REA-36)** — the Hub is 18+ only. Every signup form has the required
   `AdultDeclaration` checkbox (`components/adult-declaration.tsx`, "Declaro que tenho 18 anos ou
   mais", never pre-checked) and sends `adult_declaration: true`: logged
