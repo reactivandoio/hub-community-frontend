@@ -6,6 +6,7 @@ import { useState } from 'react';
 
 import { AdminPage, AdminPageHeader } from '@/components/admin/admin-page';
 import { GuardedLink } from '@/components/admin/unsaved-guard';
+import { DuplicateCpfGroups } from '@/components/admin/user-merge/duplicate-cpf-groups';
 import { FadeIn } from '@/components/animations';
 import {
   AlertDialog,
@@ -35,13 +36,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/auth-context';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useToast } from '@/hooks/use-toast';
 import { roleLabel } from '@/lib/admin-access';
 import { accessMismatch } from '@/lib/access-links';
 import { adminUserHref } from '@/lib/admin-user';
-import { ADMIN_ROLES, ADMIN_USERS, ROLE_CHANGES, SET_USER_ROLE } from '@/lib/queries';
+import { duplicateCpfIds } from '@/lib/admin-user-merge';
+import { ADMIN_DUPLICATE_CPF_GROUPS, ADMIN_ROLES, ADMIN_USERS, ROLE_CHANGES, SET_USER_ROLE } from '@/lib/queries';
+import type { AdminDuplicateCpfGroup } from '@/lib/types';
 
 // Admin only (ADMIN_ONLY_PATHS in lib/admin-access); the BFF checks it again on every call,
 // and refuses taking your own admin role away and leaving the Hub without an admin.
@@ -203,6 +207,15 @@ export default function UsersAdminPage() {
   });
   const users = data?.adminUsers;
 
+  // REA-96: accounts sharing a CPF — a warning here and the "CPFs duplicados" tab.
+  const [tab, setTab] = useState('usuarios');
+  const { data: duplicatesData } = useQuery<{
+    adminDuplicateCpfGroups: { total: number; groups: AdminDuplicateCpfGroup[] };
+  }>(ADMIN_DUPLICATE_CPF_GROUPS, { fetchPolicy: 'cache-and-network' });
+  const duplicateGroups = duplicatesData?.adminDuplicateCpfGroups;
+  const duplicateIds = duplicateCpfIds(duplicateGroups?.groups);
+  const duplicateTotal = duplicateGroups?.total || 0;
+
   const [setUserRole, { loading: saving }] = useMutation(SET_USER_ROLE, {
     refetchQueries: [ROLE_CHANGES],
   });
@@ -245,170 +258,211 @@ export default function UsersAdminPage() {
           }
         />
 
-        <section className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                aria-label="Buscar usuários"
-                placeholder="Buscar por nome, e-mail ou usuário"
-                className="pl-9"
-                value={search}
-                maxLength={100}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
-            <Select
-              value={roleFilter}
-              onValueChange={(value) => {
-                setRoleFilter(value);
-                setPage(1);
-              }}
-            >
-              <SelectTrigger className="sm:w-56" aria-label="Filtrar por role">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_ROLES}>Todas as roles</SelectItem>
-                {roles.map((role) => (
-                  <SelectItem key={role.type} value={role.type}>
-                    {role.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <Tabs value={tab} onValueChange={setTab} className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="usuarios">Usuários</TabsTrigger>
+            <TabsTrigger value="cpfs">
+              CPFs duplicados{duplicateTotal > 0 ? ` (${duplicateTotal})` : ''}
+            </TabsTrigger>
+          </TabsList>
 
-          {error && (
-            <p className="text-sm text-destructive">Não foi possível carregar os usuários: {error.message}</p>
-          )}
-          {!error && loading && !users && <p className="text-sm text-muted-foreground">Carregando…</p>}
-
-          {users && (
-            <>
-              <div className="border rounded-lg overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Usuário</TableHead>
-                      <TableHead>Comunidades e eventos</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.items.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                          Nenhum usuário encontrado.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                    {users.items.map((row) => (
-                      <TableRow key={row.id}>
-                        <TableCell>
-                          {/* REA-52: the user's page (profile and e-mails). */}
-                          <GuardedLink href={adminUserHref(row.id)} className="font-medium text-primary hover:underline">
-                            {row.name || row.username || row.email || '—'}
-                          </GuardedLink>
-                          <div className="text-sm text-muted-foreground">{row.email}</div>
-                          {row.blocked && <Badge variant="destructive">Bloqueado</Badge>}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {/* REA-48: the communities it organizes and the events it manages. */}
-                          {row.communities.length > 0 && (
-                            <div>
-                              <span className="text-muted-foreground">Comunidades: </span>
-                              {titles(row.communities)}
-                            </div>
-                          )}
-                          {(row.events || []).length > 0 && (
-                            <div>
-                              <span className="text-muted-foreground">Eventos: </span>
-                              {titles(row.events)}
-                            </div>
-                          )}
-                          {row.communities.length === 0 && (row.events || []).length === 0 && '—'}
-                          {(() => {
-                            const warning = accessMismatch(
-                              row.role?.type,
-                              row.communities.length,
-                              (row.events || []).length,
-                            );
-                            return warning ? (
-                              <p
-                                className="mt-1 flex items-start gap-1 text-xs text-amber-600 dark:text-amber-400"
-                                data-testid={`access-warning-${row.id}`}
-                              >
-                                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                                {warning}
-                              </p>
-                            ) : null;
-                          })()}
-                        </TableCell>
-                        <TableCell>
-                          <Select
-                            value={row.role?.type || ''}
-                            disabled={saving || roles.length === 0}
-                            onValueChange={(roleType) => {
-                              if (roleType !== row.role?.type) setPending({ user: row, roleType });
-                            }}
-                          >
-                            <SelectTrigger
-                              className="w-48"
-                              aria-label={`Role de ${row.email || row.username}`}
-                            >
-                              <SelectValue placeholder={roleLabel(row.role?.type)}>
-                                <Badge variant={roleVariant(row.role?.type)}>{roleLabel(row.role?.type)}</Badge>
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              {roles.map((role) => (
-                                <SelectItem
-                                  key={role.type}
-                                  value={role.type}
-                                  // Your own admin role stays (the BFF refuses it too).
-                                  disabled={isMe(row) && row.role?.type === 'admin' && role.type !== 'admin'}
-                                >
-                                  {role.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {isMe(row) && <span className="ml-2 text-xs text-muted-foreground">você</span>}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" onClick={() => setHistoryUser(row)}>
-                            <History className="h-4 w-4 mr-1" /> Histórico
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+          <TabsContent value="usuarios" className="space-y-8">
+            {duplicateTotal > 0 && (
+              <div
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+                role="status"
+              >
+                <span className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  {duplicateTotal === 1
+                    ? 'Há 1 CPF em mais de uma conta.'
+                    : `Há ${duplicateTotal} CPFs em mais de uma conta.`}
+                </span>
+                <Button size="sm" variant="outline" onClick={() => setTab('cpfs')}>
+                  Ver CPFs duplicados
+                </Button>
               </div>
-              <Pager page={users.page} total={users.total} pageSize={users.pageSize} onPage={setPage} />
-            </>
-          )}
-        </section>
+            )}
 
-        {historyUser ? (
-          <div className="space-y-2">
-            <Button variant="link" className="px-0" onClick={() => setHistoryUser(null)}>
-              Ver o histórico de todos
-            </Button>
-            <RoleHistory
-              key={historyUser.id}
-              userId={historyUser.id}
-              title={`Histórico de ${historyUser.email || historyUser.username}`}
-            />
-          </div>
-        ) : (
-          <RoleHistory title="Histórico de trocas de role" />
-        )}
+            <section className="space-y-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    aria-label="Buscar usuários"
+                    placeholder="Buscar por nome, e-mail ou usuário"
+                    className="pl-9"
+                    value={search}
+                    maxLength={100}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setPage(1);
+                    }}
+                  />
+                </div>
+                <Select
+                  value={roleFilter}
+                  onValueChange={(value) => {
+                    setRoleFilter(value);
+                    setPage(1);
+                  }}
+                >
+                  <SelectTrigger className="sm:w-56" aria-label="Filtrar por role">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL_ROLES}>Todas as roles</SelectItem>
+                    {roles.map((role) => (
+                      <SelectItem key={role.type} value={role.type}>
+                        {role.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {error && (
+                <p className="text-sm text-destructive">Não foi possível carregar os usuários: {error.message}</p>
+              )}
+              {!error && loading && !users && <p className="text-sm text-muted-foreground">Carregando…</p>}
+
+              {users && (
+                <>
+                  <div className="border rounded-lg overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Usuário</TableHead>
+                          <TableHead>Comunidades e eventos</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {users.items.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                              Nenhum usuário encontrado.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                        {users.items.map((row) => (
+                          <TableRow key={row.id}>
+                            <TableCell>
+                              {/* REA-52: the user's page (profile and e-mails). */}
+                              <GuardedLink href={adminUserHref(row.id)} className="font-medium text-primary hover:underline">
+                                {row.name || row.username || row.email || '—'}
+                              </GuardedLink>
+                              <div className="text-sm text-muted-foreground">{row.email}</div>
+                              {row.blocked && <Badge variant="destructive">Bloqueado</Badge>}
+                              {duplicateIds.has(row.id) && (
+                                <Badge
+                                  variant="outline"
+                                  className="ml-1 border-amber-400 text-amber-700 dark:text-amber-300"
+                                  data-testid={`duplicate-cpf-${row.id}`}
+                                >
+                                  CPF duplicado
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {/* REA-48: the communities it organizes and the events it manages. */}
+                              {row.communities.length > 0 && (
+                                <div>
+                                  <span className="text-muted-foreground">Comunidades: </span>
+                                  {titles(row.communities)}
+                                </div>
+                              )}
+                              {(row.events || []).length > 0 && (
+                                <div>
+                                  <span className="text-muted-foreground">Eventos: </span>
+                                  {titles(row.events)}
+                                </div>
+                              )}
+                              {row.communities.length === 0 && (row.events || []).length === 0 && '—'}
+                              {(() => {
+                                const warning = accessMismatch(
+                                  row.role?.type,
+                                  row.communities.length,
+                                  (row.events || []).length,
+                                );
+                                return warning ? (
+                                  <p
+                                    className="mt-1 flex items-start gap-1 text-xs text-amber-600 dark:text-amber-400"
+                                    data-testid={`access-warning-${row.id}`}
+                                  >
+                                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                    {warning}
+                                  </p>
+                                ) : null;
+                              })()}
+                            </TableCell>
+                            <TableCell>
+                              <Select
+                                value={row.role?.type || ''}
+                                disabled={saving || roles.length === 0}
+                                onValueChange={(roleType) => {
+                                  if (roleType !== row.role?.type) setPending({ user: row, roleType });
+                                }}
+                              >
+                                <SelectTrigger
+                                  className="w-48"
+                                  aria-label={`Role de ${row.email || row.username}`}
+                                >
+                                  <SelectValue placeholder={roleLabel(row.role?.type)}>
+                                    <Badge variant={roleVariant(row.role?.type)}>{roleLabel(row.role?.type)}</Badge>
+                                  </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {roles.map((role) => (
+                                    <SelectItem
+                                      key={role.type}
+                                      value={role.type}
+                                      // Your own admin role stays (the BFF refuses it too).
+                                      disabled={isMe(row) && row.role?.type === 'admin' && role.type !== 'admin'}
+                                    >
+                                      {role.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {isMe(row) && <span className="ml-2 text-xs text-muted-foreground">você</span>}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="sm" onClick={() => setHistoryUser(row)}>
+                                <History className="h-4 w-4 mr-1" /> Histórico
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <Pager page={users.page} total={users.total} pageSize={users.pageSize} onPage={setPage} />
+                </>
+              )}
+            </section>
+
+            {historyUser ? (
+              <div className="space-y-2">
+                <Button variant="link" className="px-0" onClick={() => setHistoryUser(null)}>
+                  Ver o histórico de todos
+                </Button>
+                <RoleHistory
+                  key={historyUser.id}
+                  userId={historyUser.id}
+                  title={`Histórico de ${historyUser.email || historyUser.username}`}
+                />
+              </div>
+            ) : (
+              <RoleHistory title="Histórico de trocas de role" />
+            )}
+          </TabsContent>
+
+          <TabsContent value="cpfs">
+            <DuplicateCpfGroups />
+          </TabsContent>
+        </Tabs>
 
         <AlertDialog open={!!pending} onOpenChange={(open) => !open && setPending(null)}>
           <AlertDialogContent>

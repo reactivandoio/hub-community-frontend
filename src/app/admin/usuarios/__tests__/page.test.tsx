@@ -34,6 +34,17 @@ const historyResult = {
   loading: false,
 };
 
+// REA-96: Bia shares her CPF with another account.
+const duplicatesResult = {
+  data: {
+    adminDuplicateCpfGroups: {
+      total: 1,
+      groups: [{ id: '5-9', suggestedKeepId: '5', suggestionReason: 'Tem mais vínculos.', users: [{ id: '5' }, { id: '9' }] }],
+    },
+  },
+  loading: false,
+};
+
 vi.mock('@/contexts/auth-context', () => ({ useAuth: () => ({ user: { email: 'root@x.io' } }) }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
 vi.mock('@/hooks/use-debounce', () => ({ useDebounce: (value: unknown) => value }));
@@ -48,6 +59,7 @@ vi.mock('@apollo/client', async (importOriginal) => {
         return usersResult;
       }
       if (name(doc) === 'AdminRoles') return rolesResult;
+      if (name(doc) === 'AdminDuplicateCpfGroups') return duplicatesResult;
       return historyResult;
     },
     useMutation: () => [setUserRole, { loading: false }],
@@ -126,5 +138,13 @@ describe('UsuariosPage — comunidades e eventos (REA-48)', () => {
     // Eva manages an event as Event Manager: fine.
     expect(screen.queryByTestId('access-warning-7')).not.toBeInTheDocument();
     expect(screen.queryByTestId('access-warning-1')).not.toBeInTheDocument();
+  });
+
+  it('REA-96: warns about duplicate CPFs and marks the accounts', () => {
+    render(<UsersAdminPage />);
+    expect(screen.getByRole('status')).toHaveTextContent('Há 1 CPF em mais de uma conta.');
+    expect(screen.getByTestId('duplicate-cpf-5')).toHaveTextContent('CPF duplicado');
+    expect(screen.queryByTestId('duplicate-cpf-1')).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'CPFs duplicados (1)' })).toBeInTheDocument();
   });
 });

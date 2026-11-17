@@ -1281,3 +1281,66 @@ export interface AdminEmailQueue {
   schedule_truncated: boolean;
   dob_requests?: AgeReviewPage | null;
 }
+
+// REA-96: accounts sharing a CPF and joining them (admin only).
+export interface AdminMergeLink {
+  label: string;
+  count: number;
+}
+
+export interface AdminMergeUser {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  created_at?: string | null;
+  last_login_at?: string | null;
+  blocked: boolean;
+  role?: string | null;
+  isAdmin: boolean;
+  isManager: boolean;
+  signups: number;
+  certificates: number;
+  links: number;
+  linkDetails: AdminMergeLink[];
+}
+
+export interface AdminDuplicateCpfGroup {
+  id: string;
+  suggestedKeepId?: string | null;
+  suggestionReason: string;
+  users: AdminMergeUser[];
+}
+
+export interface AdminMergeAccount {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  role?: string | null;
+  blocked: boolean;
+}
+
+export interface AdminMergePreview {
+  keep?: AdminMergeAccount | null;
+  drop?: AdminMergeAccount | null;
+  blockers: string[];
+  canMerge: boolean;
+  links: AdminMergeLink[];
+  certificatesByEmail: number;
+  requestsByEmail: number;
+  filledFields: string[];
+  signupsToMove: number;
+  signupConflicts: number;
+}
+
+export interface AdminMergeResult {
+  keepUserId: string;
+  linksMoved: AdminMergeLink[];
+  certificatesByEmail: number;
+  requestsByEmail: number;
+  filledFields: string[];
+  signupsMoved: number;
+  signupsKept: number;
+  signupsFailed: number;
+  recorded: boolean;
+  message: string;
+}
