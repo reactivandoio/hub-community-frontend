@@ -309,6 +309,15 @@ src/
   nothing. Organizers of any of the event's communities manage it. The public event page already
   lists every community.
 
+- **Excluir conta (REA-65)** — `/excluir-conta` (`components/account-deletion/delete-account-view.tsx`,
+  texts and rules in `lib/account-deletion.ts`), the web link Google Play asks for; linked in the footer
+  and in `/privacy`. It explains what is deleted and what is kept (app spec REA-58 §5: the BFF anonymizes,
+  keeps payments, certificates and votes), asks for the login in place (`LoginRequired`), sends a fresh
+  code to the account's e-mail (`requestLoginCode`) and confirms with `DELETE_MY_ACCOUNT(code)`; the BFF
+  message shows on a wrong/expired code; success runs `signOut` and shows "Conta excluída". Signups that
+  stop being valid come from `MY_SIGNUPS` (`signupsLostOnDeletion`); while the BFF lacks `mySignups` the
+  query fails and the list is left out.
+
 ### Provider Hierarchy (layout.tsx)
 FirebaseProvider → ApolloProvider → AuthProvider → LoginPromptProvider → LogoutModalWrapper → AgendaProvider → FilterProvider → ThemeProvider → children
 

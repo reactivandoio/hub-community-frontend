@@ -90,6 +90,11 @@ export function Footer() {
                       Termos
                     </Link>
                   </li>
+                  <li>
+                    <Link href="/excluir-conta" className="hover:text-white transition-colors">
+                      Excluir conta
+                    </Link>
+                  </li>
                 </ul>
               </div>
             </div>

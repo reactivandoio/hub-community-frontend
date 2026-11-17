@@ -589,6 +589,39 @@ export const VERIFY_LOGIN_CODE = gql`
   }
 `;
 
+// REA-65 (spec REA-58 §4.2): deletes (anonymizes) the signed-in user's account. Needs a fresh login
+// code sent to the account's e-mail (REQUEST_LOGIN_CODE), so a stolen token alone cannot delete it.
+// Errors: UNAUTHENTICATED, LOGIN_CODE_INVALID, LOGIN_CODE_EXPIRED, RATE_LIMITED.
+export const DELETE_MY_ACCOUNT = gql`
+  mutation DeleteMyAccount($code: String!) {
+    deleteMyAccount(code: $code) {
+      success
+      message
+    }
+  }
+`;
+
+// REA-58 §4.1 (B1): the signed-in user's signups, by the token's e-mail. The account deletion page
+// only reads what it needs to warn about tickets that stop being valid; while the BFF does not
+// have the query yet, the page leaves the list out.
+export const MY_SIGNUPS = gql`
+  query MySignups {
+    mySignups {
+      id
+      product_name
+      payment_status
+      holds_place
+      event {
+        id
+        slug
+        title
+        start_date
+        end_date
+      }
+    }
+  }
+`;
+
 // The authenticated user's own profile, read fresh from the server.
 export const ME = gql`
   query Me {
