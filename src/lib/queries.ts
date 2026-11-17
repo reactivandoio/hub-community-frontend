@@ -2390,3 +2390,92 @@ export const ADMIN_EMAIL_QUEUE = gql`
     }
   }
 `;
+
+// REA-96 (admin only): accounts sharing a CPF (never the CPF itself), with a suggestion of which
+// stays, and joining two accounts of the same person.
+const ADMIN_MERGE_USER_FIELDS = `
+  id
+  name
+  email
+  created_at
+  last_login_at
+  blocked
+  role
+  isAdmin
+  isManager
+  signups
+  certificates
+  links
+  linkDetails {
+    label
+    count
+  }
+`;
+
+export const ADMIN_DUPLICATE_CPF_GROUPS = gql`
+  query AdminDuplicateCpfGroups {
+    adminDuplicateCpfGroups {
+      total
+      groups {
+        id
+        suggestedKeepId
+        suggestionReason
+        users {
+          ${ADMIN_MERGE_USER_FIELDS}
+        }
+      }
+    }
+  }
+`;
+
+export const ADMIN_MERGE_PREVIEW = gql`
+  query AdminMergePreview($keepUserId: ID!, $dropUserId: ID!) {
+    adminMergePreview(keepUserId: $keepUserId, dropUserId: $dropUserId) {
+      keep {
+        id
+        name
+        email
+        role
+        blocked
+      }
+      drop {
+        id
+        name
+        email
+        role
+        blocked
+      }
+      blockers
+      canMerge
+      links {
+        label
+        count
+      }
+      certificatesByEmail
+      requestsByEmail
+      filledFields
+      signupsToMove
+      signupConflicts
+    }
+  }
+`;
+
+export const ADMIN_MERGE_USERS = gql`
+  mutation AdminMergeUsers($keepUserId: ID!, $dropUserId: ID!) {
+    adminMergeUsers(keepUserId: $keepUserId, dropUserId: $dropUserId) {
+      keepUserId
+      linksMoved {
+        label
+        count
+      }
+      certificatesByEmail
+      requestsByEmail
+      filledFields
+      signupsMoved
+      signupsKept
+      signupsFailed
+      recorded
+      message
+    }
+  }
+`;
