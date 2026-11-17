@@ -211,7 +211,20 @@ export default function PrivacyPage() {
                   {section.title}
                 </h2>
                 <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
-                  {section.id === 'cookies' ? (
+                  {section.id === 'direitos' ? (
+                    <>
+                      {section.content}
+                      {'\n\n'}Você também pode excluir a sua conta a qualquer momento, sem
+                      precisar nos escrever, na página{' '}
+                      <Link
+                        href="/excluir-conta"
+                        className="text-primary hover:underline font-medium"
+                      >
+                        Excluir conta
+                      </Link>
+                      , que mostra o que é apagado e o que fica.
+                    </>
+                  ) : section.id === 'cookies' ? (
                     <>
                       Utilizamos cookies e tecnologias similares para coletar
                       informações sobre sua interação com a Plataforma. As
@@ -255,6 +268,12 @@ export default function PrivacyPage() {
                 className="text-primary hover:underline font-medium"
               >
                 Política de Cookies
+              </Link>
+              <Link
+                href="/excluir-conta"
+                className="text-primary hover:underline font-medium"
+              >
+                Excluir conta
               </Link>
             </div>
           </div>
